@@ -2,7 +2,7 @@
 
 ## Fase 1 — MVP orologio
 
-- Scheletro progetto, `Makefile`, font OFL (IBM Plex Sans Bold) in `assets/`.
+- Scheletro progetto, `Makefile`, font OFL (IBM Plex Sans Condensed Bold) in `assets/`.
 - Finestra SDL3 su Wayland, app-id `flipclock`, HiDPI, ridimensionabile.
 - Tessere + cifre pre-renderizzate, layout `HH:MM` e `HH:MM:SS`.
 - Animazione flip (sezione 3 di `02-design-grafico.md`).

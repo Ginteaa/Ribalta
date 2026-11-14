@@ -63,7 +63,7 @@ Fliqlo_linux/
 ├── README.md
 ├── docs/
 ├── assets/
-│   ├── font.ttf          (IBM Plex Sans Bold, OFL) + OFL.txt
+│   ├── font.ttf          (IBM Plex Sans Condensed Bold, OFL) + OFL.txt
 │   └── ding.wav          (suono fine timer, breve, libero da diritti)
 └── src/
     ├── main.c            init SDL, loop eventi, dispatch tasti, scelta del timeout

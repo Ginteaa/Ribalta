@@ -137,16 +137,20 @@ static bool build_glyphs(Render *r)
     for (int pass = 0; pass < 2; pass++) {
         f = open_font_for(r->font_path, '0', target, &top_off);
         if (!f) { SDL_Log("render: font open failed: %s", SDL_GetError()); return false; }
+        /* larghezza d'inchiostro (senza spazi laterali) della cifra più larga */
         maxw = 0;
         for (int d = 0; d < 10; d++) {
-            int w = 0, h = 0;
-            if (TTF_GetStringSize(f, (char[]){(char)('0' + d), 0}, 1, &w, &h) && (float)w > maxw) maxw = (float)w;
+            int minx, maxx, miny, maxy, adv;
+            if (TTF_GetGlyphMetrics(f, (Uint32)('0' + d), &minx, &maxx, &miny, &maxy, &adv)
+                && (float)(maxx - minx) > maxw)
+                maxw = (float)(maxx - minx);
         }
-        /* le due cifre devono stare nella tessera: se no, riduci l'altezza */
-        float lim = 0.84f * (float)r->tw;
-        if (pass == 0 && maxw * 2.0f > lim) { target *= lim / (maxw * 2.0f); TTF_CloseFont(f); f = NULL; }
-        else break;
+        /* cella = inchiostro + 10% di spaziatura; due celle entro l'86% della tessera */
+        float cell = maxw * 1.10f, lim = 0.86f * (float)r->tw;
+        if (pass == 0 && cell * 2.0f > lim) { target *= lim / (cell * 2.0f); TTF_CloseFont(f); f = NULL; }
+        else { r->cell_w = cell; break; }
     }
+    float cell_w = r->cell_w;
     maxw = 0;
     for (int d = 0; d < 10; d++) {
         SDL_Surface *s = TTF_RenderGlyph_Blended(f, (Uint32)('0' + d), col);
@@ -158,7 +162,8 @@ static bool build_glyphs(Render *r)
         SDL_DestroySurface(s);
         if (r->dig[d]) SDL_SetTextureScaleMode(r->dig[d], SDL_SCALEMODE_LINEAR);
     }
-    r->cell_w = maxw;
+    (void)maxw;
+    r->cell_w = cell_w;
     r->ink_cy = (float)top_off;
     TTF_CloseFont(f);
 
