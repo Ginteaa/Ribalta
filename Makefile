@@ -32,10 +32,12 @@ release: clean
 install: release
 	install -Dm755 $(BIN) $(PREFIX)/bin/$(BIN)
 	install -Dm644 ribalta.desktop $(PREFIX)/share/applications/ribalta.desktop
-	install -Dm644 -t $(PREFIX)/share/ribalta assets/font.ttf assets/OFL.txt assets/ding.wav
+	install -Dm644 -t $(PREFIX)/share/ribalta assets/font.ttf assets/OFL.txt assets/ding.wav assets/ribalta.svg
+	install -Dm644 assets/ribalta.svg $(PREFIX)/share/icons/hicolor/scalable/apps/ribalta.svg
 
 uninstall:
-	rm -rf $(PREFIX)/bin/$(BIN) $(PREFIX)/share/ribalta $(PREFIX)/share/applications/ribalta.desktop
+	rm -rf $(PREFIX)/bin/$(BIN) $(PREFIX)/share/ribalta $(PREFIX)/share/applications/ribalta.desktop \
+	      $(PREFIX)/share/icons/hicolor/scalable/apps/ribalta.svg
 
 clean:
 	rm -rf build $(BIN)

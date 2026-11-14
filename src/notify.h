@@ -7,9 +7,10 @@
  * Nessun costo a riposo: niente thread, il sottosistema audio è aperto solo mentre suona. */
 
 /* wav_path: percorso di ding.wav, o NULL se assente (il suono viene saltato). */
-void notify_init(const char *wav_path);
+/* icon_path: percorso dell'icona (ribalta.svg) per le notifiche, o NULL -> icona di tema "alarm-clock". */
+void notify_init(const char *wav_path, const char *icon_path);
 
-/* Lancia `notify-send -a ribalta -i alarm-clock <title> <body>` senza bloccare
+/* Lancia `notify-send -a Ribalta -i <icona> <title> <body>` senza bloccare
  * (posix_spawnp). Se notify-send manca, fallisce in silenzio. */
 void notify_desktop(const char *title, const char *body);
 

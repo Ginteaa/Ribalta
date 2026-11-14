@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/ribalta.svg" alt="Ribalta icon" width="112">
+</p>
+
 <h1 align="center">Ribalta</h1>
 
 <p align="center">
@@ -75,7 +79,7 @@ make install    # installs to ~/.local (runs a release build first)
 ```
 
 `make install` puts the binary in `~/.local/bin/ribalta`, the launcher in
-`~/.local/share/applications/ribalta.desktop` and the assets (font, licence, chime) in
+`~/.local/share/applications/ribalta.desktop` and the assets (font, licence, chime, icon) in
 `~/.local/share/ribalta`. Use `PREFIX=/usr make install` (as root) for a system-wide install, and
 `make uninstall` (with the same `PREFIX`) to remove everything. Make sure `~/.local/bin` is in
 your `PATH`.

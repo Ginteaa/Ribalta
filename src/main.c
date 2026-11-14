@@ -740,7 +740,9 @@ static bool app_open(App *a, const char *font_path)
     pomo_init(&a->pomo, &a->cfg);
     a->applied_color = COLOR_DEFAULT;
     char wav[1024];
-    notify_init(settings_find_asset("ding.wav", wav, sizeof wav) ? wav : NULL);
+    char icon[1024];
+    notify_init(settings_find_asset("ding.wav", wav, sizeof wav) ? wav : NULL,
+                settings_find_asset("ribalta.svg", icon, sizeof icon) ? icon : NULL);
     if (!a->screensaver) {
         a->ui = ui_settings_create(a->ren, font_path);
         a->sui = ui_stats_create(a->ren, font_path);

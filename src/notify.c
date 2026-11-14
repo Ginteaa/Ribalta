@@ -4,6 +4,8 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <errno.h>
+#include <stdio.h>
+#include <unistd.h>
 
 extern char **environ;
 
@@ -11,6 +13,7 @@ extern char **environ;
 #define POLL_MS 100
 
 static char        g_wav_path[1024];
+static char        g_icon[1024] = "alarm-clock";
 static bool        g_have_wav;
 static pid_t       g_children[MAX_CHILDREN];
 static int         g_nchildren;
@@ -21,8 +24,18 @@ static Uint8            *g_wav_buf;
 static bool              g_drained;    /* coda vuota: un ultimo giro di grazia */
 static Uint64            g_deadline;   /* ms (SDL_GetTicks) oltre cui chiudere comunque */
 
-void notify_init(const char *wav_path) {
+void notify_init(const char *wav_path, const char *icon_path) {
     g_have_wav = false;
+    /* il demone delle notifiche vuole un percorso assoluto (l'asset può essere "./assets/...") */
+    char cwd[512];
+    if (icon_path && icon_path[0] == '/' && SDL_strlen(icon_path) < sizeof g_icon)
+        SDL_strlcpy(g_icon, icon_path, sizeof g_icon);
+    else if (icon_path && icon_path[0] && getcwd(cwd, sizeof cwd)) {
+        const char *rel = (icon_path[0] == '.' && icon_path[1] == '/') ? icon_path + 2 : icon_path;
+        int n = snprintf(g_icon, sizeof g_icon, "%s/%s", cwd, rel);
+        if (n < 0 || (size_t)n >= sizeof g_icon)
+            SDL_strlcpy(g_icon, "alarm-clock", sizeof g_icon);
+    }
     g_nchildren = 0;
     if (wav_path && wav_path[0] && SDL_strlen(wav_path) < sizeof g_wav_path) {
         SDL_strlcpy(g_wav_path, wav_path, sizeof g_wav_path);
@@ -32,7 +45,7 @@ void notify_init(const char *wav_path) {
 
 void notify_desktop(const char *title, const char *body) {
     if (g_nchildren >= MAX_CHILDREN) return;
-    char *argv[] = { "notify-send", "-a", "Ribalta", "-i", "alarm-clock", "-u", "normal",
+    char *argv[] = { "notify-send", "-a", "Ribalta", "-i", g_icon, "-u", "normal",
                      (char *)(title ? title : ""), (char *)(body ? body : ""), NULL };
     pid_t pid;
     int rc = posix_spawnp(&pid, "notify-send", NULL, NULL, argv, environ);
