@@ -1,5 +1,5 @@
-#ifndef FLIPCLOCK_CLOCK_H
-#define FLIPCLOCK_CLOCK_H
+#ifndef RIBALTA_CLOCK_H
+#define RIBALTA_CLOCK_H
 #include <stdbool.h>
 #include <stdint.h>
 #include "settings.h"

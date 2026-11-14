@@ -3,7 +3,7 @@
 ## Fase 1 — MVP orologio
 
 - Scheletro progetto, `Makefile`, font OFL (IBM Plex Sans Condensed Bold) in `assets/`.
-- Finestra SDL3 su Wayland, app-id `flipclock`, HiDPI, ridimensionabile.
+- Finestra SDL3 su Wayland, app-id `ribalta`, HiDPI, ridimensionabile.
 - Tessere + cifre pre-renderizzate, layout `HH:MM` e `HH:MM:SS`.
 - Animazione flip (sezione 3 di `02-design-grafico.md`).
 - Loop guidato dagli eventi con risveglio al prossimo minuto/secondo.
@@ -19,7 +19,7 @@
 - Barra di avanzamento, etichette `TIMER`/`PAUSA`.
 - Notifica `notify-send` + suono `ding.wav`.
 - Pannello impostazioni in overlay con tutte le voci.
-- File `flipclock.desktop` e target `make install`.
+- File `ribalta.desktop` e target `make install`.
 
 **Fatto quando**: un timer da 2 minuti termina con notifica e suono; il countdown non accumula
 errore (±1 s su 1 h); le impostazioni sopravvivono a un riavvio.
@@ -44,7 +44,7 @@ errore (±1 s su 1 h); le impostazioni sopravvivono a un riavvio.
   `pomodoro_auto_continue` (bool).
 
 ### 3.2 Statistiche di studio (tasto `I`)
-- File `$XDG_DATA_HOME/flipclock/sessions.csv` (fallback `~/.local/share/flipclock/`), una riga
+- File `$XDG_DATA_HOME/ribalta/sessions.csv` (fallback `~/.local/share/ribalta/`), una riga
   per sessione: `inizio_iso8601_locale,durata_secondi,tipo,completata` con tipo `timer|pomodoro`.
   Prima riga di intestazione se il file è nuovo.
 - Cosa si registra (solo tempo di studio, mai i riposi), se la durata studiata è ≥ 60 s:
@@ -58,12 +58,12 @@ errore (±1 s su 1 h); le impostazioni sopravvivono a un riavvio.
 - Il file viene letto solo all'apertura del pannello; font e texture solo mentre è aperto.
 
 ### 3.3 Modalità screensaver
-- `flipclock --screensaver`: schermo intero, cursore nascosto subito; esce con qualsiasi tasto,
+- `ribalta --screensaver`: schermo intero, cursore nascosto subito; esce con qualsiasi tasto,
   clic o movimento del mouse (ignorando gli eventi del primo secondo). Non salva nulla.
-- `flipclock --help` mostra le opzioni.
+- `ribalta --help` mostra le opzioni.
 - Avvio automatico dopo inattività con `swayidle` (README con esempio per niri:
-  `spawn-at-startup "swayidle" "-w" "timeout" "300" "flipclock --screensaver"`).
-  Se flipclock è già aperto, l'istanza screensaver esce subito (istanza singola).
+  `spawn-at-startup "swayidle" "-w" "timeout" "300" "ribalta --screensaver"`).
+  Se ribalta è già aperto, l'istanza screensaver esce subito (istanza singola).
 - **Blocco dello spegnimento schermo**: mentre un timer o un Pomodoro è IN CORSO l'app chiama
   `SDL_DisableScreenSaver()` (idle-inhibit su Wayland); quando nessuno è in corso
   `SDL_EnableScreenSaver()`.

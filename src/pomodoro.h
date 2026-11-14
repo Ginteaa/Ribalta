@@ -1,5 +1,5 @@
-#ifndef FLIPCLOCK_POMODORO_H
-#define FLIPCLOCK_POMODORO_H
+#ifndef RIBALTA_POMODORO_H
+#define RIBALTA_POMODORO_H
 #include <stdbool.h>
 #include <stdint.h>
 #include <SDL3/SDL.h>

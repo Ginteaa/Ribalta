@@ -59,7 +59,7 @@ Ogni modifica è applicata subito e salvata alla chiusura del pannello.
 | `start_fullscreen` | bool | `false` | Avvio a schermo intero |
 | `animations` | bool | `true` | Se false, le cifre cambiano senza animazione (consumo minimo) |
 
-File: `~/.config/flipclock/config.ini` (rispetta `$XDG_CONFIG_HOME`). Formato `chiave=valore`,
+File: `~/.config/ribalta/config.ini` (rispetta `$XDG_CONFIG_HOME`). Formato `chiave=valore`,
 righe con `#` ignorate, chiavi sconosciute ignorate, valori non validi → default.
 Se il file non esiste viene creato al primo salvataggio.
 
@@ -83,7 +83,7 @@ Il cursore del mouse si nasconde dopo 2 s di inattività in schermo intero.
 
 ## 3. Finestra
 
-- Titolo `flipclock`, app-id Wayland `flipclock` (per regole del compositor, es. niri `window-rule`).
+- Titolo `ribalta`, app-id Wayland `ribalta` (per regole del compositor, es. niri `window-rule`).
 - Ridimensionabile; il layout si adatta mantenendo le proporzioni e restando centrato.
 - Dimensione iniziale 960×400 (logici), supporto HiDPI (`SDL_WINDOW_HIGH_PIXEL_DENSITY`).
 

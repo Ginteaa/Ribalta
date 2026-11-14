@@ -1,5 +1,5 @@
-#ifndef FLIPCLOCK_SETTINGS_H
-#define FLIPCLOCK_SETTINGS_H
+#ifndef RIBALTA_SETTINGS_H
+#define RIBALTA_SETTINGS_H
 #include <stdbool.h>
 #include <stddef.h>
 
@@ -24,7 +24,7 @@ typedef struct {
 
 void settings_defaults(Settings *s);
 
-/* Legge $XDG_CONFIG_HOME/flipclock/config.ini (fallback ~/.config/...).
+/* Legge $XDG_CONFIG_HOME/ribalta/config.ini (fallback ~/.config/...).
  * Applica prima i default; chiavi sconosciute/valori non validi ignorati.
  * Ritorna false se il file non esiste o non è leggibile (s resta coi default). */
 bool settings_load(Settings *s);
@@ -33,10 +33,10 @@ bool settings_load(Settings *s);
 bool settings_save(const Settings *s);
 
 /* Cerca un file asset (es. "font.ttf") in ordine:
- * $FLIPCLOCK_DATA, ./assets, <dir dell'eseguibile>/assets,
- * $XDG_DATA_HOME/flipclock (fallback ~/.local/share/flipclock), /usr/share/flipclock.
+ * $RIBALTA_DATA, ./assets, <dir dell'eseguibile>/assets,
+ * $XDG_DATA_HOME/ribalta (fallback ~/.local/share/ribalta), /usr/share/ribalta.
  * Scrive il percorso trovato in out. Ritorna false se non trovato. */
-/* Directory dati: $XDG_DATA_HOME/flipclock (fallback ~/.local/share/flipclock), creata se manca.
+/* Directory dati: $XDG_DATA_HOME/ribalta (fallback ~/.local/share/ribalta), creata se manca.
  * Ritorna false su errore. */
 bool settings_data_dir(char *out, size_t out_size);
 

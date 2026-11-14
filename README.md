@@ -1,4 +1,4 @@
-# flipclock
+# Ribalta
 
 Orologio flip leggero per Linux (Wayland/X11), scritto in C17 con SDL3 e SDL3_ttf.
 Mostra l'ora a tessere animate e include un timer di studio (da 0h01 a 23h59) che
@@ -37,7 +37,7 @@ make uninstall
 
 ## Configurazione
 
-File `~/.config/flipclock/config.ini` (rispetta `$XDG_CONFIG_HOME`), formato `chiave=valore`:
+File `~/.config/ribalta/config.ini` (rispetta `$XDG_CONFIG_HOME`), formato `chiave=valore`:
 
 | Chiave | Default | Descrizione |
 |---|---|---|
@@ -69,27 +69,27 @@ e possono girare entrambi in background.
 ## Statistiche
 
 Le sessioni di studio (timer e fasi STUDIO del Pomodoro, mai i riposi, solo se durano almeno 60 s)
-sono registrate in `$XDG_DATA_HOME/flipclock/sessions.csv` (default `~/.local/share/flipclock/sessions.csv`),
+sono registrate in `$XDG_DATA_HOME/ribalta/sessions.csv` (default `~/.local/share/ribalta/sessions.csv`),
 una riga per sessione: `inizio_iso8601_locale,durata_secondi,tipo,completata`.
 `I` mostra oggi, ultimi 7 giorni, mese, giorni consecutivi e sessioni completate.
 
 ## Screensaver
 
 ```sh
-flipclock --screensaver
+ribalta --screensaver
 ```
 
 Schermo intero con cursore nascosto; esce con qualsiasi tasto, clic o movimento del mouse
-(gli eventi del primo secondo sono ignorati). Non salva nulla. Se flipclock è già aperto,
+(gli eventi del primo secondo sono ignorati). Non salva nulla. Se ribalta è già aperto,
 l'istanza screensaver esce subito. Esempio con `swayidle` in niri (`config.kdl`):
 
 ```kdl
-spawn-at-startup "swayidle" "-w" "timeout" "300" "flipclock --screensaver"
+spawn-at-startup "swayidle" "-w" "timeout" "300" "ribalta --screensaver"
 ```
 
 Mentre un timer o un Pomodoro è in corso, l'app impedisce lo spegnimento dello schermo (idle-inhibit).
 
-`flipclock --help` mostra le opzioni.
+`ribalta --help` mostra le opzioni.
 
 ## Documentazione
 

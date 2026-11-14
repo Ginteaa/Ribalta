@@ -1,9 +1,9 @@
 [Desktop Entry]
 Type=Application
-Name=flipclock
+Name=Ribalta
 Comment=Orologio flip con timer di studio
-Exec=flipclock
+Exec=ribalta
 Icon=alarm-clock
 Categories=Utility;Clock;
-StartupWMClass=flipclock
+StartupWMClass=ribalta
 Terminal=false

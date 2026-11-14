@@ -35,11 +35,11 @@ static bool xdg_dir(char *out, size_t n, const char *env, const char *home_sub)
 {
     const char *x = getenv(env);
     if (x && x[0] == '/')
-        return snprintf(out, n, "%s/flipclock", x) < (int)n;
+        return snprintf(out, n, "%s/ribalta", x) < (int)n;
     const char *h = getenv("HOME");
     if (!h || !h[0])
         return false;
-    return snprintf(out, n, "%s/%s/flipclock", h, home_sub) < (int)n;
+    return snprintf(out, n, "%s/%s/ribalta", h, home_sub) < (int)n;
 }
 
 static bool config_path(char *out, size_t n, bool dir_only)
@@ -160,7 +160,7 @@ bool settings_save(const Settings *s)
     if (!f)
         return false;
 #define B(x) ((x) ? "true" : "false")
-    fprintf(f, "# flipclock config\n");
+    fprintf(f, "# ribalta config\n");
     fprintf(f, "show_seconds=%s\n", B(s->show_seconds));
     fprintf(f, "clock_24h=%s\n", B(s->clock_24h));
     fprintf(f, "timer_default_minutes=%d\n", s->timer_default_minutes);
@@ -210,7 +210,7 @@ static bool try_dir(const char *dir, const char *name, char *out, size_t n)
 bool settings_find_asset(const char *name, char *out, size_t out_size)
 {
     char d[PATH_MAX_LEN];
-    if (try_dir(getenv("FLIPCLOCK_DATA"), name, out, out_size))
+    if (try_dir(getenv("RIBALTA_DATA"), name, out, out_size))
         return true;
     if (try_dir("./assets", name, out, out_size))
         return true;
@@ -220,5 +220,5 @@ bool settings_find_asset(const char *name, char *out, size_t out_size)
         return true;
     if (xdg_dir(d, sizeof d, "XDG_DATA_HOME", ".local/share") && try_dir(d, name, out, out_size))
         return true;
-    return try_dir("/usr/share/flipclock", name, out, out_size);
+    return try_dir("/usr/share/ribalta", name, out, out_size);
 }

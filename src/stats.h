@@ -1,5 +1,5 @@
-#ifndef FLIPCLOCK_STATS_H
-#define FLIPCLOCK_STATS_H
+#ifndef RIBALTA_STATS_H
+#define RIBALTA_STATS_H
 #include <stdbool.h>
 #include <time.h>
 

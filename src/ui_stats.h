@@ -1,5 +1,5 @@
-#ifndef FLIPCLOCK_UI_STATS_H
-#define FLIPCLOCK_UI_STATS_H
+#ifndef RIBALTA_UI_STATS_H
+#define RIBALTA_UI_STATS_H
 #include <stdbool.h>
 #include <SDL3/SDL.h>
 

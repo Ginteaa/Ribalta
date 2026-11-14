@@ -1,5 +1,5 @@
-#ifndef FLIPCLOCK_RENDER_H
-#define FLIPCLOCK_RENDER_H
+#ifndef RIBALTA_RENDER_H
+#define RIBALTA_RENDER_H
 #include <stdbool.h>
 #include <SDL3/SDL.h>
 

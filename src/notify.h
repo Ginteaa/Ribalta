@@ -1,5 +1,5 @@
-#ifndef FLIPCLOCK_NOTIFY_H
-#define FLIPCLOCK_NOTIFY_H
+#ifndef RIBALTA_NOTIFY_H
+#define RIBALTA_NOTIFY_H
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -9,7 +9,7 @@
 /* wav_path: percorso di ding.wav, o NULL se assente (il suono viene saltato). */
 void notify_init(const char *wav_path);
 
-/* Lancia `notify-send -a flipclock -i alarm-clock <title> <body>` senza bloccare
+/* Lancia `notify-send -a ribalta -i alarm-clock <title> <body>` senza bloccare
  * (posix_spawnp). Se notify-send manca, fallisce in silenzio. */
 void notify_desktop(const char *title, const char *body);
 

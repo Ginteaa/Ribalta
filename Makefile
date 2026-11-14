@@ -5,7 +5,7 @@ override CFLAGS += $(shell pkg-config --cflags $(PKGS)) -D_POSIX_C_SOURCE=200809
 override LDLIBS += $(shell pkg-config --libs $(PKGS)) -lm
 SRC     := $(wildcard src/*.c)
 OBJ     := $(SRC:src/%.c=build/%.o)
-BIN     := flipclock
+BIN     := ribalta
 PREFIX  ?= $(HOME)/.local
 
 all: $(BIN)
@@ -31,11 +31,11 @@ release: clean
 
 install: release
 	install -Dm755 $(BIN) $(PREFIX)/bin/$(BIN)
-	install -Dm644 flipclock.desktop $(PREFIX)/share/applications/flipclock.desktop
-	install -Dm644 -t $(PREFIX)/share/flipclock assets/font.ttf assets/OFL.txt assets/ding.wav
+	install -Dm644 ribalta.desktop $(PREFIX)/share/applications/ribalta.desktop
+	install -Dm644 -t $(PREFIX)/share/ribalta assets/font.ttf assets/OFL.txt assets/ding.wav
 
 uninstall:
-	rm -rf $(PREFIX)/bin/$(BIN) $(PREFIX)/share/flipclock $(PREFIX)/share/applications/flipclock.desktop
+	rm -rf $(PREFIX)/bin/$(BIN) $(PREFIX)/share/ribalta $(PREFIX)/share/applications/ribalta.desktop
 
 clean:
 	rm -rf build $(BIN)

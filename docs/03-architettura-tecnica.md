@@ -61,16 +61,16 @@
      fino al prossimo confine di minuto/secondo, +5 ms di margine.
    - Timer: `SDL_GetTicksNS()` (monotono); si memorizza l'istante di fine, non si decrementa un contatore.
 5. **Nessun thread aggiuntivo**, nessuna allocazione dinamica nel ciclo principale.
-6. **Hint SDL**: `SDL_HINT_VIDEO_DRIVER="wayland,x11"`, `SDL_HINT_APP_ID="flipclock"`,
+6. **Hint SDL**: `SDL_HINT_VIDEO_DRIVER="wayland,x11"`, `SDL_HINT_APP_ID="ribalta"`,
    `SDL_HINT_VIDEO_ALLOW_SCREENSAVER="1"` (tranne con timer attivo, Fase 3).
 7. **Build release** con `-O2`, `-flto`, `-s` (strip) per un binario piccolo.
 
-Verifica dei consumi: `ps -o rss,pcpu -C flipclock`, `pidstat -p <pid> 1`, `/usr/bin/time -v`.
+Verifica dei consumi: `ps -o rss,pcpu -C ribalta`, `pidstat -p <pid> 1`, `/usr/bin/time -v`.
 
 ## 3. Struttura del repository
 
 ```
-Fliqlo_linux/
+ribalta/
 ├── Makefile
 ├── README.md
 ├── docs/
@@ -89,8 +89,8 @@ Fliqlo_linux/
     └── notify.c/.h       notify-send + suono SDL
 ```
 
-I file degli asset vengono cercati, in ordine: `$FLIPCLOCK_DATA`, `./assets`,
-`~/.local/share/flipclock`, `/usr/share/flipclock`.
+I file degli asset vengono cercati, in ordine: `$RIBALTA_DATA`, `./assets`,
+`~/.local/share/ribalta`, `/usr/share/ribalta`.
 
 ### Interfacce principali (bozza)
 
@@ -137,7 +137,7 @@ CFLAGS  += $(shell pkg-config --cflags $(PKGS))
 LDLIBS  += $(shell pkg-config --libs $(PKGS)) -lm
 SRC     := $(wildcard src/*.c)
 OBJ     := $(SRC:src/%.c=build/%.o)
-BIN     := flipclock
+BIN     := ribalta
 PREFIX  ?= $(HOME)/.local
 
 all: $(BIN)
@@ -154,10 +154,10 @@ release: clean $(BIN)
 
 install: release
 	install -Dm755 $(BIN) $(PREFIX)/bin/$(BIN)
-	install -Dm644 -t $(PREFIX)/share/flipclock assets/*
-	install -Dm644 flipclock.desktop $(PREFIX)/share/applications/flipclock.desktop
+	install -Dm644 -t $(PREFIX)/share/ribalta assets/*
+	install -Dm644 ribalta.desktop $(PREFIX)/share/applications/ribalta.desktop
 uninstall:
-	rm -rf $(PREFIX)/bin/$(BIN) $(PREFIX)/share/flipclock $(PREFIX)/share/applications/flipclock.desktop
+	rm -rf $(PREFIX)/bin/$(BIN) $(PREFIX)/share/ribalta $(PREFIX)/share/applications/ribalta.desktop
 clean:
 	rm -rf build $(BIN)
 

@@ -1,6 +1,6 @@
-# flipclock — documentazione
+# Ribalta — documentazione
 
-**flipclock** è un orologio a tessere ribaltabili ("flip clock") per Linux, ispirato allo stile di Fliqlo
+**Ribalta** è un orologio a tessere ribaltabili ("flip clock") per Linux, ispirato allo stile di Fliqlo
 ma con grafica e codice originali. Mostra l'ora a schermo intero o in finestra, con l'animazione
 delle cifre che si ribaltano, e ha un timer per sessioni di studio di durata scelta dall'utente.
 Deve occupare pochissima RAM e restare praticamente a 0% di CPU quando non anima.
@@ -17,5 +17,5 @@ Scritto in C con SDL3, gira nativamente su Wayland (testato su niri) e su X11.
 
 ## Nota sul nome
 
-Il progetto si chiama `flipclock` e non usa asset, font, icone o marchio di Fliqlo:
+Il progetto si chiama `ribalta` e non usa asset, font, icone o marchio di Fliqlo:
 l'aspetto "flip clock" è uno stile generico, ricreato da zero.

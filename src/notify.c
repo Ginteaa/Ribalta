@@ -32,7 +32,7 @@ void notify_init(const char *wav_path) {
 
 void notify_desktop(const char *title, const char *body) {
     if (g_nchildren >= MAX_CHILDREN) return;
-    char *argv[] = { "notify-send", "-a", "flipclock", "-i", "alarm-clock", "-u", "normal",
+    char *argv[] = { "notify-send", "-a", "Ribalta", "-i", "alarm-clock", "-u", "normal",
                      (char *)(title ? title : ""), (char *)(body ? body : ""), NULL };
     pid_t pid;
     int rc = posix_spawnp(&pid, "notify-send", NULL, NULL, argv, environ);

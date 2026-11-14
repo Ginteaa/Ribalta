@@ -529,7 +529,7 @@ static void on_timer_finished(App *a, Uint64 now)
         int m = a->timer.minutes;
         char body[96];
         snprintf(body, sizeof body, "Sessione di studio completata (%dh %02dmin)", m / 60, m % 60);
-        notify_desktop("flipclock", body);
+        notify_desktop("Ribalta", body);
     }
     if (a->cfg.timer_sound)
         notify_sound();
@@ -552,7 +552,7 @@ static void on_pomo_finished(App *a, PomoPhase finished)
         msg = body;
     }
     if (a->cfg.timer_notify)
-        notify_desktop("flipclock", msg);
+        notify_desktop("Ribalta", msg);
     if (a->cfg.timer_sound)
         notify_sound();
 }
@@ -694,17 +694,17 @@ static void main_loop(App *a)
 static bool app_init(void)
 {
     SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "wayland,x11");
-    SDL_SetHint(SDL_HINT_APP_ID, "flipclock");
+    SDL_SetHint(SDL_HINT_APP_ID, "ribalta");
     SDL_SetHint(SDL_HINT_VIDEO_ALLOW_SCREENSAVER, "1");
     /* "gpu" (SDL_GPU/Vulkan) misurato: ~17 MB PSS contro ~37 MB di opengl.
      * La variabile d'ambiente SDL_RENDER_DRIVER ha comunque la precedenza. */
     SDL_SetHint(SDL_HINT_RENDER_DRIVER, "gpu,opengl,opengles2,software");
     if (!SDL_Init(SDL_INIT_VIDEO)) {
-        fprintf(stderr, "flipclock: SDL_Init: %s\n", SDL_GetError());
+        fprintf(stderr, "ribalta: SDL_Init: %s\n", SDL_GetError());
         return false;
     }
     if (!TTF_Init()) {
-        fprintf(stderr, "flipclock: TTF_Init: %s\n", SDL_GetError());
+        fprintf(stderr, "ribalta: TTF_Init: %s\n", SDL_GetError());
         return false;
     }
     return true;
@@ -715,23 +715,23 @@ static bool app_open(App *a, const char *font_path)
     SDL_WindowFlags fl = SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY;
     if (a->cfg.start_fullscreen || a->screensaver)
         fl |= SDL_WINDOW_FULLSCREEN;
-    a->win = SDL_CreateWindow("flipclock", 960, 400, fl);
+    a->win = SDL_CreateWindow("Ribalta", 960, 400, fl);
     if (!a->win) {
-        fprintf(stderr, "flipclock: SDL_CreateWindow: %s\n", SDL_GetError());
+        fprintf(stderr, "ribalta: SDL_CreateWindow: %s\n", SDL_GetError());
         return false;
     }
     a->ren = SDL_CreateRenderer(a->win, NULL);
     if (!a->ren) {
-        fprintf(stderr, "flipclock: SDL_CreateRenderer: %s\n", SDL_GetError());
+        fprintf(stderr, "ribalta: SDL_CreateRenderer: %s\n", SDL_GetError());
         return false;
     }
     SDL_SetRenderVSync(a->ren, 1);
-    if (getenv("FLIPCLOCK_DEBUG"))
-        fprintf(stderr, "flipclock: renderer=%s\n", SDL_GetRendererName(a->ren));
+    if (getenv("RIBALTA_DEBUG"))
+        fprintf(stderr, "ribalta: renderer=%s\n", SDL_GetRendererName(a->ren));
 
     a->render = render_create(a->ren, font_path);
     if (!a->render) {
-        fprintf(stderr, "flipclock: render_create failed (%s)\n", font_path);
+        fprintf(stderr, "ribalta: render_create failed (%s)\n", font_path);
         return false;
     }
     render_set_style(a->render, a->cfg.scale, a->cfg.brightness);
@@ -774,14 +774,14 @@ static void app_close(App *a)
     SDL_Quit();
 }
 
-/* Istanza singola: lock esclusivo su $XDG_RUNTIME_DIR/flipclock.lock (fallback /tmp).
+/* Istanza singola: lock esclusivo su $XDG_RUNTIME_DIR/ribalta.lock (fallback /tmp).
  * Il descrittore resta aperto per tutta la vita del processo; il kernel rilascia
  * il lock all'uscita, anche in caso di crash. Ritorna false se un'altra istanza è attiva. */
 static bool acquire_single_instance(void)
 {
     const char *dir = getenv("XDG_RUNTIME_DIR");
     char path[512];
-    snprintf(path, sizeof path, "%s/flipclock.lock", (dir && *dir) ? dir : "/tmp");
+    snprintf(path, sizeof path, "%s/ribalta.lock", (dir && *dir) ? dir : "/tmp");
     int fd = open(path, O_RDWR | O_CREAT | O_CLOEXEC, 0600);
     if (fd < 0)
         return true; /* non bloccare l'avvio se il lock non è creabile */
@@ -794,7 +794,7 @@ static bool acquire_single_instance(void)
 
 static void usage(FILE *out)
 {
-    fputs("Uso: flipclock [opzioni]\n"
+    fputs("Uso: ribalta [opzioni]\n"
           "\n"
           "Orologio flip con timer di studio, Pomodoro e statistiche.\n"
           "\n"
@@ -819,14 +819,14 @@ int main(int argc, char **argv)
             usage(stdout);
             return 0;
         } else {
-            fprintf(stderr, "flipclock: opzione sconosciuta: %s\n\n", argv[i]);
+            fprintf(stderr, "ribalta: opzione sconosciuta: %s\n\n", argv[i]);
             usage(stderr);
             return 2;
         }
     }
 
     if (!acquire_single_instance()) {
-        fprintf(stderr, "flipclock: già in esecuzione\n");
+        fprintf(stderr, "ribalta: già in esecuzione\n");
         return 0;
     }
 
@@ -838,8 +838,8 @@ int main(int argc, char **argv)
 
     char font[1024];
     if (!settings_find_asset("font.ttf", font, sizeof font)) {
-        fprintf(stderr, "flipclock: font.ttf not found (searched $FLIPCLOCK_DATA, ./assets, "
-                        "<exe>/assets, ~/.local/share/flipclock, /usr/share/flipclock)\n");
+        fprintf(stderr, "ribalta: font.ttf not found (searched $RIBALTA_DATA, ./assets, "
+                        "<exe>/assets, ~/.local/share/ribalta, /usr/share/ribalta)\n");
         return 1;
     }
     int rc = 1;
