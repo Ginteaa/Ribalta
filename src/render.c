@@ -13,7 +13,7 @@
 #define DIGIT_H_RATIO     0.72f  /* altezza cifre / altezza tessera */
 #define DIGIT_MAX_STRETCH 1.25f  /* allungamento verticale massimo */
 #ifndef TILE_H_RATIO
-#define TILE_H_RATIO      0.82f  /* altezza / larghezza tessera */
+#define TILE_H_RATIO      0.92f  /* altezza / larghezza tessera */
 #endif
 
 typedef struct {

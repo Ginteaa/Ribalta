@@ -19,7 +19,7 @@ Tutte le misure sono relative alla larghezza `W` disponibile (`W = larghezza fin
 - **Coppie di tessere**: 2 (`HH:MM`) o 3 (`HH:MM:SS`). Ogni tessera contiene **due cifre**.
 - Larghezza tessera `Tw`: con 2 tessere `Tw = W × 0.46`; con 3 tessere `Tw = W × 0.31`.
 - Spazio tra tessere `G = W × 0.04` (con 3 tessere `G = W × 0.035`).
-- Altezza tessera `Th = Tw × 0.82` (rettangolare, `TILE_H_RATIO` in render.c), limitata all'85% dell'altezza finestra
+- Altezza tessera `Th = Tw × 0.92` (leggermente rettangolare, `TILE_H_RATIO` in render.c), limitata all'85% dell'altezza finestra
   (se supera, si scala tutto di conseguenza).
 - Raggio angoli `R = Tw × 0.05`.
 - Linea di taglio orizzontale al centro: spessore `max(2px, Th × 0.012)`.
