@@ -1,4 +1,5 @@
 #include "settings.h"
+#include "color.h"
 #include <SDL3/SDL.h>
 #include <ctype.h>
 #include <errno.h>
@@ -27,6 +28,10 @@ void settings_defaults(Settings *s)
     s->pomodoro_long_break = 15;
     s->pomodoro_cycles = 4;
     s->pomodoro_auto_continue = true;
+    s->digit_color = 0xb7b7b7;
+    s->recent_count = 0;
+    for (int i = 0; i < RECENT_COLORS_MAX; i++)
+        s->recent_colors[i] = 0;
 }
 
 /* ---- percorsi ---- */
@@ -87,7 +92,17 @@ static void parse_int(const char *v, int *dst, int lo, int hi)
     *dst = (int)x;
 }
 
-static void apply_kv(Settings *s, const char *k, const char *v)
+static void parse_recent(Settings *s, char *v)
+{
+    s->recent_count = 0;
+    for (char *tok = strtok(v, ","); tok && s->recent_count < RECENT_COLORS_MAX; tok = strtok(NULL, ",")) {
+        uint32_t c;
+        if (color_parse_hex(tok, &c))
+            s->recent_colors[s->recent_count++] = c;
+    }
+}
+
+static void apply_kv(Settings *s, const char *k, char *v)
 {
     if (!strcmp(k, "show_seconds")) parse_bool(v, &s->show_seconds);
     else if (!strcmp(k, "clock_24h")) parse_bool(v, &s->clock_24h);
@@ -103,6 +118,12 @@ static void apply_kv(Settings *s, const char *k, const char *v)
     else if (!strcmp(k, "pomodoro_long_break")) parse_int(v, &s->pomodoro_long_break, 1, 120);
     else if (!strcmp(k, "pomodoro_cycles")) parse_int(v, &s->pomodoro_cycles, 1, 12);
     else if (!strcmp(k, "pomodoro_auto_continue")) parse_bool(v, &s->pomodoro_auto_continue);
+    else if (!strcmp(k, "digit_color")) {
+        uint32_t c;
+        if (color_parse_hex(v, &c))
+            s->digit_color = c;
+    }
+    else if (!strcmp(k, "recent_colors")) parse_recent(s, v);
 }
 
 bool settings_load(Settings *s)
@@ -176,7 +197,31 @@ bool settings_save(const Settings *s)
     fprintf(f, "pomodoro_cycles=%d\n", s->pomodoro_cycles);
     fprintf(f, "pomodoro_auto_continue=%s\n", B(s->pomodoro_auto_continue));
 #undef B
+    char hex[8];
+    color_format_hex(s->digit_color, hex);
+    fprintf(f, "digit_color=%s\n", hex);
+    if (s->recent_count > 0) {
+        fprintf(f, "recent_colors=");
+        for (int i = 0; i < s->recent_count && i < RECENT_COLORS_MAX; i++) {
+            color_format_hex(s->recent_colors[i], hex);
+            fprintf(f, "%s%s", i ? "," : "", hex);
+        }
+        fprintf(f, "\n");
+    }
     return fclose(f) == 0;
+}
+
+void settings_push_recent(Settings *s, uint32_t rgb)
+{
+    uint32_t out[RECENT_COLORS_MAX];
+    int n = 0;
+    out[n++] = rgb;
+    for (int i = 0; i < s->recent_count && i < RECENT_COLORS_MAX && n < RECENT_COLORS_MAX; i++)
+        if (s->recent_colors[i] != rgb)
+            out[n++] = s->recent_colors[i];
+    for (int i = 0; i < n; i++)
+        s->recent_colors[i] = out[i];
+    s->recent_count = n;
 }
 
 bool settings_data_dir(char *out, size_t out_size)

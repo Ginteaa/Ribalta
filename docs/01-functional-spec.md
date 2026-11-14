@@ -24,6 +24,13 @@ The app has one active mode at a time. It always starts in **Clock** mode.
   is at full brightness, the other is dimmed to 40% (no blinking: zero CPU wake-ups).
   ←/→ select hours or minutes; ↑/↓ change the selected part by ±1
   (on minutes, Shift = ±10). The duration is always clamped to 0h01–23h59.
+- **Keyboard entry (microwave style)**: in SETUP, the digit keys `0`–`9` (also keypad) enter from
+  the right, up to 4 digits: `1`,`3`,`0` → `01:30`. Raw values are shown while typing (`90` →
+  `00:90`) and normalised on confirm (→ 1h30, clamped to 0h01–23h59). Both tiles are at full
+  brightness and flip on each digit. `Backspace` deletes a digit. `Enter`/`Space` confirm and start
+  (an empty or zero entry just cancels); arrows, `T`, `P`, `S`, `I` confirm without starting; `R`
+  or `Esc` cancel and keep the previous duration (`Esc` does not leave fullscreen in that case).
+  Digits are ignored while the timer is running or paused.
 - **RUNNING**: countdown using the same flip tiles.
   - If the remaining time is ≥ 1 h → shows `HH:MM` (minutes update on every whole minute).
   - If < 1 h → shows `MM:SS`.
@@ -61,6 +68,14 @@ Every change is applied immediately and saved when the panel is closed.
 | `brightness` | int (20–100) | `100` | Digit brightness (useful at night) |
 | `start_fullscreen` | bool | `false` | Start fullscreen |
 | `animations` | bool | `true` | If false, digits change without animation (minimum power use) |
+| `digit_color` | colour | `#b7b7b7` | Digit colour (`#rrggbb`); also the accent of progress bar and labels |
+| `recent_colors` | list | empty | Up to 5 recent colours, comma separated, most recent first |
+
+The "Digit colour" row shows a swatch and the HEX value; ←/→ step through the palette and Enter
+opens a **colour picker** overlay (saturation/value square, hue bar, HEX field with read-only
+RGB/HSV, palette grid, recent colours; mouse and keyboard). The digits preview the colour live;
+Enter applies, saves and adds it to the recents, Esc restores the previous colour. In Pomodoro
+breaks the digits are blue `#6fa8dc` (amber `#ffb347` if the chosen colour is bluish).
 
 The Pomodoro keys (`pomodoro_work`, `pomodoro_break`, `pomodoro_long_break`, `pomodoro_cycles`,
 `pomodoro_auto_continue`) are described in [04-roadmap.md](04-roadmap.md), section 3.1.
@@ -80,9 +95,10 @@ If the file does not exist it is created on the first save.
 | `R` | Timer: reset to the set duration. Pomodoro: reset everything (STUDIO 1/N, stopped) |
 | `N` | Pomodoro: skip to the next phase |
 | `I` | Open/close the study statistics panel |
+| `0`–`9` / keypad, `Backspace` | Timer in setup: type the duration (microwave style), delete a digit |
 | `↑ ↓ ← →` | Timer in setup: adjust duration. Panels: navigate |
 | `S` | Open/close the settings panel |
-| `Esc` | Close the panel (settings or statistics); otherwise leave fullscreen; otherwise nothing |
+| `Esc` | Cancel timer entry; close the colour picker, or the panel (settings or statistics); otherwise leave fullscreen; otherwise nothing |
 | `Q` / `Ctrl+Q` | Quit |
 
 The mouse cursor hides after 2 s of inactivity in fullscreen.

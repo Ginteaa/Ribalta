@@ -42,8 +42,8 @@ struct Render {
     float lbl_w[2], lbl_h[2];
     SDL_Texture *tag[2];     /* TIMER, PAUSA */
     float tag_w[2], tag_h[2];
-    Uint8 gray;              /* grigio delle etichette/barra (con luminosita') */
     Uint8 dig_rgb[3];        /* colore base cifre (prima della luminosita') */
+    Uint8 acc_rgb[3];        /* colore base etichette/barra (prima della luminosita') */
     char text[64];           /* etichetta a testo libero ("" = assente) */
     SDL_Texture *txt;
     float txt_w, txt_h;
@@ -58,6 +58,9 @@ struct Render {
 };
 
 static float clampf(float v, float lo, float hi) { return v < lo ? lo : (v > hi ? hi : v); }
+
+/* colore base x luminosita' (0..100) */
+static Uint8 scale_c(Uint8 c, int bright) { return (Uint8)((float)c * (float)bright / 100.0f + 0.5f); }
 
 static void free_textures(Render *r)
 {
@@ -96,6 +99,7 @@ Render *render_create(SDL_Renderer *ren, const char *font_path)
     r->bright = 100;
     r->progress = -1.0f;
     r->dig_rgb[0] = r->dig_rgb[1] = r->dig_rgb[2] = 0xb7;
+    r->acc_rgb[0] = r->acc_rgb[1] = r->acc_rgb[2] = 0xb7;
     for (int i = 0; i < MAX_TILES; i++) r->alpha[i] = 1.0f;
     return r;
 }
@@ -167,9 +171,7 @@ static void build_text(Render *r)
         }
         *o = '\0';
     }
-    const float b = (float)r->bright / 100.0f;
-    const Uint8 g = (Uint8)(0xb7 * b + 0.5f);
-    const SDL_Color col = { g, g, g, 255 };
+    const SDL_Color col = { 255, 255, 255, 255 }; /* il colore si applica con ColorMod */
     SDL_Surface *s = TTF_RenderText_Blended(f, buf, 0, col);
     if (s) {
         r->txt_w = (float)s->w;
@@ -186,12 +188,9 @@ static void build_text(Render *r)
 
 static bool build_glyphs(Render *r)
 {
-    const float b = (float)r->bright / 100.0f;
-    const Uint8 g = (Uint8)(0xb7 * b + 0.5f);
-    const SDL_Color col = { g, g, g, 255 };
-    r->gray = g;
-    const SDL_Color dcol = { (Uint8)(r->dig_rgb[0] * b + 0.5f), (Uint8)(r->dig_rgb[1] * b + 0.5f),
-                             (Uint8)(r->dig_rgb[2] * b + 0.5f), 255 };
+    /* glifi sempre bianchi: colore e luminosita' si applicano con SDL_SetTextureColorMod */
+    const SDL_Color col = { 255, 255, 255, 255 };
+    const SDL_Color dcol = col;
 
     /* cifre */
     int top_off = 0;
@@ -296,6 +295,8 @@ static void render_face(Render *r, int i, int k, int v)
         SDL_SetTextureBlendMode(r->bg, SDL_BLENDMODE_NONE);
         SDL_RenderTexture(r->ren, r->bg, NULL, NULL);
     }
+    const Uint8 cr = scale_c(r->dig_rgb[0], r->bright), cg = scale_c(r->dig_rgb[1], r->bright),
+                cb = scale_c(r->dig_rgb[2], r->bright);
     int d[2], n = 2;
     d[0] = v / 10; d[1] = v % 10;
     if (i == 0 && r->hide_lz && v < 10) { d[0] = d[1]; n = 1; }
@@ -308,6 +309,7 @@ static void render_face(Render *r, int i, int k, int v)
             SDL_FRect dst = { SDL_roundf(x + (r->cell_w - w) * 0.5f),
                               SDL_roundf((float)r->th * 0.5f - r->ink_cy), w, h };
             SDL_SetTextureBlendMode(t, SDL_BLENDMODE_BLEND);
+            SDL_SetTextureColorMod(t, cr, cg, cb);
             SDL_RenderTexture(r->ren, t, NULL, &dst);
         }
         x += r->cell_w;
@@ -448,7 +450,21 @@ void render_set_digit_color(Render *r, Uint8 red, Uint8 green, Uint8 blue)
     if (!r) return;
     if (r->dig_rgb[0] == red && r->dig_rgb[1] == green && r->dig_rgb[2] == blue) return;
     r->dig_rgb[0] = red; r->dig_rgb[1] = green; r->dig_rgb[2] = blue;
-    rebuild(r); /* azzera anche i flip in corso e ridisegna le facce */
+    /* solo ricomposizione delle facce: nessun font, glifo o sfondo ricostruito */
+    for (int i = 0; i < r->count; i++) {
+        Tile *t = &r->tile[i];
+        t->anim = false;
+        if (!r->have_vals || !t->face[0]) continue;
+        /* solo la faccia visibile: l'altra viene riscritta al prossimo cambio di valore */
+        render_face(r, i, t->cur, t->value);
+    }
+}
+
+void render_set_accent(Render *r, Uint8 red, Uint8 green, Uint8 blue)
+{
+    if (!r) return;
+    if (r->acc_rgb[0] == red && r->acc_rgb[1] == green && r->acc_rgb[2] == blue) return;
+    r->acc_rgb[0] = red; r->acc_rgb[1] = green; r->acc_rgb[2] = blue;
 }
 
 void render_set_progress(Render *r, float p)
@@ -557,11 +573,14 @@ void render_draw(Render *r, Uint64 now_ns)
         SDL_FRect cut = { x, y + (float)r->th * 0.5f - (float)r->cut * 0.5f, (float)r->tw, (float)r->cut };
         SDL_RenderFillRect(r->ren, &cut);
     }
+    const Uint8 ar = scale_c(r->acc_rgb[0], r->bright), ag = scale_c(r->acc_rgb[1], r->bright),
+                ab = scale_c(r->acc_rgb[2], r->bright);
     if (r->ampm >= 1 && r->ampm <= 2) {
         int k = r->ampm - 1;
         if (r->lbl[k]) {
             float m = (float)r->tw * 0.06f;
             SDL_FRect dst = { (float)r->x0 + m, (float)r->y0 + m, r->lbl_w[k], r->lbl_h[k] };
+            SDL_SetTextureColorMod(r->lbl[k], ar, ag, ab);
             SDL_RenderTexture(r->ren, r->lbl[k], NULL, &dst);
         }
     }
@@ -572,11 +591,13 @@ void render_draw(Render *r, Uint64 now_ns)
     const float th = (float)r->th;
     if (r->txt) {
         SDL_FRect dst = { lx, (float)r->y0 - th * 0.05f - r->txt_h, r->txt_w, r->txt_h };
+        SDL_SetTextureColorMod(r->txt, ar, ag, ab);
         SDL_RenderTexture(r->ren, r->txt, NULL, &dst);
     } else if (r->label != LABEL_NONE) {
         int k = r->label == LABEL_TIMER ? 0 : 1;
         if (r->tag[k]) {
             SDL_FRect dst = { lx, (float)r->y0 - th * 0.05f - r->tag_h[k], r->tag_w[k], r->tag_h[k] };
+            SDL_SetTextureColorMod(r->tag[k], ar, ag, ab);
             SDL_RenderTexture(r->ren, r->tag[k], NULL, &dst);
         }
     }
@@ -584,14 +605,13 @@ void render_draw(Render *r, Uint64 now_ns)
         float bh = SDL_roundf(th * 0.012f);
         if (bh < 3.0f) bh = 3.0f;
         float by = (float)(r->y0 + r->th) + th * 0.06f;
-        const Uint8 g = r->gray;
         SDL_SetRenderDrawBlendMode(r->ren, SDL_BLENDMODE_BLEND);
         SDL_FRect track = { lx, by, total, bh };
-        SDL_SetRenderDrawColor(r->ren, g, g, g, 51);   /* 20% */
+        SDL_SetRenderDrawColor(r->ren, ar, ag, ab, 51);  /* 20% */
         SDL_RenderFillRect(r->ren, &track);
         SDL_FRect fill = { lx, by, SDL_roundf(total * r->progress), bh };
         if (fill.w > 0.0f) {
-            SDL_SetRenderDrawColor(r->ren, g, g, g, 153); /* 60% */
+            SDL_SetRenderDrawColor(r->ren, ar, ag, ab, 153); /* 60% */
             SDL_RenderFillRect(r->ren, &fill);
         }
         SDL_SetRenderDrawBlendMode(r->ren, SDL_BLENDMODE_NONE);

@@ -8,12 +8,14 @@
 #include <SDL3/SDL.h>
 #include <SDL3_ttf/SDL_ttf.h>
 #include "clock.h"
+#include "color.h"
 #include "notify.h"
 #include "pomodoro.h"
 #include "render.h"
 #include "settings.h"
 #include "stats.h"
 #include "timer.h"
+#include "ui_color.h"
 #include "ui_settings.h"
 #include "ui_stats.h"
 
@@ -22,8 +24,8 @@
 #define BLINK_PHASES   6
 #define SAVER_GRACE_NS (1000ULL * SDL_NS_PER_MS)
 #define SAVER_MOVE_PX  8.0f   /* movimento reale minimo per uscire dallo screensaver */
-#define COLOR_DEFAULT  0xb7b7b7u
 #define COLOR_BREAK    0x6fa8dcu
+#define COLOR_BREAK_ALT 0xffb347u /* riposo se il colore scelto e gia blu */
 
 typedef enum { VIEW_CLOCK, VIEW_TIMER, VIEW_POMODORO } View;
 
@@ -35,6 +37,7 @@ typedef struct {
     bool        has_progress;
     float       alpha[2];   /* tessere 0 e 1; la 2 (secondi) segue la 1 */
     Uint32      color;      /* colore base delle cifre 0xRRGGBB */
+    Uint32      accent;     /* colore di barra ed etichette 0xRRGGBB */
     char        text[40];   /* etichetta libera (Pomodoro); "" = nessuna */
 } Display;
 
@@ -47,6 +50,11 @@ typedef struct {
     Timer         timer;
     Pomodoro      pomo;
     StatsUI      *sui;
+    ColorUI      *cui;               /* selettore colore (NULL in screensaver) */
+    bool          preview_active;    /* anteprima dal vivo del selettore (non salvata) */
+    uint32_t      preview_color;
+    TimerEntry    entry;             /* inserimento durata da tastiera (stile microonde) */
+    bool          entry_active;
     bool          screensaver;
     Uint64        start_ns;          /* avvio app (grazia screensaver) */
     float         saver_moved;       /* movimento mouse accumulato dopo la grazia */
@@ -66,6 +74,7 @@ typedef struct {
     bool          cursor_hidden;
     Uint64        cursor_deadline;   /* 0 = nessuna scadenza pendente */
     Uint32        applied_color;
+    Uint32        applied_accent;
 } App;
 
 static bool is_fullscreen(const App *a)
@@ -122,6 +131,66 @@ static void pixel_size(const App *a, int *w, int *h)
 }
 
 static void close_panel(App *a);
+
+static bool color_open(const App *a)
+{
+    return a->cui && ui_color_is_open(a->cui);
+}
+
+/* Colore base delle cifre: anteprima del selettore se attiva, altrimenti quello salvato. */
+static uint32_t base_color(const App *a)
+{
+    return a->preview_active ? a->preview_color : a->cfg.digit_color;
+}
+
+static void open_color(App *a)
+{
+    int w, h;
+    if (!a->cui)
+        return;
+    pixel_size(a, &w, &h);
+    ui_color_open(a->cui, w, h, a->cfg.digit_color, a->cfg.recent_colors, a->cfg.recent_count);
+    a->dirty = true;
+}
+
+static void color_finish(App *a)
+{
+    a->preview_active = false;
+    if (color_open(a))
+        ui_color_close(a->cui);
+    a->dirty = true;
+}
+
+static void color_result(App *a, UiColorResult r)
+{
+    switch (r) {
+    case UICOLOR_CHANGED:
+        a->preview_active = true;
+        a->preview_color = ui_color_value(a->cui);
+        a->dirty = true;
+        break;
+    case UICOLOR_APPLY:
+        a->cfg.digit_color = ui_color_value(a->cui);
+        settings_push_recent(&a->cfg, a->cfg.digit_color);
+        settings_save(&a->cfg);
+        color_finish(a);
+        break;
+    case UICOLOR_CANCEL:
+        color_finish(a);
+        break;
+    default:
+        break;
+    }
+    if (a->cui && ui_color_dirty(a->cui))
+        a->dirty = true;
+}
+
+static void color_mouse(App *a, const SDL_Event *ev)
+{
+    SDL_Event copy = *ev;
+    SDL_ConvertEventToRenderCoordinates(a->ren, &copy);
+    color_result(a, ui_color_mouse(a->cui, &copy));
+}
 
 static bool stats_open(const App *a)
 {
@@ -184,6 +253,8 @@ static void on_key_panel(App *a, const SDL_KeyboardEvent *k)
     int old = a->cfg.timer_default_minutes;
     if (ui_settings_key(a->ui, k->key, k->mod, &a->cfg))
         settings_changed(a, old);
+    if (a->cui && ui_settings_take_color_request(a->ui))
+        open_color(a);
     a->dirty = true;
 }
 
@@ -231,34 +302,107 @@ static void set_view(App *a, View v)
     a->dirty = true;
 }
 
-/* Tasti del timer; le frecce accettano il repeat. */
-static void on_key_timer(App *a, const SDL_KeyboardEvent *k)
+static void entry_cancel(App *a)
+{
+    timer_entry_clear(&a->entry);
+    a->entry_active = false;
+    a->dirty = true;
+}
+
+/* Conferma l'inserimento: durata valida -> timer_init (e avvio se start). 0 = solo annulla. */
+static void entry_commit(App *a, bool start)
+{
+    if (!a->entry_active)
+        return;
+    int m = timer_entry_minutes(&a->entry);
+    entry_cancel(a);
+    if (m > 0) {
+        timer_init(&a->timer, m);
+        if (start)
+            timer_toggle(&a->timer, SDL_GetTicksNS());
+    }
+}
+
+/* Cifra 0..9 dal tasto (riga alfanumerica o tastierino), -1 altrimenti. */
+static int key_digit(SDL_Keycode key)
+{
+    if (key >= SDLK_0 && key <= SDLK_9)
+        return (int)(key - SDLK_0);
+    if (key >= SDLK_KP_1 && key <= SDLK_KP_9)
+        return (int)(key - SDLK_KP_1) + 1;
+    if (key == SDLK_KP_0)
+        return 0;
+    return -1;
+}
+
+/* Tasti del timer; le frecce accettano il repeat. Ritorna true se il tasto e consumato
+ * (Esc che annulla l'inserimento: non deve uscire dallo schermo intero). */
+static bool on_key_timer(App *a, const SDL_KeyboardEvent *k)
 {
     Timer *t = &a->timer;
     bool shift = (k->mod & SDL_KMOD_SHIFT) != 0;
+    int digit = key_digit(k->key);
+    if (digit >= 0) {
+        if (!k->repeat && t->state == TIMER_SETUP) {
+            a->blink_active = false;
+            timer_entry_push(&a->entry, digit);
+            a->entry_active = true;
+            a->dirty = true;
+        }
+        return false;
+    }
     switch (k->key) {
+    case SDLK_BACKSPACE:
+        if (a->entry_active) {
+            timer_entry_pop(&a->entry);
+            a->dirty = true;
+        }
+        break;
+    case SDLK_ESCAPE:
+        if (a->entry_active) {
+            entry_cancel(a);
+            return true;
+        }
+        break;
+    case SDLK_T:
+    case SDLK_P:
+    case SDLK_S:
+    case SDLK_I:
+        entry_commit(a, false);
+        break;
     case SDLK_SPACE:
     case SDLK_RETURN:
     case SDLK_KP_ENTER:
-        if (!k->repeat)
+        if (k->repeat)
+            break;
+        if (a->entry_active)
+            entry_commit(a, true);
+        else
             timer_toggle(t, SDL_GetTicksNS());
         break;
     case SDLK_R:
         if (!k->repeat) {
-            log_timer_partial(a, SDL_GetTicksNS());
-            timer_reset(t);
+            if (a->entry_active) {
+                entry_cancel(a);
+            } else {
+                log_timer_partial(a, SDL_GetTicksNS());
+                timer_reset(t);
+            }
         }
         break;
     case SDLK_LEFT:
+        entry_commit(a, false);
         if (t->state == TIMER_SETUP)
             a->timer_sel = 0;
         break;
     case SDLK_RIGHT:
+        entry_commit(a, false);
         if (t->state == TIMER_SETUP)
             a->timer_sel = 1;
         break;
     case SDLK_UP:
     case SDLK_DOWN: {
+        entry_commit(a, false);
         int step = a->timer_sel == 0 ? 60 : (shift ? 10 : 1);
         timer_adjust(t, k->key == SDLK_UP ? step : -step);
         break;
@@ -266,6 +410,7 @@ static void on_key_timer(App *a, const SDL_KeyboardEvent *k)
     default:
         break;
     }
+    return false;
 }
 
 /* Tasti della vista Pomodoro. */
@@ -301,9 +446,15 @@ static void on_key(App *a, const SDL_KeyboardEvent *k)
     if (a->screensaver)
         return;
     if (k->key == SDLK_Q && !k->repeat) {
+        if (color_open(a))
+            color_finish(a); /* annulla l'anteprima */
         if (panel_open(a))
             settings_save(&a->cfg);
         a->running = false;
+        return;
+    }
+    if (color_open(a)) {
+        color_result(a, ui_color_key(a->cui, k->key, k->mod));
         return;
     }
     if (stats_open(a)) {
@@ -323,9 +474,10 @@ static void on_key(App *a, const SDL_KeyboardEvent *k)
         on_key_panel(a, k);
         return;
     }
-    if (a->view == VIEW_TIMER)
-        on_key_timer(a, k);
-    else if (a->view == VIEW_POMODORO)
+    if (a->view == VIEW_TIMER) {
+        if (on_key_timer(a, k))
+            return;
+    } else if (a->view == VIEW_POMODORO)
         on_key_pomo(a, k);
     if (k->repeat)
         return;
@@ -361,9 +513,18 @@ static void handle_event(App *a, const SDL_Event *ev)
     case SDL_EVENT_QUIT:
         a->running = false;
         break;
+    case SDL_EVENT_MOUSE_BUTTON_UP:
+        if (color_open(a))
+            color_mouse(a, ev);
+        break;
     case SDL_EVENT_KEY_DOWN:
     case SDL_EVENT_MOUSE_BUTTON_DOWN:
     case SDL_EVENT_MOUSE_MOTION:
+        if (ev->type != SDL_EVENT_KEY_DOWN && color_open(a)) {
+            cursor_activity(a);
+            color_mouse(a, ev);
+            break;
+        }
         if (a->screensaver) {
             if (SDL_GetTicksNS() - a->start_ns < SAVER_GRACE_NS)
                 break;
@@ -428,7 +589,13 @@ static void build_timer_display(const App *a, Uint64 now, Display *d)
     d->label = t->state == TIMER_PAUSED ? LABEL_PAUSA : LABEL_TIMER;
     d->has_progress = t->state != TIMER_SETUP;
     d->alpha[0] = d->alpha[1] = t->state == TIMER_PAUSED ? 0.5f : 1.0f;
-    if (t->state == TIMER_SETUP) {
+    if (a->entry_active && t->state == TIMER_SETUP) {
+        timer_entry_face(&a->entry, d->face.values);
+        d->face.count = 2;
+        d->label = LABEL_TIMER;
+        d->has_progress = false;
+        d->alpha[0] = d->alpha[1] = 1.0f;
+    } else if (t->state == TIMER_SETUP) {
         d->alpha[0] = a->timer_sel == 0 ? 1.0f : 0.4f;
         d->alpha[1] = a->timer_sel == 1 ? 1.0f : 0.4f;
     }
@@ -441,7 +608,11 @@ static void build_pomo_display(const App *a, Uint64 now, Display *d)
     pomo_label(p, &a->cfg, d->text, sizeof d->text);
     d->has_progress = p->timer.state != TIMER_SETUP;
     d->alpha[0] = d->alpha[1] = p->timer.state == TIMER_PAUSED ? 0.5f : 1.0f;
-    d->color = p->phase == POMO_WORK ? COLOR_DEFAULT : COLOR_BREAK;
+    uint32_t base = base_color(a);
+    if (p->phase == POMO_WORK)
+        d->color = base;
+    else
+        d->color = color_is_bluish(base) ? COLOR_BREAK_ALT : COLOR_BREAK;
 }
 
 static void build_blink_display(const App *a, Uint64 now, Display *d)
@@ -460,7 +631,8 @@ static void build_display(const App *a, Uint64 now, Display *d)
     d->view = a->view;
     d->alpha[0] = d->alpha[1] = 1.0f;
     d->label = LABEL_NONE;
-    d->color = COLOR_DEFAULT;
+    d->color = base_color(a);
+    d->accent = base_color(a);
     if (a->view == VIEW_CLOCK) {
         clock_get(&a->cfg, &d->face);
     } else if (a->view == VIEW_POMODORO) {
@@ -476,7 +648,7 @@ static bool display_equal(const Display *x, const Display *y)
 {
     return x->view == y->view && x->label == y->label && x->has_progress == y->has_progress &&
            x->alpha[0] == y->alpha[0] && x->alpha[1] == y->alpha[1] &&
-           x->color == y->color && strcmp(x->text, y->text) == 0 && face_equal(&x->face, &y->face);
+           x->color == y->color && x->accent == y->accent && strcmp(x->text, y->text) == 0 && face_equal(&x->face, &y->face);
 }
 
 static void apply_alpha(App *a, const Display *d)
@@ -496,6 +668,10 @@ static void apply_display(App *a, const Display *d, Uint64 now)
     if (d->color != a->applied_color) {
         render_set_digit_color(a->render, (Uint8)(d->color >> 16), (Uint8)(d->color >> 8), (Uint8)d->color);
         a->applied_color = d->color;
+    }
+    if (d->accent != a->applied_accent) {
+        render_set_accent(a->render, (Uint8)(d->accent >> 16), (Uint8)(d->accent >> 8), (Uint8)d->accent);
+        a->applied_accent = d->accent;
     }
     render_set_tiles(a->render, f->values, f->count, f->hide_leading_zero, animate, now);
     render_set_ampm(a->render, f->ampm);
@@ -575,6 +751,8 @@ static void apply_resize(App *a)
             ui_settings_resize(a->ui, w, h);
         if (stats_open(a))
             ui_stats_resize(a->sui, w, h);
+        if (color_open(a))
+            ui_color_resize(a->cui, w, h);
     }
     a->resized = false;
 }
@@ -681,7 +859,9 @@ static void main_loop(App *a)
 
         if (a->dirty) {
             render_draw(a->render, now);
-            if (panel_open(a))
+            if (color_open(a))
+                ui_color_draw(a->cui);
+            else if (panel_open(a))
                 ui_settings_draw(a->ui, &a->cfg);
             else if (stats_open(a))
                 ui_stats_draw(a->sui);
@@ -738,7 +918,8 @@ static bool app_open(App *a, const char *font_path)
     apply_resize(a);
     timer_init(&a->timer, a->cfg.timer_default_minutes);
     pomo_init(&a->pomo, &a->cfg);
-    a->applied_color = COLOR_DEFAULT;
+    a->applied_color = ~0u; /* forza la prima applicazione */
+    a->applied_accent = ~0u;
     char wav[1024];
     char icon[1024];
     notify_init(settings_find_asset("ding.wav", wav, sizeof wav) ? wav : NULL,
@@ -746,6 +927,7 @@ static bool app_open(App *a, const char *font_path)
     if (!a->screensaver) {
         a->ui = ui_settings_create(a->ren, font_path);
         a->sui = ui_stats_create(a->ren, font_path);
+        a->cui = ui_color_create(a->ren, font_path);
     }
     update_display(a, SDL_GetTicksNS());
     a->dirty = true;
@@ -766,6 +948,8 @@ static void app_close(App *a)
         ui_settings_destroy(a->ui);
     if (a->sui)
         ui_stats_destroy(a->sui);
+    if (a->cui)
+        ui_color_destroy(a->cui);
     if (a->render)
         render_destroy(a->render);
     if (a->ren)
@@ -806,6 +990,7 @@ static void usage(FILE *out)
           "\n"
           "Tasti:\n"
           "  F/F11 schermo intero   T timer   P Pomodoro   S impostazioni   I statistiche\n"
+          "  0-9 durata timer (stile microonde)   Backspace cancella\n"
           "  Spazio/Invio avvia/pausa   R reset   N fase successiva (Pomodoro)\n"
           "  Q esci   Esc chiude pannello / esce dallo schermo intero\n",
           out);

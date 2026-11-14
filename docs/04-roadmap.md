@@ -70,8 +70,19 @@ accumulate error (±1 s over 1 h); settings survive a restart.
   `SDL_DisableScreenSaver()` (idle-inhibit on Wayland); when none is running,
   `SDL_EnableScreenSaver()`.
 
+## Phase 4 — Keyboard entry & colours ✅
+
+- Microwave-style timer entry: digits `0`–`9` enter from the right (`1` `3` `0` → `01:30`), `Backspace`
+  deletes, `Enter`/`Space` confirm and start, arrows / `T` / `P` / `S` / `I` confirm, `R`/`Esc` cancel.
+- Configurable digit colour (`digit_color`) applied to digits, progress bar and labels (accent);
+  cheap re-colouring (white glyphs + colour modulation, no font reopening).
+- Colour picker overlay (saturation/value square, hue bar, HEX, palette, recent colours via
+  `recent_colors`), live preview, mouse and keyboard.
+- Pomodoro breaks keep blue digits (amber if the chosen colour is blue).
+- Automated tests (`make test`).
+
 ## Future ideas
-- Colour themes (light, amber, terminal green).
+- Colour themes (light, amber, terminal green) built on the digit colour.
 - Choice of monitor in fullscreen.
 - AUR package (`PKGBUILD`).
 - Status bar integration (e.g. waybar) showing the timer's remaining time.

@@ -2,6 +2,9 @@
 #define RIBALTA_SETTINGS_H
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
+
+#define RECENT_COLORS_MAX 5
 
 /* Vedi docs/01-specifiche-funzionali.md §1.3 */
 typedef struct {
@@ -20,6 +23,10 @@ typedef struct {
     int  pomodoro_long_break;    /* default 15, range 1..120 */
     int  pomodoro_cycles;        /* default 4,  range 1..12  */
     bool pomodoro_auto_continue; /* default true */
+    /* Colori: 0xRRGGBB. Nel file: digit_color=#rrggbb, recent_colors=#rrggbb,#rrggbb,... */
+    uint32_t digit_color;                        /* default 0xb7b7b7 */
+    uint32_t recent_colors[RECENT_COLORS_MAX];   /* il più recente per primo */
+    int      recent_count;                       /* 0..RECENT_COLORS_MAX */
 } Settings;
 
 void settings_defaults(Settings *s);
@@ -31,6 +38,9 @@ bool settings_load(Settings *s);
 
 /* Scrive il file (crea le directory se mancano). Ritorna false su errore. */
 bool settings_save(const Settings *s);
+
+/* Mette rgb in testa ai colori recenti (rimuove un eventuale duplicato, tronca a RECENT_COLORS_MAX). */
+void settings_push_recent(Settings *s, uint32_t rgb);
 
 /* Cerca un file asset (es. "font.ttf") in ordine:
  * $RIBALTA_DATA, ./assets, <dir dell'eseguibile>/assets,

@@ -51,8 +51,15 @@ void render_set_tile_alpha(Render *r, int tile, float alpha);
 void render_set_label_text(Render *r, const char *text);
 
 /* Colore base delle cifre (prima della luminosità). Default 0xb7b7b7; pausa Pomodoro 0x6fa8dc.
- * Se cambia, rigenera le texture delle cifre e le facce (nessuna animazione). */
+ * ECONOMICO: i glifi sono bianchi e il colore si applica con SDL_SetTextureColorMod; un cambio
+ * ricompone solo le facce delle tessere (nessuna riapertura del font, nessuna animazione).
+ * Pensato per essere chiamato anche molte volte al secondo (anteprima del selettore colore). */
 void render_set_digit_color(Render *r, Uint8 red, Uint8 green, Uint8 blue);
+
+/* Colore di barra di avanzamento ed etichette (TIMER, STUDIO 2/4, AM/PM, testo libero).
+ * Default 0xb7b7b7. Le etichette restano semitrasparenti (50%/70%) e la luminosità moltiplica.
+ * Economico come render_set_digit_color (nessuna texture ricreata). */
+void render_set_accent(Render *r, Uint8 red, Uint8 green, Uint8 blue);
 
 /* true se almeno una tessera sta ancora animando a now_ns */
 bool render_is_animating(const Render *r, Uint64 now_ns);

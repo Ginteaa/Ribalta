@@ -23,6 +23,11 @@ void ui_settings_resize(SettingsUI *ui, int pixel_w, int pixel_h);
  * Esc e S NON sono gestiti qui (li gestisce main per chiudere). */
 bool ui_settings_key(SettingsUI *ui, SDL_Keycode key, SDL_Keymod mod, Settings *s);
 
+/* Riga "Colore cifre": Invio chiede di aprire il selettore colore. Ritorna true UNA volta
+ * dopo che l'utente l'ha chiesto (main allora apre ui_color). ←/→ sulla riga scorrono la
+ * palette (color_palette_step) modificando s->digit_color e ui_settings_key ritorna true. */
+bool ui_settings_take_color_request(SettingsUI *ui);
+
 /* Disegna overlay + pannello sopra il fotogramma corrente. Non chiama Present. */
 void ui_settings_draw(SettingsUI *ui, const Settings *s);
 

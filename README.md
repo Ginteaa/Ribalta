@@ -36,8 +36,9 @@ original and the project is not affiliated with Fliqlo.
 ## ✨ Features
 
 - 🕰️ **Flip clock** `HH:MM`, with optional seconds and 12h/24h format; only the tiles that change flip
-- ⏳ **Study timer** from 0h01 to 23h59, keeps running while you look at the clock
-- 🍅 **Pomodoro** with study, short break and long break phases (breaks turn the digits blue)
+- ⏳ **Study timer** from 0h01 to 23h59, keeps running while you look at the clock; type the duration with the digit keys, microwave style (`1` `3` `0` → `01:30`)
+- 🍅 **Pomodoro** with study, short break and long break phases (breaks turn the digits blue, or amber if you picked a blue colour)
+- 🎨 **Digit colour** with a built-in colour picker (palette, HEX field, recent colours, live preview); the accent applies to digits, progress bar and labels
 - 📊 **Study statistics**: today, last 7 days, month, streak, completed sessions
 - ⚙️ **Settings overlay** (`S`), changes apply live and are saved to a plain `config.ini`
 - 🌙 **Screensaver mode** (`ribalta --screensaver`), easy to hook to `swayidle`
@@ -51,7 +52,7 @@ original and the project is not affiliated with Fliqlo.
 |:---:|:---:|
 | <img src="docs/images/clock.png" alt="Fullscreen clock" width="420"><br>**Clock**: fullscreen `HH:MM` | <img src="docs/images/timer.png" alt="Study timer" width="420"><br>**Study timer**: running, with progress bar |
 | <img src="docs/images/pomodoro.png" alt="Pomodoro break" width="420"><br>**Pomodoro**: break phase in blue | <img src="docs/images/settings.png" alt="Settings panel" width="420"><br>**Settings** overlay (`S`) |
-| <img src="docs/images/stats.png" alt="Statistics panel" width="420"><br>**Statistics** overlay (`I`, sample data) | |
+| <img src="docs/images/stats.png" alt="Statistics panel" width="420"><br>**Statistics** overlay (`I`, sample data) | <img src="docs/images/colors.png" alt="Colour picker" width="420"><br>**Colour picker**: live preview of the digit colour |
 
 ## 📦 Installation
 
@@ -92,12 +93,14 @@ your `PATH`.
 | `T` | Toggle Clock / Timer view (a running timer continues in the background) |
 | `P` | Toggle Clock / Pomodoro view (`T` and `P` also switch directly between the two) |
 | `Space` / `Enter` | Timer or Pomodoro: start / pause / resume |
+| `0`–`9` / keypad | Timer in setup: type the duration, digits enter from the right (`1` `3` `0` → `01:30`, `90` → 1h30); `Enter`/`Space` confirms and starts, arrows / `T` / `P` / `S` / `I` confirm without starting |
+| `Backspace` | Timer entry: delete the last digit |
 | `R` | Timer: reset to the set duration. Pomodoro: reset everything |
 | `N` | Pomodoro: skip to the next phase |
 | `I` | Open / close the statistics panel |
 | `← →` / `↑ ↓` | Timer in setup: select hours or minutes / adjust them (hours ±1, minutes ±1, `Shift` = ±10 min). Panels: navigate and change values |
 | `S` | Open / close the settings panel |
-| `Esc` | Close the panel; otherwise leave fullscreen |
+| `Esc` | Cancel timer entry (keeps the previous duration); close the panel or the colour picker; otherwise leave fullscreen |
 | `Q` / `Ctrl+Q` | Quit |
 
 `ribalta --help` lists the command-line options.
@@ -124,6 +127,14 @@ edit it by hand: the settings panel (`S`) changes everything live and saves on c
 | `pomodoro_long_break` | `15` | Long break minutes (1–120) |
 | `pomodoro_cycles` | `4` | Study sessions before the long break (1–12) |
 | `pomodoro_auto_continue` | `true` | Start the next phase automatically |
+| `digit_color` | `#b7b7b7` | Digit colour `#rrggbb`; also tints the progress bar and labels (accent) |
+| `recent_colors` | empty | Up to 5 recently used colours, comma separated (`#rrggbb,#rrggbb`) |
+
+The **Digit colour** row of the settings panel shows a swatch and the HEX code: `←`/`→` step through
+the palette, `Enter` opens the colour picker (saturation/value square, hue bar, HEX field, palette
+grid, recent colours; mouse or keyboard: `Tab` changes zone, `Enter` applies, `Esc` cancels). The
+digits preview the colour live. During Pomodoro breaks the digits are blue (`#6fa8dc`), or amber
+(`#ffb347`) if the chosen colour is already blue; the accent stays your colour.
 
 ## 🍅 Pomodoro
 

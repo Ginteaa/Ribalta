@@ -53,8 +53,21 @@ clean:
 	rm -rf build $(BIN)
 
 -include $(OBJ:.o=.d)
+# test unitari (senza display): ogni tests/test_*.c e' un programma a se', fallisce al primo errore
+TESTS   := $(patsubst tests/%.c,%,$(wildcard tests/test_*.c))
+TEST_COMMON := src/settings.c src/color.c src/timer.c
+
+build/tests:
+	mkdir -p build/tests
+
+build/tests/%: tests/%.c $(TEST_COMMON) | build/tests
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $< $(TEST_COMMON) $(LDLIBS)
+
+test: $(addprefix build/tests/,$(TESTS))
+	@for t in $(TESTS); do echo "== $$t"; ./build/tests/$$t || exit 1; done
+
 # rigenera le PNG dell'icona da assets/ribalta.svg (serve rsvg-convert; le PNG sono nel repo)
 icons:
 	./tools/icons.sh
 
-.PHONY: all debug release install uninstall clean icons
+.PHONY: all debug release install uninstall clean icons test

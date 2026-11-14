@@ -37,4 +37,20 @@ void timer_face(const Timer *t, const Settings *s, Uint64 now, int values[3], in
 /* ms al prossimo cambio visibile delle tessere (RUNNING); UINT32_MAX se nulla cambia (SETUP/PAUSED). */
 uint32_t timer_ms_to_next_change(const Timer *t, const Settings *s, Uint64 now);
 
+/* --- Inserimento da tastiera "stile microonde" (docs: roadmap, inserimento timer) ---
+ * Le cifre entrano da destra: 1,3,0 -> "130" -> 01:30. Massimo 4 cifre (HHMM). */
+typedef struct {
+    char d[4];   /* cifre '0'..'9', le più vecchie a sinistra */
+    int  n;      /* 0..4 */
+} TimerEntry;
+
+void timer_entry_clear(TimerEntry *e);
+bool timer_entry_push(TimerEntry *e, int digit);   /* false se già 4 cifre o digit fuori 0..9 */
+bool timer_entry_pop(TimerEntry *e);               /* false se vuoto */
+/* Valori grezzi da mostrare: {HH, MM} dalle cifre allineate a destra, es. "190" -> {1, 90}. */
+void timer_entry_face(const TimerEntry *e, int values[2]);
+/* Minuti totali normalizzati: HH*60 + MM (MM può superare 59: "90" -> 90 min = 1h30),
+ * limitati a 1..1439. Ritorna 0 se il buffer è vuoto o vale zero (= nessuna durata valida). */
+int  timer_entry_minutes(const TimerEntry *e);
+
 #endif

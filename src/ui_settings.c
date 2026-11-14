@@ -1,4 +1,5 @@
 #include "ui_settings.h"
+#include "color.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -6,7 +7,7 @@
 #include <string.h>
 #include <SDL3_ttf/SDL_ttf.h>
 
-enum { ROW_COUNT = 14 };
+enum { ROW_COUNT = 15, ROW_COLOR = 7 };
 
 typedef struct {
     SDL_Texture *tex;
@@ -24,9 +25,12 @@ struct SettingsUI {
     Settings      shown;       /* valori con cui sono state costruite le texture */
     bool          have_shown;
     bool          arrows;      /* il font ha le frecce */
+    bool          color_req;   /* Invio sulla riga colore */
 
     float         pw, ph, px, py, pitch, pad;
     SDL_Texture  *panel_tex;
+    SDL_Texture  *swatch_tex;    /* quadrato arrotondato bianco, colorato con color mod */
+    float         swatch;        /* lato in px */
     Label         title, footer;
     Label         label[ROW_COUNT][2];   /* [riga][0=normale, 1=selezionata] */
     Label         value[ROW_COUNT][2];
@@ -34,7 +38,7 @@ struct SettingsUI {
 
 static const char *const k_labels[ROW_COUNT] = {
     "Mostra secondi", "Formato 24 ore", "Timer predefinito", "Suono fine timer",
-    "Notifica fine timer", "Dimensione", "Luminosità", "Schermo intero all'avvio", "Animazioni",
+    "Notifica fine timer", "Dimensione", "Luminosità", "Colore cifre", "Schermo intero all'avvio", "Animazioni",
     "Pomodoro: studio", "Pomodoro: riposo", "Pomodoro: riposo lungo", "Pomodoro: cicli",
     "Pomodoro: avvio automatico"
 };
@@ -66,6 +70,8 @@ static void free_textures(SettingsUI *ui)
 {
     if (ui->panel_tex) SDL_DestroyTexture(ui->panel_tex);
     ui->panel_tex = NULL;
+    if (ui->swatch_tex) SDL_DestroyTexture(ui->swatch_tex);
+    ui->swatch_tex = NULL;
     label_free(&ui->title);
     label_free(&ui->footer);
     for (int i = 0; i < ROW_COUNT; i++)
@@ -88,18 +94,19 @@ static void fmt_value(int row, const Settings *s, char *buf, size_t n)
     case 4: snprintf(buf, n, "%s", s->timer_notify ? "sì" : "no"); break;
     case 5: snprintf(buf, n, "%d%%", s->scale); break;
     case 6: snprintf(buf, n, "%d%%", s->brightness); break;
-    case 7: snprintf(buf, n, "%s", s->start_fullscreen ? "sì" : "no"); break;
-    case 8: snprintf(buf, n, "%s", s->animations ? "sì" : "no"); break;
-    case 9: snprintf(buf, n, "%d min", s->pomodoro_work); break;
-    case 10: snprintf(buf, n, "%d min", s->pomodoro_break); break;
-    case 11: snprintf(buf, n, "%d min", s->pomodoro_long_break); break;
-    case 12: snprintf(buf, n, "%d", s->pomodoro_cycles); break;
+    case 7: { char hx[8]; color_format_hex(s->digit_color, hx); snprintf(buf, n, "%s", hx); break; }
+    case 8: snprintf(buf, n, "%s", s->start_fullscreen ? "sì" : "no"); break;
+    case 9: snprintf(buf, n, "%s", s->animations ? "sì" : "no"); break;
+    case 10: snprintf(buf, n, "%d min", s->pomodoro_work); break;
+    case 11: snprintf(buf, n, "%d min", s->pomodoro_break); break;
+    case 12: snprintf(buf, n, "%d min", s->pomodoro_long_break); break;
+    case 13: snprintf(buf, n, "%d", s->pomodoro_cycles); break;
     default: snprintf(buf, n, "%s", s->pomodoro_auto_continue ? "sì" : "no"); break;
     }
 }
 
 /* Pannello con angoli arrotondati, antialiasing per copertura. */
-static SDL_Texture *make_panel(SettingsUI *ui, int w, int h, float radius)
+static SDL_Texture *make_panel(SettingsUI *ui, int w, int h, float radius, Uint8 gray)
 {
     SDL_Surface *s = SDL_CreateSurface(w, h, SDL_PIXELFORMAT_RGBA32);
     if (!s) return NULL;
@@ -115,7 +122,7 @@ static SDL_Texture *make_panel(SettingsUI *ui, int w, int h, float radius)
                 cov = radius - d + 0.5f;
                 cov = cov < 0.0f ? 0.0f : (cov > 1.0f ? 1.0f : cov);
             }
-            row[x * 4 + 0] = 0x1a; row[x * 4 + 1] = 0x1a; row[x * 4 + 2] = 0x1a;
+            row[x * 4 + 0] = gray; row[x * 4 + 1] = gray; row[x * 4 + 2] = gray;
             row[x * 4 + 3] = (Uint8)(cov * 255.0f + 0.5f);
         }
     }
@@ -150,7 +157,9 @@ static void rebuild(SettingsUI *ui, const Settings *s)
     ui->ph = ph;
     ui->px = floorf((W - pw) * 0.5f);
     ui->py = floorf((H - ph) * 0.5f);
-    ui->panel_tex = make_panel(ui, (int)pw, (int)ph, pw * 0.03f);
+    ui->panel_tex = make_panel(ui, (int)pw, (int)ph, pw * 0.03f, 0x1a);
+    ui->swatch = floorf(ui->pitch * 0.6f);
+    ui->swatch_tex = make_panel(ui, (int)ui->swatch, (int)ui->swatch, ui->swatch * 0.28f, 0xff);
 
     const SDL_Color norm = {0xb7, 0xb7, 0xb7, 255}, sel = {0xff, 0xff, 0xff, 255};
     const SDL_Color dim = {0x80, 0x80, 0x80, 255};
@@ -250,10 +259,13 @@ bool ui_settings_key(SettingsUI *ui, SDL_Keycode key, SDL_Keymod mod, Settings *
     case SDLK_UP:    ui->sel = (ui->sel + ROW_COUNT - 1) % ROW_COUNT; ui->dirty = true; return false;
     case SDLK_DOWN:  ui->sel = (ui->sel + 1) % ROW_COUNT;             ui->dirty = true; return false;
     case SDLK_LEFT:  dir = -1; break;
-    case SDLK_RIGHT:
+    case SDLK_RIGHT: dir = 1; break;
     case SDLK_RETURN:
     case SDLK_KP_ENTER:
-    case SDLK_SPACE: dir = 1; break;
+    case SDLK_SPACE:
+        if (ui->sel == ROW_COLOR) { ui->color_req = true; return false; }
+        dir = 1;
+        break;
     default: return false;
     }
 
@@ -266,18 +278,26 @@ bool ui_settings_key(SettingsUI *ui, SDL_Keycode key, SDL_Keymod mod, Settings *
     case 4: s->timer_notify = !s->timer_notify; break;
     case 5: s->scale = clampi(s->scale + dir * (shift ? 10 : 5), 50, 100); break;
     case 6: s->brightness = clampi(s->brightness + dir * (shift ? 20 : 10), 20, 100); break;
-    case 7: s->start_fullscreen = !s->start_fullscreen; break;
-    case 8: s->animations = !s->animations; break;
-    case 9: s->pomodoro_work = clampi(s->pomodoro_work + dir * (shift ? 5 : 1), 1, 180); break;
-    case 10: s->pomodoro_break = clampi(s->pomodoro_break + dir * (shift ? 5 : 1), 1, 60); break;
-    case 11: s->pomodoro_long_break = clampi(s->pomodoro_long_break + dir * (shift ? 5 : 1), 1, 120); break;
-    case 12: s->pomodoro_cycles = clampi(s->pomodoro_cycles + dir, 1, 12); break;
-    case 13: s->pomodoro_auto_continue = !s->pomodoro_auto_continue; break;
+    case 8: s->start_fullscreen = !s->start_fullscreen; break;
+    case 9: s->animations = !s->animations; break;
+    case 10: s->pomodoro_work = clampi(s->pomodoro_work + dir * (shift ? 5 : 1), 1, 180); break;
+    case 11: s->pomodoro_break = clampi(s->pomodoro_break + dir * (shift ? 5 : 1), 1, 60); break;
+    case 12: s->pomodoro_long_break = clampi(s->pomodoro_long_break + dir * (shift ? 5 : 1), 1, 120); break;
+    case 13: s->pomodoro_cycles = clampi(s->pomodoro_cycles + dir, 1, 12); break;
+    case 14: s->pomodoro_auto_continue = !s->pomodoro_auto_continue; break;
+    case ROW_COLOR: s->digit_color = color_palette_step(s->digit_color, dir); break;
     default: break;
     }
     bool changed = memcmp(&old, s, sizeof old) != 0;
     if (changed) ui->dirty = true;
     return changed;
+}
+
+bool ui_settings_take_color_request(SettingsUI *ui)
+{
+    if (!ui || !ui->color_req) return false;
+    ui->color_req = false;
+    return true;
 }
 
 static void blit(SettingsUI *ui, const Label *l, float x, float y)
@@ -324,7 +344,22 @@ void ui_settings_draw(SettingsUI *ui, const Settings *s)
         }
         const Label *lb = &ui->label[i][is_sel], *vl = &ui->value[i][is_sel];
         blit(ui, lb, x0, ry + (ui->pitch - (float)lb->h) * 0.5f);
-        blit(ui, vl, x1 - (float)vl->w, ry + (ui->pitch - (float)vl->h) * 0.5f);
+        float vx = x1 - (float)vl->w;
+        if (i == ROW_COLOR) {
+            float sw = ui->swatch, gap = ui->pad * 0.5f;
+            vx -= sw + gap;
+            SDL_FRect sr = {x1 - sw, ry + (ui->pitch - sw) * 0.5f, sw, sw};
+            if (ui->swatch_tex) {
+                SDL_SetTextureColorMod(ui->swatch_tex, (Uint8)(s->digit_color >> 16),
+                                       (Uint8)(s->digit_color >> 8), (Uint8)s->digit_color);
+                SDL_RenderTexture(ui->ren, ui->swatch_tex, NULL, &sr);
+            } else {
+                SDL_SetRenderDrawColor(ui->ren, (Uint8)(s->digit_color >> 16),
+                                       (Uint8)(s->digit_color >> 8), (Uint8)s->digit_color, 255);
+                SDL_RenderFillRect(ui->ren, &sr);
+            }
+        }
+        blit(ui, vl, vx, ry + (ui->pitch - (float)vl->h) * 0.5f);
     }
     y += (float)ROW_COUNT * ui->pitch + ui->pitch * 0.35f;
     blit(ui, &ui->footer, x0, y);

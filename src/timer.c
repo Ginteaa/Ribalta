@@ -122,3 +122,38 @@ uint32_t timer_ms_to_next_change(const Timer *t, const Settings *s, Uint64 now) 
     if (ms > UINT32_MAX - 1) ms = UINT32_MAX - 1;
     return ms < 1 ? 1 : (uint32_t)ms;
 }
+
+/* ---- inserimento da tastiera ---- */
+
+void timer_entry_clear(TimerEntry *e) {
+    e->n = 0;
+    for (int i = 0; i < 4; i++) e->d[i] = '0';
+}
+
+bool timer_entry_push(TimerEntry *e, int digit) {
+    if (digit < 0 || digit > 9 || e->n >= 4) return false;
+    e->d[e->n++] = (char)('0' + digit);
+    return true;
+}
+
+bool timer_entry_pop(TimerEntry *e) {
+    if (e->n <= 0) return false;
+    e->n--;
+    return true;
+}
+
+void timer_entry_face(const TimerEntry *e, int values[2]) {
+    int v[4] = {0, 0, 0, 0};
+    /* allineate a destra: l'ultima cifra inserita e' l'unita' dei minuti */
+    for (int i = 0; i < e->n; i++) v[4 - e->n + i] = e->d[i] - '0';
+    values[0] = v[0] * 10 + v[1];
+    values[1] = v[2] * 10 + v[3];
+}
+
+int timer_entry_minutes(const TimerEntry *e) {
+    int v[2];
+    timer_entry_face(e, v);
+    int m = v[0] * 60 + v[1];
+    if (m <= 0) return 0;
+    return m > MAX_MINUTES ? MAX_MINUTES : m;
+}
