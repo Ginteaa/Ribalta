@@ -10,6 +10,9 @@
 #define ANIM_NS   400000000ULL
 #define PI_F      3.14159265358979f
 
+#define DIGIT_H_RATIO     0.72f  /* altezza cifre / altezza tessera */
+#define DIGIT_MAX_STRETCH 1.25f  /* allungamento verticale massimo */
+
 typedef struct {
     SDL_Texture *face[2]; /* target: face[cur] = valore mostrato/nuovo, face[cur^1] = precedente */
     int cur;
@@ -132,7 +135,7 @@ static bool build_glyphs(Render *r)
 
     /* cifre */
     int top_off = 0;
-    float target = r->th * 0.72f, maxw = 0;
+    float target = r->th * DIGIT_H_RATIO, maxw = 0;
     TTF_Font *f = NULL;
     for (int pass = 0; pass < 2; pass++) {
         f = open_font_for(r->font_path, '0', target, &top_off);
@@ -151,11 +154,22 @@ static bool build_glyphs(Render *r)
         else { r->cell_w = cell; break; }
     }
     float cell_w = r->cell_w;
+    /* Cifre più lunghe: se la larghezza ha ridotto l'altezza, renderizza alla piena altezza
+     * (fino a 1.25x) e comprimi in orizzontale in fase di disegno -> glifi alti e nitidi. */
+    const float full = r->th * DIGIT_H_RATIO;
+    float sx = 1.0f;
+    if (target < full) {
+        float sy = SDL_min(full / target, DIGIT_MAX_STRETCH);
+        TTF_CloseFont(f);
+        f = open_font_for(r->font_path, '0', target * sy, &top_off);
+        if (!f) { SDL_Log("render: font open failed: %s", SDL_GetError()); return false; }
+        sx = 1.0f / sy;
+    }
     maxw = 0;
     for (int d = 0; d < 10; d++) {
         SDL_Surface *s = TTF_RenderGlyph_Blended(f, (Uint32)('0' + d), col);
         if (!s) continue;
-        r->dig_w[d] = (float)s->w;
+        r->dig_w[d] = (float)s->w * sx;
         r->dig_h[d] = (float)s->h;
         if (s->w > maxw) maxw = (float)s->w;
         r->dig[d] = SDL_CreateTextureFromSurface(r->ren, s);

@@ -25,7 +25,8 @@ Tutte le misure sono relative alla larghezza `W` disponibile (`W = larghezza fin
 - Linea di taglio orizzontale al centro: spessore `max(2px, Th × 0.012)`.
 - Cifre: IBM Plex Sans Condensed Bold, altezza glifo fino a `Th × 0.72`, limitata in larghezza:
   cella = larghezza d'inchiostro della cifra più larga × 1.10, due celle ≤ `Tw × 0.86`
-  (in pratica ~0.6 × `Th`). Centrate nella tessera.
+  Se la larghezza riduce l'altezza, le cifre vengono renderizzate alla piena altezza (fino a 1.25×)
+  e compresse in orizzontale al disegno: risultato ~0.71 × `Th`, glifi alti e nitidi. Centrate nella tessera.
 - Indicatore AM/PM: altezza `Th × 0.08`, in alto a sinistra, margine `Tw × 0.06`.
 - Niente due punti `:` tra le tessere (stile minimale), lo spazio `G` basta.
 
