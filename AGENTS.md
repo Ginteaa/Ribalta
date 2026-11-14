@@ -40,7 +40,7 @@ src/
 │                 display.c (what the tiles show) · session.c (timer/Pomodoro end, stats, inhibit)
 ├── core/         pure logic, no window needed: clock, timer, pomodoro, stats, settings, color
 ├── platform/     notify.c (notify-send + chime) · paths.c (XDG dirs, asset lookup)
-│                 fonts.c (system font list, fontconfig only while needed)
+│                 fonts.c (system font list; fontconfig dlopen'd only while needed)
 │                 gpu.c (Flatpak only: Vulkan driver filter, saves ~40 MB)
 ├── render/       render.c — tiles, pre-rendered glyphs, flip animation
 └── ui/           overlays: ui_settings, ui_stats, ui_color (colour picker), ui_font (font menu)

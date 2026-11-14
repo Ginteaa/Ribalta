@@ -7,7 +7,7 @@
 | Language | **C17** | no runtime, small binary, full control over memory |
 | Window / rendering / input / audio | **SDL3** (3.4.x at the time of writing) | native Wayland backend, GPU renderer, a single dependency |
 | Font rasterisation | **SDL3_ttf** (3.2.x) | simple API; used only to generate textures once at startup/resize. The font is closed after generation to free memory |
-| Font list | **fontconfig** | lists installed scalable fonts that contain the digits; used **only while the font menu is open** (or on ←/→ in the settings row), then released with `FcFini`. Startup opens `font_file` directly, without fontconfig |
+| Font list | **fontconfig** (loaded with `dlopen`) | lists installed scalable fonts that contain the digits; loaded **only while the font menu is open** (or on ←/→ in the settings row), then released with `FcFini`. Startup opens `font_file` directly, without fontconfig |
 | Notifications | `notify-send` process (`fork`+`execvp`) | avoids linking libnotify/GLib (several MB of RAM) |
 | Build | **Makefile** + `pkg-config` | simple, no extra build system |
 
@@ -178,8 +178,14 @@ Uint32 clock_ms_to_next_change(const Settings *s);
 - **Flatpak**: `packaging/flatpak/io.github.ginteaa.Ribalta.yml` builds with `make release` and
   `make install-files PREFIX=/app APPID=io.github.ginteaa.Ribalta`; the AppStream metainfo is
   installed next to it. The CI workflow `flatpak.yml` produces the `ribalta.flatpak` bundle.
-- **Dependencies**: the `org.freedesktop.Platform` 25.08 runtime already ships SDL3, SDL3_ttf,
-  fontconfig and `notify-send`, so the manifest needs no extra modules.
+- **Dependencies**: the `org.freedesktop.Platform` 25.08 runtime ships SDL3, fontconfig and
+  `notify-send`. FreeType 2.13.3 and SDL3_ttf 3.2.2 are built by the manifest as **static, minimal**
+  libraries (no harfbuzz, png, brotli, bzip2, zlib, plutosvg): the runtime's SDL3_ttf would load
+  harfbuzz → glib, pcre2, graphite, png, brotli at startup (~3 MB). Ribalta only draws digits and
+  Latin labels, so no shaping is needed. The app is linked with `PKGFLAGS=--static` and
+  `-Wl,--as-needed`.
+- **fontconfig is loaded with `dlopen`** (`fonts.c`) only while the font list is needed, and
+  `dlclose`d afterwards; it is not a link-time dependency (headers only at build time).
 - **Permissions** (`finish-args`):
   - `--socket=wayland`, `--socket=fallback-x11`: show the window on Wayland, or on X11 as fallback.
   - `--share=ipc`: required by X11 shared memory.
@@ -210,10 +216,14 @@ Uint32 clock_ms_to_next_change(const Settings *s);
 > |---|---|---|
 > | All Mesa Vulkan drivers loaded (no filter) | ~70 MB | — |
 > | `VK_LOADER_DRIVERS_SELECT=*intel*` (automatic) | ~27.5 MB | ~27.5 MB |
-> | Native build, for comparison | ~18 MB | ~28.5 MB |
+> | + static minimal FreeType/SDL3_ttf, fontconfig via `dlopen` | **~24.9 MB** | ~24.9 MB |
+> | Native build, for comparison | ~18.8 MB | ~28.4 MB |
 >
-> RSS is the same as native; PSS is higher only because the runtime's libraries are not shared
-> with host processes. CPU at idle: ~20 ms in 65 s.
+> RSS is lower than native; PSS is higher only because the runtime's libraries (Mesa Vulkan driver,
+> libc, libstdc++, SDL3 …) are not shared with host processes. The remaining gap is mostly
+> unavoidable: the runtime's Intel Vulkan driver alone is +2.3 MB, libc +1.8 MB, libstdc++ (needed
+> by Mesa) +1.4 MB. Other renderers are worse (opengl/opengles2/software load EGL and `libLLVM`,
+> 80–97 MB). CPU at idle: ~20 ms in 65 s.
 
 ## 4. Makefile
 

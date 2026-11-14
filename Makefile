@@ -5,10 +5,14 @@
 #   make debug      ASan + UBSan             make icons      rigenera le PNG dell'icona
 
 CC      ?= cc
-PKGS    := sdl3 sdl3-ttf fontconfig
+PKGS    := sdl3 sdl3-ttf
+# fontconfig: solo header (caricata a richiesta con dlopen in fonts.c), non va linkata
+FCPKG   := fontconfig
+# PKGFLAGS=--static quando SDL3_ttf è una libreria statica (Flatpak): aggiunge le sue dipendenze
+PKGFLAGS ?=
 CFLAGS  ?= -std=c17 -Wall -Wextra -Wpedantic -O2
-override CFLAGS += $(shell pkg-config --cflags $(PKGS)) -D_POSIX_C_SOURCE=200809L -Isrc
-override LDLIBS += $(shell pkg-config --libs $(PKGS)) -lm
+override CFLAGS += $(shell pkg-config --cflags $(PKGS) $(FCPKG)) -D_POSIX_C_SOURCE=200809L -Isrc
+override LDLIBS += $(shell pkg-config $(PKGFLAGS) --libs $(PKGS)) -lm
 SRC     := $(shell find src -name '*.c' | sort)
 OBJ     := $(SRC:src/%.c=build/%.o)
 BIN     := ribalta
