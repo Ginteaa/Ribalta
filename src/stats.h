@@ -23,7 +23,7 @@ typedef struct {
  * File assente -> riepilogo tutto a zero e ritorna true. */
 bool stats_summary(StatsSummary *out, time_t now);
 
-/* Formatta una durata come "1h 25m", "45m", "0m". */
+/* Formatta una durata come "1h 25m", "2h", "45m", "0m". */
 void stats_format_duration(long seconds, char *out, size_t out_size);
 
 #endif

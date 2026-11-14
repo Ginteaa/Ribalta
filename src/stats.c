@@ -107,6 +107,7 @@ void stats_format_duration(long seconds, char *out, size_t out_size)
     if (!out || out_size == 0) return;
     if (seconds < 0) seconds = 0;
     long m = seconds / 60, h = m / 60;
-    if (h > 0) snprintf(out, out_size, "%ldh %ldm", h, m % 60);
+    if (h > 0 && m % 60 == 0) snprintf(out, out_size, "%ldh", h);
+    else if (h > 0) snprintf(out, out_size, "%ldh %ldm", h, m % 60);
     else snprintf(out, out_size, "%ldm", m);
 }

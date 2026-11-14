@@ -1,75 +1,76 @@
-# 02 — Design grafico
+# 02 — Visual design
 
 ## 1. Palette
 
-| Elemento | Colore | Note |
+| Element | Colour | Notes |
 |---|---|---|
-| Sfondo | `#000000` | nero pieno (ideale per OLED) |
-| Tessera | `#1a1a1a` | grigio molto scuro |
-| Cifra | `#b7b7b7` | grigio chiaro; moltiplicato per `brightness` |
-| Linea di taglio | `#000000` | separa la metà superiore e inferiore della tessera |
-| Ombra del flip | nero con alpha 0–60% | scurisce la metà in rotazione |
-| AM/PM, etichette | `#b7b7b7` al 70% | testo piccolo |
-| Pausa Pomodoro (Fase 3) | cifra `#6fa8dc` | blu tenue per distinguere la pausa |
+| Background | `#000000` | pure black (ideal for OLED) |
+| Tile | `#1a1a1a` | very dark grey |
+| Digit | `#b7b7b7` | light grey; multiplied by `brightness` |
+| Cut line | `#000000` | separates the upper and lower halves of the tile |
+| Flip shadow | black with alpha 0–60% | darkens the rotating half |
+| AM/PM, labels | `#b7b7b7` at 70% | small text |
+| Pomodoro break (Phase 3) | digit `#6fa8dc` | soft blue to tell breaks apart |
 
-## 2. Geometria
+## 2. Geometry
 
-Tutte le misure sono relative alla larghezza `W` disponibile (`W = larghezza finestra × scale/100`).
+All measurements are relative to the available width `W` (`W = window width × scale/100`).
 
-- **Coppie di tessere**: 2 (`HH:MM`) o 3 (`HH:MM:SS`). Ogni tessera contiene **due cifre**.
-- Larghezza tessera `Tw`: con 2 tessere `Tw = W × 0.46`; con 3 tessere `Tw = W × 0.31`.
-- Spazio tra tessere `G = W × 0.04` (con 3 tessere `G = W × 0.035`).
-- Altezza tessera `Th = Tw × 0.92` (leggermente rettangolare, `TILE_H_RATIO` in render.c), limitata all'85% dell'altezza finestra
-  (se supera, si scala tutto di conseguenza).
-- Raggio angoli `R = Tw × 0.05`.
-- Linea di taglio orizzontale al centro: spessore `max(2px, Th × 0.012)`.
-- Cifre: IBM Plex Sans Condensed Bold, altezza glifo fino a `Th × 0.72`, limitata in larghezza:
-  cella = larghezza d'inchiostro della cifra più larga × 1.10, due celle ≤ `Tw × 0.86`
-  Se la larghezza riduce l'altezza, le cifre vengono renderizzate alla piena altezza (fino a 1.25×)
-  e compresse in orizzontale al disegno: risultato ~0.71 × `Th`, glifi alti e nitidi. Centrate nella tessera.
-- Indicatore AM/PM: altezza `Th × 0.08`, in alto a sinistra, margine `Tw × 0.06`.
-- Niente due punti `:` tra le tessere (stile minimale), lo spazio `G` basta.
+- **Tile pairs**: 2 (`HH:MM`) or 3 (`HH:MM:SS`). Each tile holds **two digits**.
+- Tile width `Tw`: with 2 tiles `Tw = W × 0.46`; with 3 tiles `Tw = W × 0.31`.
+- Gap between tiles `G = W × 0.04` (with 3 tiles `G = W × 0.035`).
+- Tile height `Th = Tw × 0.92` (slightly rectangular, `TILE_H_RATIO` in render.c), capped at 85% of
+  the window height (if it exceeds that, everything is scaled accordingly).
+- Corner radius `R = Tw × 0.05`.
+- Horizontal cut line at the centre: thickness `max(2px, Th × 0.012)`.
+- Digits: IBM Plex Sans Condensed Bold, glyph height up to `Th × 0.72`, limited in width:
+  cell = ink width of the widest digit × 1.10, two cells ≤ `Tw × 0.86`.
+  If the width limit would reduce the height, digits are rendered at full height (up to 1.25×)
+  and compressed horizontally when drawn: the result is ~0.71 × `Th`, tall and crisp glyphs.
+  Centred in the tile.
+- AM/PM indicator: height `Th × 0.08`, top-left, margin `Tw × 0.06`.
+- No colon `:` between tiles (minimal style); the gap `G` is enough.
 
 ```
  ┌──────────────────────┐    ┌──────────────────────┐
  │                      │    │                      │
  │        ██  ██        │    │        ██  ██        │
- │ ────── 1 ── 2 ────── │    │ ────── 3 ── 4 ────── │   ← linea di taglio
+ │ ────── 1 ── 2 ────── │    │ ────── 3 ── 4 ────── │   ← cut line
  │        ██  ██        │    │        ██  ██        │
  │                      │    │                      │
  └──────────────────────┘    └──────────────────────┘
-          ore                        minuti
+         hours                       minutes
 ```
 
-## 3. Animazione flip
+## 3. Flip animation
 
-Ogni tessera che cambia valore (es. `12` → `13`) è composta da 4 metà:
+Every tile whose value changes (e.g. `12` → `13`) is made of 4 halves:
 
-- `top_old`, `bottom_old` — metà superiore e inferiore del valore vecchio
-- `top_new`, `bottom_new` — metà superiore e inferiore del valore nuovo
+- `top_old`, `bottom_old` — upper and lower half of the old value
+- `top_new`, `bottom_new` — upper and lower half of the new value
 
-Sequenza (durata totale `D = 400 ms`, disegnata a 30 fps, `t ∈ [0,1]`):
+Sequence (total duration `D = 400 ms`, drawn at 30 fps, `t ∈ [0,1]`):
 
-1. **Sfondo fisso**: disegna `top_new` sopra e `bottom_old` sotto.
-2. **Fase A (`t` 0 → 0.5)**: la metà `top_old` "cade" verso il centro: viene disegnata con altezza
-   `h = Th/2 × cos(θ)`, `θ = t/0.5 × 90°`, ancorata alla linea di taglio. Easing **ease-in** (quadratico).
-   Ombra su `top_old` che cresce da 0 a 60%.
-3. **Fase B (`t` 0.5 → 1)**: la metà `bottom_new` si "apre" dal centro verso il basso:
-   altezza `h = Th/2 × sin(θ)`, `θ = (t−0.5)/0.5 × 90°`, ancorata alla linea di taglio.
-   Easing **ease-out** con leggero rimbalzo finale (overshoot ≤ 3%). Ombra da 60% a 0.
-   Contemporaneamente `bottom_old` (sotto) si scurisce leggermente (0 → 30%) e poi viene coperto.
-4. A fine animazione la tessera mostra solo `top_new` + `bottom_new`.
+1. **Static background**: draw `top_new` on top and `bottom_old` below.
+2. **Phase A (`t` 0 → 0.5)**: the `top_old` half "falls" towards the centre: it is drawn with height
+   `h = Th/2 × cos(θ)`, `θ = t/0.5 × 90°`, anchored at the cut line. **Ease-in** (quadratic).
+   A shadow on `top_old` grows from 0 to 60%.
+3. **Phase B (`t` 0.5 → 1)**: the `bottom_new` half "opens" from the centre downwards:
+   height `h = Th/2 × sin(θ)`, `θ = (t−0.5)/0.5 × 90°`, anchored at the cut line.
+   **Ease-out** with a slight final bounce (overshoot ≤ 3%). Shadow from 60% to 0.
+   At the same time `bottom_old` (below) darkens slightly (0 → 30%) and is then covered.
+4. At the end of the animation the tile shows only `top_new` + `bottom_new`.
 
-È una prospettiva **simulata con scala verticale** (nessuna proiezione 3D): basta
-`SDL_RenderTexture` con rettangolo di destinazione schiacciato. Le metà sono sottorettangoli della
-texture pre-renderizzata della tessera (vedi architettura).
+The perspective is **simulated with vertical scaling** (no 3D projection): a plain
+`SDL_RenderTexture` with a squashed destination rectangle is enough. The halves are sub-rectangles
+of the tile's pre-rendered texture (see the architecture document).
 
-Quando cambiano più tessere nello stesso istante (es. `12:59` → `13:00`), partono insieme;
-con `animations=false` il cambio è istantaneo.
+When several tiles change at the same instant (e.g. `12:59` → `13:00`) they start together;
+with `animations=false` the change is instantaneous.
 
-## 4. Layout (mockup)
+## 4. Layouts (mockups)
 
-### Orologio `HH:MM`
+### Clock `HH:MM`
 ```
 ┌────────────────────────────────────────────────────────┐
 │                                                        │
@@ -83,7 +84,7 @@ con `animations=false` il cambio è istantaneo.
 └────────────────────────────────────────────────────────┘
 ```
 
-### Orologio `HH:MM:SS`
+### Clock `HH:MM:SS`
 ```
 ┌────────────────────────────────────────────────────────┐
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  │
@@ -93,7 +94,7 @@ con `animations=false` il cambio è istantaneo.
 └────────────────────────────────────────────────────────┘
 ```
 
-### Timer (in corso)
+### Timer (running)
 ```
 ┌────────────────────────────────────────────────────────┐
 │   TIMER                                                │
@@ -101,12 +102,12 @@ con `animations=false` il cambio è istantaneo.
 │   │         0 2          │   │         2 9          │  │
 │   │──────────────────────│   │──────────────────────│  │
 │   └──────────────────────┘   └──────────────────────┘  │
-│   ██████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░   │ ← barra avanzamento
+│   ██████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░   │ ← progress bar
 └────────────────────────────────────────────────────────┘
 ```
-L'etichetta `TIMER` (o `PAUSA`) è piccola, in alto a sinistra, al 50% di opacità.
+The `TIMER` label (or `PAUSA` when paused) is small, top-left, at 50% opacity.
 
-### Pannello impostazioni (overlay)
+### Settings panel (overlay)
 ```
 ┌────────────────────────────────────────────────────────┐
 │        ┌──────────────────────────────────┐            │
@@ -124,10 +125,14 @@ L'etichetta `TIMER` (o `PAUSA`) è piccola, in alto a sinistra, al 50% di opacit
 │        └──────────────────────────────────┘            │
 └────────────────────────────────────────────────────────┘
 ```
-Sfondo overlay `#000000` al 75%, pannello `#1a1a1a`, testo `#b7b7b7`, voce selezionata in bianco.
+(The labels in the mockup are the app's current Italian UI strings: "Show seconds", "24h format",
+"Default timer", "Timer sound", "Notification", "Size", "Brightness", "Start fullscreen",
+"Animations", "Esc to close".)
+
+Overlay background `#000000` at 75%, panel `#1a1a1a`, text `#b7b7b7`, selected entry in white.
 
 ## 5. Font
 
-Font sans-serif bold con licenza **OFL** incluso in `assets/` (scelta in fase di implementazione,
-es. una famiglia tipo grotesk/neo-grotesk con cifre tabulari). Il file di licenza va copiato
-accanto al font. Nessun font proprietario.
+A bold sans-serif font under the **OFL** licence, bundled in `assets/` (IBM Plex Sans Condensed
+Bold, chosen during implementation: a grotesque-style family with tabular figures). The licence
+file is kept next to the font. No proprietary fonts.

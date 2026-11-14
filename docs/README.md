@@ -1,21 +1,24 @@
-# Ribalta — documentazione
+# Ribalta — documentation
 
-**Ribalta** è un orologio a tessere ribaltabili ("flip clock") per Linux, ispirato allo stile di Fliqlo
-ma con grafica e codice originali. Mostra l'ora a schermo intero o in finestra, con l'animazione
-delle cifre che si ribaltano, e ha un timer per sessioni di studio di durata scelta dall'utente.
-Deve occupare pochissima RAM e restare praticamente a 0% di CPU quando non anima.
-Scritto in C con SDL3, gira nativamente su Wayland (testato su niri) e su X11.
+**Ribalta** is a flip clock for Linux, inspired by the classic flip-clock look but with original
+artwork and code. It shows the time fullscreen or in a window, with digits that flip over, and
+includes a study timer with a user-chosen duration. It must use very little RAM and stay at
+practically 0% CPU when nothing is animating. Written in C with SDL3, it runs natively on
+Wayland (tested on niri) and on X11.
 
-## Indice
+## Index
 
-| File | Contenuto |
+| File | Contents |
 |---|---|
-| [01-specifiche-funzionali.md](01-specifiche-funzionali.md) | Cosa fa l'app: modalità orologio, timer, impostazioni, controlli, requisiti non funzionali |
-| [02-design-grafico.md](02-design-grafico.md) | Palette, proporzioni delle tessere, animazione flip, mockup dei layout |
-| [03-architettura-tecnica.md](03-architettura-tecnica.md) | Stack (C17 + SDL3), strategia per risparmiare RAM/CPU, moduli, Makefile, flusso di sviluppo con agenti |
-| [04-roadmap.md](04-roadmap.md) | Fasi di sviluppo: MVP, timer, Pomodoro, statistiche, screensaver |
+| [01-functional-spec.md](01-functional-spec.md) | What the app does: clock mode, timer, settings, controls, non-functional requirements |
+| [02-visual-design.md](02-visual-design.md) | Palette, tile proportions, flip animation, layout mockups |
+| [03-architecture.md](03-architecture.md) | Stack (C17 + SDL3), RAM/CPU saving strategy, modules, Makefile, agent-based development workflow |
+| [04-roadmap.md](04-roadmap.md) | Development phases: MVP, timer, Pomodoro, statistics, screensaver |
 
-## Nota sul nome
+## A note on the name
 
-Il progetto si chiama `ribalta` e non usa asset, font, icone o marchio di Fliqlo:
-l'aspetto "flip clock" è uno stile generico, ricreato da zero.
+The project is called `ribalta` and uses no assets, fonts, icons or trademarks from Fliqlo:
+the "flip clock" look is a generic style, recreated from scratch.
+
+Note: the app's user interface is currently in Italian, so UI labels quoted in these documents
+(`TIMER`, `RIPOSO`, `IMPOSTAZIONI`, ...) are the literal on-screen strings.

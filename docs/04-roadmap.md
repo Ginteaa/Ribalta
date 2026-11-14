@@ -1,75 +1,77 @@
 # 04 — Roadmap
 
-## Fase 1 — MVP orologio
+## Phase 1 — Clock MVP ✅
 
-- Scheletro progetto, `Makefile`, font OFL (IBM Plex Sans Condensed Bold) in `assets/`.
-- Finestra SDL3 su Wayland, app-id `ribalta`, HiDPI, ridimensionabile.
-- Tessere + cifre pre-renderizzate, layout `HH:MM` e `HH:MM:SS`.
-- Animazione flip (sezione 3 di `02-design-grafico.md`).
-- Loop guidato dagli eventi con risveglio al prossimo minuto/secondo.
+- Project skeleton, `Makefile`, OFL font (IBM Plex Sans Condensed Bold) in `assets/`.
+- SDL3 window on Wayland, app-id `ribalta`, HiDPI, resizable.
+- Pre-rendered tiles and digits, `HH:MM` and `HH:MM:SS` layouts.
+- Flip animation (section 3 of [02-visual-design.md](02-visual-design.md)).
+- Event-driven loop waking at the next minute/second.
 - `config.ini`: `show_seconds`, `clock_24h`, `scale`, `brightness`, `start_fullscreen`, `animations`.
-- Schermo intero (`F`/`F11`/doppio clic), `Q` per uscire, cursore nascosto.
+- Fullscreen (`F`/`F11`/double click), `Q` to quit, hidden cursor.
 
-**Fatto quando**: l'ora è corretta e si ribalta a ogni minuto; RSS < 20 MB; CPU a riposo ~0%
-(misurata con `pidstat` per 2 minuti); `make debug` senza errori ASan.
+**Done when**: the time is correct and flips every minute; RSS < 20 MB; CPU at rest ~0%
+(measured with `pidstat` for 2 minutes); `make debug` runs without ASan errors.
 
-## Fase 2 — Timer di studio + impostazioni
+## Phase 2 — Study timer + settings ✅
 
-- Modalità Timer completa (sezione 1.2 di `01-specifiche-funzionali.md`).
-- Barra di avanzamento, etichette `TIMER`/`PAUSA`.
-- Notifica `notify-send` + suono `ding.wav`.
-- Pannello impostazioni in overlay con tutte le voci.
-- File `ribalta.desktop` e target `make install`.
+- Full Timer mode (section 1.2 of [01-functional-spec.md](01-functional-spec.md)).
+- Progress bar, `TIMER`/`PAUSA` labels.
+- `notify-send` notification + `ding.wav` sound.
+- Overlay settings panel with all entries.
+- `ribalta.desktop` file and `make install` target.
 
-**Fatto quando**: un timer da 2 minuti termina con notifica e suono; il countdown non accumula
-errore (±1 s su 1 h); le impostazioni sopravvivono a un riavvio.
+**Done when**: a 2-minute timer ends with a notification and sound; the countdown does not
+accumulate error (±1 s over 1 h); settings survive a restart.
 
-## Fase 3 — Aggiunte
+## Phase 3 — Additions ✅
 
-### 3.1 Modalità Pomodoro (tasto `P`)
-- `P` alterna la vista Pomodoro (come `T` per il timer; `T`/`P` da una vista all'altra passano
-  direttamente). Timer e Pomodoro sono indipendenti e possono girare entrambi in background.
-- Ciclo: STUDIO (`pomodoro_work`, default 25 min) → RIPOSO (`pomodoro_break`, 5) → … ; dopo
-  `pomodoro_cycles` (default 4) sessioni di studio il riposo è RIPOSO LUNGO (`pomodoro_long_break`, 15),
-  poi il ciclo ricomincia da 1.
-- Tasti nella vista: `Spazio`/`Invio` avvia/pausa, `N` salta alla fase successiva, `R` azzera tutto
-  (fase STUDIO 1/N, fermo).
-- Etichetta: `STUDIO 2/4`, `RIPOSO`, `RIPOSO LUNGO`; in pausa si aggiunge ` · IN PAUSA` e le tessere
-  vanno al 50%. Durante RIPOSO/RIPOSO LUNGO le cifre diventano blu tenue `#6fa8dc`.
-- A fine fase: notifica ("Fine studio — riposo di 5 min" / "Riposo finito — si torna a studiare")
-  + suono; se `pomodoro_auto_continue=true` (default) la fase successiva parte da sola, altrimenti
-  resta ferma pronta a partire. La vista non cambia (niente lampeggio, resta sul Pomodoro).
-- Nuove chiavi config (anche nel pannello impostazioni): `pomodoro_work` (1..180),
+### 3.1 Pomodoro mode (`P` key)
+- `P` toggles the Pomodoro view (like `T` for the timer; `T`/`P` from one view to the other switch
+  directly). Timer and Pomodoro are independent and can both run in the background.
+- Cycle: STUDIO (`pomodoro_work`, default 25 min) → RIPOSO (`pomodoro_break`, 5) → … ; after
+  `pomodoro_cycles` (default 4) study sessions the break is RIPOSO LUNGO (`pomodoro_long_break`, 15),
+  then the cycle restarts from 1.
+- Keys in the view: `Space`/`Enter` start/pause, `N` skip to the next phase, `R` reset everything
+  (STUDIO phase 1/N, stopped).
+- Label: `STUDIO 2/4`, `RIPOSO`, `RIPOSO LUNGO`; when paused ` · IN PAUSA` is appended and the tiles
+  go to 50%. During RIPOSO/RIPOSO LUNGO the digits turn soft blue `#6fa8dc`.
+- At the end of a phase: notification ("Fine studio — riposo di 5 min" / "Riposo finito — si torna a
+  studiare", i.e. study over — 5 min break / break over — back to studying) + sound; if
+  `pomodoro_auto_continue=true` (default) the next phase starts by itself, otherwise it stays
+  stopped, ready to start. The view does not change (no blinking, it stays on Pomodoro).
+- New config keys (also in the settings panel): `pomodoro_work` (1..180),
   `pomodoro_break` (1..60), `pomodoro_long_break` (1..120), `pomodoro_cycles` (1..12),
   `pomodoro_auto_continue` (bool).
 
-### 3.2 Statistiche di studio (tasto `I`)
-- File `$XDG_DATA_HOME/ribalta/sessions.csv` (fallback `~/.local/share/ribalta/`), una riga
-  per sessione: `inizio_iso8601_locale,durata_secondi,tipo,completata` con tipo `timer|pomodoro`.
-  Prima riga di intestazione se il file è nuovo.
-- Cosa si registra (solo tempo di studio, mai i riposi), se la durata studiata è ≥ 60 s:
-  - timer: a fine timer (completata=1); su `R` o all'uscita dall'app con timer avviato (completata=0);
-  - pomodoro: a fine fase STUDIO (1); su `N`/`R`/uscita durante uno STUDIO avviato (0).
-  - Durata = tempo effettivamente trascorso, pause escluse.
-- `I` apre/chiude un pannello in overlay (stile pannello impostazioni): **Oggi**, **Ultimi 7 giorni**
-  (barre orizzontali per giorno, etichetta giorno abbreviato in italiano e `1h 25m`), **Questo mese**,
-  **Giorni consecutivi** (streak: giorni consecutivi fino a oggi, o fino a ieri se oggi ancora 0),
-  **Sessioni completate** totali. `Esc`/`I` chiude.
-- Il file viene letto solo all'apertura del pannello; font e texture solo mentre è aperto.
+### 3.2 Study statistics (`I` key)
+- File `$XDG_DATA_HOME/ribalta/sessions.csv` (fallback `~/.local/share/ribalta/`), one row
+  per session: `start_iso8601_local,duration_seconds,type,completed` with type `timer|pomodoro`.
+  A header row is written if the file is new (the header uses the Italian column names
+  `inizio,durata_s,tipo,completata`).
+- What is recorded (study time only, never breaks), if the studied duration is ≥ 60 s:
+  - timer: when the timer ends (completed=1); on `R` or on quitting the app with a started timer (completed=0);
+  - pomodoro: at the end of a STUDIO phase (1); on `N`/`R`/quit during a started STUDIO (0).
+  - Duration = time actually elapsed, pauses excluded.
+- `I` opens/closes an overlay panel (same style as the settings panel): **Today**, **Last 7 days**
+  (horizontal bars per day, abbreviated Italian day label and `1h 25m`), **This month**,
+  **Streak** (consecutive days up to today, or up to yesterday if today is still 0),
+  total **Completed sessions**. `Esc`/`I` closes it.
+- The file is read only when the panel opens; font and textures exist only while it is open.
 
-### 3.3 Modalità screensaver
-- `ribalta --screensaver`: schermo intero, cursore nascosto subito; esce con qualsiasi tasto,
-  clic o movimento del mouse (ignorando gli eventi del primo secondo). Non salva nulla.
-- `ribalta --help` mostra le opzioni.
-- Avvio automatico dopo inattività con `swayidle` (README con esempio per niri:
+### 3.3 Screensaver mode
+- `ribalta --screensaver`: fullscreen, cursor hidden immediately; exits on any key, click or
+  mouse movement (ignoring events during the first second). Saves nothing.
+- `ribalta --help` shows the options.
+- Automatic start after inactivity with `swayidle` (README with a niri example:
   `spawn-at-startup "swayidle" "-w" "timeout" "300" "ribalta --screensaver"`).
-  Se ribalta è già aperto, l'istanza screensaver esce subito (istanza singola).
-- **Blocco dello spegnimento schermo**: mentre un timer o un Pomodoro è IN CORSO l'app chiama
-  `SDL_DisableScreenSaver()` (idle-inhibit su Wayland); quando nessuno è in corso
+  If ribalta is already open, the screensaver instance exits immediately (single instance).
+- **Screen-blank inhibition**: while a timer or a Pomodoro is RUNNING the app calls
+  `SDL_DisableScreenSaver()` (idle-inhibit on Wayland); when none is running,
   `SDL_EnableScreenSaver()`.
 
-## Idee future
-- Temi colore (chiaro, ambra, verde terminale).
-- Scelta del monitor in schermo intero.
-- Pacchetto AUR (`PKGBUILD`).
-- Integrazione con la barra di stato (es. waybar) che mostra il tempo rimanente del timer.
+## Future ideas
+- Colour themes (light, amber, terminal green).
+- Choice of monitor in fullscreen.
+- AUR package (`PKGBUILD`).
+- Status bar integration (e.g. waybar) showing the timer's remaining time.
