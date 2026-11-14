@@ -31,10 +31,11 @@ release: clean
 
 install: release
 	install -Dm755 $(BIN) $(PREFIX)/bin/$(BIN)
-	install -Dm644 -t $(PREFIX)/share/flipclock assets/*
+	install -Dm644 flipclock.desktop $(PREFIX)/share/applications/flipclock.desktop
+	install -Dm644 -t $(PREFIX)/share/flipclock assets/font.ttf assets/OFL.txt assets/ding.wav
 
 uninstall:
-	rm -rf $(PREFIX)/bin/$(BIN) $(PREFIX)/share/flipclock
+	rm -rf $(PREFIX)/bin/$(BIN) $(PREFIX)/share/flipclock $(PREFIX)/share/applications/flipclock.desktop
 
 clean:
 	rm -rf build $(BIN)

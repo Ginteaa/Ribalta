@@ -7,17 +7,40 @@
 #include <SDL3/SDL.h>
 #include <SDL3_ttf/SDL_ttf.h>
 #include "clock.h"
+#include "notify.h"
 #include "render.h"
 #include "settings.h"
+#include "timer.h"
+#include "ui_settings.h"
 
 #define CURSOR_HIDE_NS (2000ULL * SDL_NS_PER_MS)
+#define BLINK_PHASE_NS (300ULL * SDL_NS_PER_MS)
+#define BLINK_PHASES   6
+
+typedef enum { VIEW_CLOCK, VIEW_TIMER } View;
+
+/* Stato desiderato/applicato di tessere, etichetta e opacità. */
+typedef struct {
+    View        view;
+    ClockFace   face;
+    RenderLabel label;
+    bool        has_progress;
+    float       alpha[2];   /* tessere 0 e 1; la 2 (secondi) segue la 1 */
+} Display;
 
 typedef struct {
     SDL_Window   *win;
     SDL_Renderer *ren;
     Render       *render;
     Settings      cfg;
-    ClockFace     face;
+    SettingsUI   *ui;
+    Timer         timer;
+    int           timer_sel;         /* 0 = ore, 1 = minuti (SETUP) */
+    View          view;
+    bool          blink_active;
+    Uint64        blink_start;
+    Display       shown;             /* ultimo stato applicato al render */
+    bool          has_shown;
     bool          running;
     bool          dirty;
     bool          resized;           /* resize da applicare (coalesced) */
@@ -65,8 +88,112 @@ static void toggle_fullscreen(App *a)
     a->dirty = true;
 }
 
+static bool panel_open(const App *a)
+{
+    return a->ui && ui_settings_is_open(a->ui);
+}
+
+static void pixel_size(const App *a, int *w, int *h)
+{
+    *w = 0;
+    *h = 0;
+    SDL_GetCurrentRenderOutputSize(a->ren, w, h);
+}
+
+static void open_panel(App *a)
+{
+    int w, h;
+    if (!a->ui)
+        return;
+    pixel_size(a, &w, &h);
+    ui_settings_open(a->ui, w, h);
+    a->dirty = true;
+}
+
+static void close_panel(App *a)
+{
+    ui_settings_close(a->ui);
+    settings_save(&a->cfg);
+    a->dirty = true;
+}
+
+static void settings_changed(App *a, int old_default_minutes)
+{
+    render_set_style(a->render, a->cfg.scale, a->cfg.brightness);
+    if (a->timer.state == TIMER_SETUP && a->cfg.timer_default_minutes != old_default_minutes)
+        timer_init(&a->timer, a->cfg.timer_default_minutes);
+    a->has_shown = false; /* riapplica il volto (24h/12h, secondi) senza animazione */
+    a->dirty = true;
+}
+
+static void on_key_panel(App *a, const SDL_KeyboardEvent *k)
+{
+    if (!k->repeat && (k->key == SDLK_ESCAPE || k->key == SDLK_S)) {
+        close_panel(a);
+        return;
+    }
+    int old = a->cfg.timer_default_minutes;
+    if (ui_settings_key(a->ui, k->key, k->mod, &a->cfg))
+        settings_changed(a, old);
+    a->dirty = true;
+}
+
+static void set_view(App *a, View v)
+{
+    a->view = v;
+    a->blink_active = false;
+    a->dirty = true;
+}
+
+/* Tasti del timer; le frecce accettano il repeat. */
+static void on_key_timer(App *a, const SDL_KeyboardEvent *k)
+{
+    Timer *t = &a->timer;
+    bool shift = (k->mod & SDL_KMOD_SHIFT) != 0;
+    switch (k->key) {
+    case SDLK_SPACE:
+    case SDLK_RETURN:
+    case SDLK_KP_ENTER:
+        if (!k->repeat)
+            timer_toggle(t, SDL_GetTicksNS());
+        break;
+    case SDLK_R:
+        if (!k->repeat)
+            timer_reset(t);
+        break;
+    case SDLK_LEFT:
+        if (t->state == TIMER_SETUP)
+            a->timer_sel = 0;
+        break;
+    case SDLK_RIGHT:
+        if (t->state == TIMER_SETUP)
+            a->timer_sel = 1;
+        break;
+    case SDLK_UP:
+    case SDLK_DOWN: {
+        int step = a->timer_sel == 0 ? 60 : (shift ? 10 : 1);
+        timer_adjust(t, k->key == SDLK_UP ? step : -step);
+        break;
+    }
+    default:
+        break;
+    }
+}
+
 static void on_key(App *a, const SDL_KeyboardEvent *k)
 {
+    if (k->key == SDLK_Q && !k->repeat) {
+        if (panel_open(a))
+            settings_save(&a->cfg);
+        a->running = false;
+        return;
+    }
+    if (panel_open(a)) {
+        on_key_panel(a, k);
+        return;
+    }
+    if (a->view == VIEW_TIMER)
+        on_key_timer(a, k);
     if (k->repeat)
         return;
     switch (k->key) {
@@ -78,8 +205,11 @@ static void on_key(App *a, const SDL_KeyboardEvent *k)
         if (is_fullscreen(a))
             toggle_fullscreen(a);
         break;
-    case SDLK_Q:
-        a->running = false;
+    case SDLK_S:
+        open_panel(a);
+        break;
+    case SDLK_T:
+        set_view(a, a->view == VIEW_CLOCK ? VIEW_TIMER : VIEW_CLOCK);
         break;
     default:
         break;
@@ -139,21 +269,109 @@ static bool face_equal(const ClockFace *x, const ClockFace *y)
     return true;
 }
 
-static void apply_face(App *a, const ClockFace *f, bool animate)
+static void build_timer_display(const App *a, Uint64 now, Display *d)
 {
-    render_set_tiles(a->render, f->values, f->count, f->hide_leading_zero, animate,
-                     SDL_GetTicksNS());
-    render_set_ampm(a->render, f->ampm);
-    a->face = *f;
+    const Timer *t = &a->timer;
+    timer_face(t, &a->cfg, now, d->face.values, &d->face.count);
+    d->label = t->state == TIMER_PAUSED ? LABEL_PAUSA : LABEL_TIMER;
+    d->has_progress = t->state != TIMER_SETUP;
+    d->alpha[0] = d->alpha[1] = t->state == TIMER_PAUSED ? 0.5f : 1.0f;
+    if (t->state == TIMER_SETUP) {
+        d->alpha[0] = a->timer_sel == 0 ? 1.0f : 0.4f;
+        d->alpha[1] = a->timer_sel == 1 ? 1.0f : 0.4f;
+    }
 }
 
-static void update_clock(App *a)
+static void build_blink_display(const App *a, Uint64 now, Display *d)
 {
-    ClockFace f;
-    clock_get(&a->cfg, &f);
-    if (!face_equal(&f, &a->face)) {
-        apply_face(a, &f, a->cfg.animations);
+    unsigned phase = (unsigned)((now - a->blink_start) / BLINK_PHASE_NS);
+    d->face.values[0] = d->face.values[1] = 0;
+    d->face.count = 2;
+    d->label = LABEL_TIMER;
+    d->has_progress = false;
+    d->alpha[0] = d->alpha[1] = (phase % 2 == 0) ? 0.15f : 1.0f;
+}
+
+static void build_display(const App *a, Uint64 now, Display *d)
+{
+    memset(d, 0, sizeof *d);
+    d->view = a->view;
+    d->alpha[0] = d->alpha[1] = 1.0f;
+    d->label = LABEL_NONE;
+    if (a->view == VIEW_CLOCK) {
+        clock_get(&a->cfg, &d->face);
+    } else if (a->blink_active) {
+        build_blink_display(a, now, d);
+    } else {
+        build_timer_display(a, now, d);
+    }
+}
+
+static bool display_equal(const Display *x, const Display *y)
+{
+    return x->view == y->view && x->label == y->label && x->has_progress == y->has_progress &&
+           x->alpha[0] == y->alpha[0] && x->alpha[1] == y->alpha[1] &&
+           face_equal(&x->face, &y->face);
+}
+
+static void apply_alpha(App *a, const Display *d)
+{
+    if (d->alpha[0] == d->alpha[1]) {
+        render_set_tile_alpha(a->render, -1, d->alpha[0]);
+    } else {
+        render_set_tile_alpha(a->render, 0, d->alpha[0]);
+        render_set_tile_alpha(a->render, 1, d->alpha[1]);
+    }
+}
+
+static void apply_display(App *a, const Display *d, Uint64 now)
+{
+    bool animate = a->cfg.animations && a->has_shown && a->shown.view == d->view;
+    const ClockFace *f = &d->face;
+    render_set_tiles(a->render, f->values, f->count, f->hide_leading_zero, animate, now);
+    render_set_ampm(a->render, f->ampm);
+    render_set_label(a->render, d->label);
+    apply_alpha(a, d);
+    float p = -1.0f;
+    if (d->has_progress)
+        p = timer_progress(&a->timer, now);
+    render_set_progress(a->render, p);
+    a->shown = *d;
+    a->has_shown = true;
+}
+
+/* Il progresso si aggiorna solo quando cambia qualcosa di visibile (nessun risveglio extra). */
+static void update_display(App *a, Uint64 now)
+{
+    Display d;
+    build_display(a, now, &d);
+    if (!a->has_shown || !display_equal(&d, &a->shown)) {
+        apply_display(a, &d, now);
         a->dirty = true;
+    }
+}
+
+/* Fine timer: notifiche, vista Timer a 00:00 e lampeggio. */
+static void on_timer_finished(App *a, Uint64 now)
+{
+    if (a->cfg.timer_notify) {
+        int m = a->timer.minutes;
+        char body[96];
+        snprintf(body, sizeof body, "Sessione di studio completata (%dh %02dmin)", m / 60, m % 60);
+        notify_desktop("flipclock", body);
+    }
+    if (a->cfg.timer_sound)
+        notify_sound();
+    a->view = VIEW_TIMER;
+    a->blink_active = true;
+    a->blink_start = now;
+}
+
+static void blink_tick(App *a, Uint64 now)
+{
+    if (a->blink_active && now - a->blink_start >= BLINK_PHASES * BLINK_PHASE_NS) {
+        a->blink_active = false;
+        a->view = VIEW_CLOCK;
     }
 }
 
@@ -161,21 +379,49 @@ static void apply_resize(App *a)
 {
     int w = 0, h = 0;
     SDL_GetCurrentRenderOutputSize(a->ren, &w, &h);
-    if (w > 0 && h > 0)
+    if (w > 0 && h > 0) {
         render_resize(a->render, w, h);
+        if (panel_open(a))
+            ui_settings_resize(a->ui, w, h);
+    }
     a->resized = false;
 }
 
-/* Timeout di attesa in ms: prossimo cambio d'ora o scadenza cursore. */
+static uint32_t ns_to_ms_ceil(Uint64 ns)
+{
+    Uint64 ms = (ns + SDL_NS_PER_MS - 1) / SDL_NS_PER_MS;
+    return ms > 0x7fffffffu ? 0x7fffffffu : (uint32_t)ms;
+}
+
+static uint32_t until_ms(Uint64 deadline, Uint64 now)
+{
+    return ns_to_ms_ceil(deadline > now ? deadline - now : 0);
+}
+
+static uint32_t blink_ms(const App *a, Uint64 now)
+{
+    if (!a->blink_active)
+        return UINT32_MAX;
+    Uint64 phase = (now - a->blink_start) / BLINK_PHASE_NS;
+    return until_ms(a->blink_start + (phase + 1) * BLINK_PHASE_NS, now);
+}
+
+static uint32_t min_u32(uint32_t x, uint32_t y)
+{
+    return x < y ? x : y;
+}
+
+/* Timeout di attesa in ms: minimo tra cambio orologio, fine/cambio timer, fase di
+ * lampeggio, scadenza cursore e poll delle notifiche. */
 static int32_t wait_timeout_ms(const App *a, Uint64 now)
 {
     uint32_t ms = clock_ms_to_next_change(&a->cfg);
-    if (a->cursor_deadline) {
-        Uint64 left = a->cursor_deadline > now ? a->cursor_deadline - now : 0;
-        uint32_t c = (uint32_t)((left + SDL_NS_PER_MS - 1) / SDL_NS_PER_MS);
-        if (c < ms)
-            ms = c;
-    }
+    if (a->timer.state == TIMER_RUNNING)
+        ms = min_u32(ms, timer_ms_to_next_change(&a->timer, &a->cfg, now));
+    ms = min_u32(ms, blink_ms(a, now));
+    ms = min_u32(ms, notify_ms_to_next_poll());
+    if (a->cursor_deadline)
+        ms = min_u32(ms, until_ms(a->cursor_deadline, now));
     return ms > 0x7fffffffu ? 0x7fffffff : (int32_t)ms;
 }
 
@@ -196,8 +442,13 @@ static void main_loop(App *a)
 
         if (a->resized)
             apply_resize(a);
-        cursor_tick(a, SDL_GetTicksNS());
-        update_clock(a);
+        now = SDL_GetTicksNS();
+        cursor_tick(a, now);
+        if (timer_update(&a->timer, now))
+            on_timer_finished(a, now);
+        blink_tick(a, now);
+        notify_poll();
+        update_display(a, now);
 
         now = SDL_GetTicksNS();
         bool animating = render_is_animating(a->render, now);
@@ -208,6 +459,8 @@ static void main_loop(App *a)
 
         if (a->dirty) {
             render_draw(a->render, now);
+            if (panel_open(a))
+                ui_settings_draw(a->ui, &a->cfg);
             SDL_RenderPresent(a->ren);
             a->dirty = false;
         }
@@ -259,9 +512,11 @@ static bool app_open(App *a, const char *font_path)
     }
     render_set_style(a->render, a->cfg.scale, a->cfg.brightness);
     apply_resize(a);
-    ClockFace f;
-    clock_get(&a->cfg, &f);
-    apply_face(a, &f, false);
+    timer_init(&a->timer, a->cfg.timer_default_minutes);
+    char wav[1024];
+    notify_init(settings_find_asset("ding.wav", wav, sizeof wav) ? wav : NULL);
+    a->ui = ui_settings_create(a->ren, font_path);
+    update_display(a, SDL_GetTicksNS());
     a->dirty = true;
     if (a->cfg.start_fullscreen)
         cursor_activity(a);
@@ -270,6 +525,9 @@ static bool app_open(App *a, const char *font_path)
 
 static void app_close(App *a)
 {
+    notify_shutdown();
+    if (a->ui)
+        ui_settings_destroy(a->ui);
     if (a->render)
         render_destroy(a->render);
     if (a->ren)

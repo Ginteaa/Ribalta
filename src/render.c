@@ -40,11 +40,17 @@ struct Render {
     float ink_cy;            /* centro verticale dell'inchiostro nella superficie cifra */
     SDL_Texture *lbl[2];     /* AM, PM */
     float lbl_w[2], lbl_h[2];
+    SDL_Texture *tag[2];     /* TIMER, PAUSA */
+    float tag_w[2], tag_h[2];
+    Uint8 gray;              /* grigio delle cifre (con luminosita') */
 
     Tile tile[MAX_TILES];
     int vals[MAX_TILES];
     bool have_vals, hide_lz;
     int ampm;
+    RenderLabel label;
+    float progress;          /* < 0: nascosta */
+    float alpha[MAX_TILES];
 };
 
 static float clampf(float v, float lo, float hi) { return v < lo ? lo : (v > hi ? hi : v); }
@@ -60,6 +66,10 @@ static void free_textures(Render *r)
     for (int i = 0; i < 2; i++) {
         if (r->lbl[i]) SDL_DestroyTexture(r->lbl[i]);
         r->lbl[i] = NULL;
+    }
+    for (int i = 0; i < 2; i++) {
+        if (r->tag[i]) SDL_DestroyTexture(r->tag[i]);
+        r->tag[i] = NULL;
     }
     for (int i = 0; i < MAX_TILES; i++)
         for (int k = 0; k < 2; k++) {
@@ -78,6 +88,8 @@ Render *render_create(SDL_Renderer *ren, const char *font_path)
     if (!r->font_path) { SDL_free(r); return NULL; }
     r->scale = 100;
     r->bright = 100;
+    r->progress = -1.0f;
+    for (int i = 0; i < MAX_TILES; i++) r->alpha[i] = 1.0f;
     return r;
 }
 
@@ -135,6 +147,7 @@ static bool build_glyphs(Render *r)
     const float b = (float)r->bright / 100.0f;
     const Uint8 g = (Uint8)(0xb7 * b + 0.5f);
     const SDL_Color col = { g, g, g, 255 };
+    r->gray = g;
 
     /* cifre */
     int top_off = 0;
@@ -198,6 +211,25 @@ static bool build_glyphs(Render *r)
             if (r->lbl[i]) {
                 SDL_SetTextureBlendMode(r->lbl[i], SDL_BLENDMODE_BLEND);
                 SDL_SetTextureAlphaMod(r->lbl[i], 178); /* 70% */
+            }
+        }
+        TTF_CloseFont(f);
+    }
+
+    /* etichette TIMER/PAUSA (50% opacita') */
+    f = open_font_for(r->font_path, 'A', r->th * 0.06f, NULL);
+    if (f) {
+        static const char *txt[2] = { "TIMER", "PAUSA" };
+        for (int i = 0; i < 2; i++) {
+            SDL_Surface *s = TTF_RenderText_Blended(f, txt[i], 0, col);
+            if (!s) continue;
+            r->tag_w[i] = (float)s->w;
+            r->tag_h[i] = (float)s->h;
+            r->tag[i] = SDL_CreateTextureFromSurface(r->ren, s);
+            SDL_DestroySurface(s);
+            if (r->tag[i]) {
+                SDL_SetTextureBlendMode(r->tag[i], SDL_BLENDMODE_BLEND);
+                SDL_SetTextureAlphaMod(r->tag[i], 128);
             }
         }
         TTF_CloseFont(f);
@@ -345,6 +377,25 @@ void render_set_ampm(Render *r, int ampm)
     if (r) r->ampm = ampm < 0 || ampm > 2 ? 0 : ampm;
 }
 
+void render_set_label(Render *r, RenderLabel label)
+{
+    if (r) r->label = (label == LABEL_TIMER || label == LABEL_PAUSA) ? label : LABEL_NONE;
+}
+
+void render_set_progress(Render *r, float p)
+{
+    if (!r) return;
+    r->progress = p < 0.0f ? -1.0f : clampf(p, 0.0f, 1.0f);
+}
+
+void render_set_tile_alpha(Render *r, int tile, float alpha)
+{
+    if (!r || tile >= MAX_TILES) return;
+    alpha = clampf(alpha, 0.0f, 1.0f);
+    if (tile < 0) { for (int i = 0; i < MAX_TILES; i++) r->alpha[i] = alpha; }
+    else r->alpha[tile] = alpha;
+}
+
 static bool tile_animating(const Tile *t, Uint64 now)
 {
     return t->anim && now - t->start < ANIM_NS;
@@ -421,12 +472,17 @@ void render_draw(Render *r, Uint64 now_ns)
         Tile *t = &r->tile[i];
         if (!t->face[0] || !t->face[1]) continue;
         float x = (float)(r->x0 + i * (r->tw + r->gap)), y = (float)r->y0;
+        const Uint8 am = (Uint8)(r->alpha[i] * 255.0f + 0.5f);
+        SDL_SetTextureAlphaMod(t->face[0], am);
+        SDL_SetTextureAlphaMod(t->face[1], am);
         if (tile_animating(t, now_ns)) {
             draw_flip(r, t, x, y, now_ns);
         } else {
             SDL_FRect dst = { x, y, (float)r->tw, (float)r->th };
             SDL_RenderTexture(r->ren, t->face[t->cur], NULL, &dst);
         }
+        SDL_SetTextureAlphaMod(t->face[0], 255);
+        SDL_SetTextureAlphaMod(t->face[1], 255);
         /* linea di taglio */
         SDL_SetRenderDrawColor(r->ren, 0, 0, 0, 255);
         SDL_FRect cut = { x, y + (float)r->th * 0.5f - (float)r->cut * 0.5f, (float)r->tw, (float)r->cut };
@@ -439,5 +495,33 @@ void render_draw(Render *r, Uint64 now_ns)
             SDL_FRect dst = { (float)r->x0 + m, (float)r->y0 + m, r->lbl_w[k], r->lbl_h[k] };
             SDL_RenderTexture(r->ren, r->lbl[k], NULL, &dst);
         }
+    }
+
+    if (r->count < 1) return;
+    const float lx = (float)r->x0;
+    const float total = (float)(r->count * r->tw + (r->count - 1) * r->gap);
+    const float th = (float)r->th;
+    if (r->label != LABEL_NONE) {
+        int k = r->label == LABEL_TIMER ? 0 : 1;
+        if (r->tag[k]) {
+            SDL_FRect dst = { lx, (float)r->y0 - th * 0.05f - r->tag_h[k], r->tag_w[k], r->tag_h[k] };
+            SDL_RenderTexture(r->ren, r->tag[k], NULL, &dst);
+        }
+    }
+    if (r->progress >= 0.0f) {
+        float bh = SDL_roundf(th * 0.006f);
+        if (bh < 2.0f) bh = 2.0f;
+        float by = (float)(r->y0 + r->th) + th * 0.06f;
+        const Uint8 g = r->gray;
+        SDL_SetRenderDrawBlendMode(r->ren, SDL_BLENDMODE_BLEND);
+        SDL_FRect track = { lx, by, total, bh };
+        SDL_SetRenderDrawColor(r->ren, g, g, g, 26);   /* 10% */
+        SDL_RenderFillRect(r->ren, &track);
+        SDL_FRect fill = { lx, by, SDL_roundf(total * r->progress), bh };
+        if (fill.w > 0.0f) {
+            SDL_SetRenderDrawColor(r->ren, g, g, g, 77); /* 30% */
+            SDL_RenderFillRect(r->ren, &fill);
+        }
+        SDL_SetRenderDrawBlendMode(r->ren, SDL_BLENDMODE_NONE);
     }
 }

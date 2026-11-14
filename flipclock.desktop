@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=flipclock
+Comment=Orologio flip con timer di studio
+Exec=flipclock
+Icon=alarm-clock
+Categories=Utility;Clock;
+StartupWMClass=flipclock
+Terminal=false

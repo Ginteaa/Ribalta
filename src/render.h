@@ -30,6 +30,20 @@ void render_set_tiles(Render *r, const int *values, int count, bool hide_leading
 /* 0 = nascosto, 1 = AM, 2 = PM */
 void render_set_ampm(Render *r, int ampm);
 
+/* --- Fase 2 --- */
+
+/* Etichetta piccola in alto a sinistra sopra la prima tessera (50% opacità). */
+typedef enum { LABEL_NONE, LABEL_TIMER, LABEL_PAUSA } RenderLabel;
+void render_set_label(Render *r, RenderLabel label);
+
+/* Barra di avanzamento sotto le tessere (2 px logici, colore cifra al 30%).
+ * p in 0..1; p < 0 la nasconde. */
+void render_set_progress(Render *r, float p);
+
+/* Opacità di una tessera (0..1; tile = -1 per tutte). Usata per: pausa (0.5),
+ * selezione in impostazione timer (0.4 sulla non selezionata), lampeggio a fine timer. */
+void render_set_tile_alpha(Render *r, int tile, float alpha);
+
 /* true se almeno una tessera sta ancora animando a now_ns */
 bool render_is_animating(const Render *r, Uint64 now_ns);
 

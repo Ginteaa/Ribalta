@@ -18,9 +18,10 @@ L'app ha una modalità attiva alla volta. All'avvio parte sempre in **Orologio**
 
 - L'utente imposta una durata in **ore e minuti** (da 0h01 a 23h59), es. 2h30 per studiare 2 ore e mezza.
 - Stati: `IMPOSTAZIONE` → `IN CORSO` ⇄ `IN PAUSA` → `FINITO`.
-- **IMPOSTAZIONE**: le tessere mostrano la durata scelta (`HH:MM`), la cifra selezionata lampeggia
-  leggermente (opacità). Frecce ↑/↓ cambiano il valore (±1 min, Shift = ±10 min,
-  Ctrl = ±1 h), ←/→ spostano la selezione tra ore e minuti.
+- **IMPOSTAZIONE**: le tessere mostrano la durata scelta (`HH:MM`); la tessera selezionata (ore o minuti)
+  è a piena luminosità, l'altra attenuata al 40% (niente lampeggio: zero risvegli della CPU).
+  ←/→ selezionano ore o minuti; ↑/↓ cambiano la parte selezionata di ±1
+  (sui minuti Shift = ±10). Durata sempre limitata a 0h01–23h59.
 - **IN CORSO**: countdown con le stesse tessere flip.
   - Se la durata rimanente è ≥ 1 h → mostra `HH:MM` (i minuti si aggiornano a ogni minuto intero).
   - Se < 1 h → mostra `MM:SS`.
@@ -30,7 +31,12 @@ L'app ha una modalità attiva alla volta. All'avvio parte sempre in **Orologio**
 - **FINITO**:
   - notifica desktop "Sessione di studio completata (2h30)" tramite `notify-send`;
   - suono breve opzionale (`timer_sound=true`), riprodotto con `SDL_PlayAudio` da un WAV incluso;
-  - le tessere mostrano `00:00` e lampeggiano 3 volte, poi l'app torna in **Orologio**.
+  - l'app passa alla vista Timer, le tessere mostrano `00:00` e lampeggiano 3 volte (≈1,8 s),
+    poi l'app torna in **Orologio** e il timer torna in IMPOSTAZIONE con l'ultima durata usata.
+- Il countdown mostra il tempo arrotondato per eccesso all'unità visibile (appena avviato un timer
+  da 2h30 mostra `02:30`).
+- **Il timer continua in background**: `T` alterna solo la vista Orologio/Timer, il conto alla
+  rovescia prosegue e la fine viene notificata anche se si sta guardando l'orologio.
 - Il timer usa un orologio monotono: non è influenzato da cambi di ora di sistema o NTP.
 - Se si chiude l'app con il timer in corso, il timer è perso (in Fase 3 la sessione parziale viene
   comunque registrata nelle statistiche).
@@ -62,7 +68,7 @@ Se il file non esiste viene creato al primo salvataggio.
 | Tasto | Azione |
 |---|---|
 | `F` / `F11` / doppio clic | Schermo intero on/off |
-| `T` | Entra/esce dalla modalità Timer (uscendo con timer attivo chiede conferma premendo di nuovo `T`) |
+| `T` | Alterna la vista Orologio / Timer (il timer attivo continua in background) |
 | `Spazio` / `Invio` | Timer: avvia / pausa / riprendi |
 | `R` | Timer: reset alla durata impostata |
 | `↑ ↓ ← →` | Timer in impostazione: regola durata. Pannello: naviga |
