@@ -5,3 +5,4 @@ build/
 
 # file locale per Claude Code (importa AGENTS.md), non versionato
 CLAUDE.md
+docs/plans/

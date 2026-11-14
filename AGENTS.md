@@ -1,4 +1,4 @@
-# AGENTS.md — guide for AI agents working on Ribalta
+ AGENTS.md — guide for AI agents working on Ribalta
 
 Read this file first. It tells you what the project is, where the documentation lives, how the code
 is organised and how work is split between agents.
@@ -27,6 +27,7 @@ preserve that (see *Engineering rules* below).
 | [`docs/03-architecture.md`](docs/03-architecture.md) | **How it is built**: stack, resource strategy, repository layout, measurements, build | you add a module, change the main loop or anything performance-related |
 | [`docs/04-roadmap.md`](docs/04-roadmap.md) | Phases done (✅) and future ideas | you plan new work |
 | `docs/images/` | Screenshots and the flip GIF used by the README | you change something visible (update the screenshot) |
+| `docs/plans/` | **Local, git-ignored**: open plans not yet implemented (one file each, with status and date) | **before planning new work** — continue an existing plan instead of starting over; may not exist on other machines |
 
 If code and docs disagree, **the code is the truth** — fix the docs in the same change.
 
@@ -78,7 +79,9 @@ Work on this project is split between an **orchestrator** and **implementers**:
 
 Typical cycle for a feature:
 
-1. **Plan** — the orchestrator agrees the behaviour with the user and writes it into the spec / roadmap.
+1. **Plan** — the orchestrator agrees the behaviour with the user, saves the plan as `docs/plans/<name>.md`
+   (local, git-ignored) and updates the spec / roadmap. When the plan is done, mark it ✅ in the roadmap
+   and delete the plan file.
 2. **Interfaces** — the orchestrator writes or extends the headers so the project still compiles.
 3. **Parallel implementation** — 2–4 Sonnet subagents, each owning different files, briefed with:
    the docs to read, the header contract, the files they may touch, acceptance criteria
