@@ -12,6 +12,9 @@
 
 #define DIGIT_H_RATIO     0.72f  /* altezza cifre / altezza tessera */
 #define DIGIT_MAX_STRETCH 1.25f  /* allungamento verticale massimo */
+#ifndef TILE_H_RATIO
+#define TILE_H_RATIO      0.82f  /* altezza / larghezza tessera */
+#endif
 
 typedef struct {
     SDL_Texture *face[2]; /* target: face[cur] = valore mostrato/nuovo, face[cur^1] = precedente */
@@ -241,7 +244,7 @@ static void layout(Render *r)
     float W = (float)r->pw * (float)r->scale / 100.0f;
     float tw = W * (n == 3 ? 0.31f : 0.46f);
     float gap = W * (n == 3 ? 0.035f : 0.04f);
-    float th = tw * 0.95f;
+    float th = tw * TILE_H_RATIO;
     float maxh = (float)r->ph * 0.85f;
     if (th > maxh) {
         float k = maxh / th;

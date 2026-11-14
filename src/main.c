@@ -1,6 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <fcntl.h>
+#include <sys/file.h>
+#include <unistd.h>
 #include <SDL3/SDL.h>
 #include <SDL3_ttf/SDL_ttf.h>
 #include "clock.h"
@@ -277,8 +280,31 @@ static void app_close(App *a)
     SDL_Quit();
 }
 
+/* Istanza singola: lock esclusivo su $XDG_RUNTIME_DIR/flipclock.lock (fallback /tmp).
+ * Il descrittore resta aperto per tutta la vita del processo; il kernel rilascia
+ * il lock all'uscita, anche in caso di crash. Ritorna false se un'altra istanza è attiva. */
+static bool acquire_single_instance(void)
+{
+    const char *dir = getenv("XDG_RUNTIME_DIR");
+    char path[512];
+    snprintf(path, sizeof path, "%s/flipclock.lock", (dir && *dir) ? dir : "/tmp");
+    int fd = open(path, O_RDWR | O_CREAT | O_CLOEXEC, 0600);
+    if (fd < 0)
+        return true; /* non bloccare l'avvio se il lock non è creabile */
+    if (flock(fd, LOCK_EX | LOCK_NB) != 0) {
+        close(fd);
+        return false;
+    }
+    return true; /* fd lasciato aperto di proposito */
+}
+
 int main(void)
 {
+    if (!acquire_single_instance()) {
+        fprintf(stderr, "flipclock: già in esecuzione\n");
+        return 0;
+    }
+
     App app;
     memset(&app, 0, sizeof app);
     app.running = true;

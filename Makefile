@@ -1,8 +1,8 @@
 CC      ?= cc
 PKGS    := sdl3 sdl3-ttf
 CFLAGS  ?= -std=c17 -Wall -Wextra -Wpedantic -O2
-CFLAGS  += $(shell pkg-config --cflags $(PKGS)) -D_POSIX_C_SOURCE=200809L
-LDLIBS  += $(shell pkg-config --libs $(PKGS)) -lm
+override CFLAGS += $(shell pkg-config --cflags $(PKGS)) -D_POSIX_C_SOURCE=200809L
+override LDLIBS += $(shell pkg-config --libs $(PKGS)) -lm
 SRC     := $(wildcard src/*.c)
 OBJ     := $(SRC:src/%.c=build/%.o)
 BIN     := flipclock
