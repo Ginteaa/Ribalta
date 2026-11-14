@@ -42,14 +42,4 @@ bool settings_save(const Settings *s);
 /* Mette rgb in testa ai colori recenti (rimuove un eventuale duplicato, tronca a RECENT_COLORS_MAX). */
 void settings_push_recent(Settings *s, uint32_t rgb);
 
-/* Cerca un file asset (es. "font.ttf") in ordine:
- * $RIBALTA_DATA, ./assets, <dir dell'eseguibile>/assets,
- * $XDG_DATA_HOME/ribalta (fallback ~/.local/share/ribalta), /usr/share/ribalta.
- * Scrive il percorso trovato in out. Ritorna false se non trovato. */
-/* Directory dati: $XDG_DATA_HOME/ribalta (fallback ~/.local/share/ribalta), creata se manca.
- * Ritorna false su errore. */
-bool settings_data_dir(char *out, size_t out_size);
-
-bool settings_find_asset(const char *name, char *out, size_t out_size);
-
 #endif

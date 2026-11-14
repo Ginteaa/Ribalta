@@ -3,8 +3,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <SDL3/SDL.h>
-#include "settings.h"
-#include "timer.h"
+#include "core/settings.h"
+#include "core/timer.h"
 
 /* Pomodoro — docs/04-roadmap.md §3.1. Usa un Timer per la fase corrente. Nessuna allocazione. */
 typedef enum { POMO_WORK, POMO_BREAK, POMO_LONG_BREAK } PomoPhase;

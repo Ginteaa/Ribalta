@@ -4,7 +4,7 @@
 #include <time.h>
 
 /* Statistiche di studio — docs/04-roadmap.md §3.2.
- * File: settings_data_dir()/sessions.csv. Letto solo su richiesta, nulla tenuto in memoria. */
+ * File: paths_data_dir()/sessions.csv. Letto solo su richiesta, nulla tenuto in memoria. */
 
 /* Aggiunge una riga (crea file + intestazione se mancano). Ignora durate < 60 s (ritorna true).
  * type: "timer" o "pomodoro". Ritorna false su errore di I/O. */

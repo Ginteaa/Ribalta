@@ -1,4 +1,4 @@
-#include "../src/settings.h"
+#include "core/settings.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

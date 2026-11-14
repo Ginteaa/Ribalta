@@ -2,7 +2,7 @@
 #define RIBALTA_UI_SETTINGS_H
 #include <stdbool.h>
 #include <SDL3/SDL.h>
-#include "settings.h"
+#include "core/settings.h"
 
 /* Pannello impostazioni in overlay — docs/01 §1.3 e docs/02 §4.
  * Il font TTF viene aperto solo mentre il pannello è aperto (RAM minima a riposo).

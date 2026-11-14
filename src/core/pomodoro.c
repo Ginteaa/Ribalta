@@ -1,4 +1,4 @@
-#include "pomodoro.h"
+#include "core/pomodoro.h"
 #include <stdio.h>
 
 static int phase_minutes(PomoPhase ph, const Settings *s)

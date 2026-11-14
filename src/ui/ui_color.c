@@ -1,4 +1,4 @@
-#include "ui_color.h"
+#include "ui/ui_color.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -6,7 +6,7 @@
 #include <string.h>
 #include <SDL3_ttf/SDL_ttf.h>
 
-#include "color.h"
+#include "core/color.h"
 
 enum { ZONE_SQUARE, ZONE_HUE, ZONE_PALETTE, ZONE_HEX, ZONE_COUNT };
 enum { DRAG_NONE, DRAG_SQUARE, DRAG_HUE };

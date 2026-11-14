@@ -1,6 +1,6 @@
-#include "settings.h"
-#include "color.h"
-#include <SDL3/SDL.h>
+#include "core/settings.h"
+#include "core/color.h"
+#include "platform/paths.h"
 #include <ctype.h>
 #include <errno.h>
 #include <stdio.h>
@@ -32,29 +32,6 @@ void settings_defaults(Settings *s)
     s->recent_count = 0;
     for (int i = 0; i < RECENT_COLORS_MAX; i++)
         s->recent_colors[i] = 0;
-}
-
-/* ---- percorsi ---- */
-
-static bool xdg_dir(char *out, size_t n, const char *env, const char *home_sub)
-{
-    const char *x = getenv(env);
-    if (x && x[0] == '/')
-        return snprintf(out, n, "%s/ribalta", x) < (int)n;
-    const char *h = getenv("HOME");
-    if (!h || !h[0])
-        return false;
-    return snprintf(out, n, "%s/%s/ribalta", h, home_sub) < (int)n;
-}
-
-static bool config_path(char *out, size_t n, bool dir_only)
-{
-    char d[PATH_MAX_LEN];
-    if (!xdg_dir(d, sizeof d, "XDG_CONFIG_HOME", ".config"))
-        return false;
-    if (dir_only)
-        return snprintf(out, n, "%s", d) < (int)n;
-    return snprintf(out, n, "%s/config.ini", d) < (int)n;
 }
 
 /* ---- parsing ---- */
@@ -130,7 +107,7 @@ bool settings_load(Settings *s)
 {
     settings_defaults(s);
     char path[PATH_MAX_LEN];
-    if (!config_path(path, sizeof path, false))
+    if (!paths_config_file(path, sizeof path))
         return false;
     FILE *f = fopen(path, "r");
     if (!f)
@@ -152,30 +129,12 @@ bool settings_load(Settings *s)
 
 /* ---- salvataggio ---- */
 
-static bool mkdir_p(const char *path)
-{
-    char tmp[PATH_MAX_LEN];
-    size_t len = strlen(path);
-    if (len == 0 || len >= sizeof tmp)
-        return false;
-    memcpy(tmp, path, len + 1);
-    for (char *p = tmp + 1; *p; p++) {
-        if (*p != '/')
-            continue;
-        *p = '\0';
-        if (mkdir(tmp, 0755) != 0 && errno != EEXIST)
-            return false;
-        *p = '/';
-    }
-    return mkdir(tmp, 0755) == 0 || errno == EEXIST;
-}
-
 bool settings_save(const Settings *s)
 {
     char dir[PATH_MAX_LEN], path[PATH_MAX_LEN];
-    if (!config_path(dir, sizeof dir, true) || !config_path(path, sizeof path, false))
+    if (!paths_config_dir(dir, sizeof dir) || snprintf(path, sizeof path, "%s/config.ini", dir) >= (int)sizeof path)
         return false;
-    if (!mkdir_p(dir))
+    if (!paths_mkdir_p(dir))
         return false;
     FILE *f = fopen(path, "w");
     if (!f)
@@ -222,48 +181,4 @@ void settings_push_recent(Settings *s, uint32_t rgb)
     for (int i = 0; i < n; i++)
         s->recent_colors[i] = out[i];
     s->recent_count = n;
-}
-
-bool settings_data_dir(char *out, size_t out_size)
-{
-    char d[PATH_MAX_LEN];
-    if (!xdg_dir(d, sizeof d, "XDG_DATA_HOME", ".local/share") || strlen(d) >= out_size)
-        return false;
-    if (!mkdir_p(d))
-        return false;
-    memcpy(out, d, strlen(d) + 1);
-    return true;
-}
-
-/* ---- asset ---- */
-
-static bool try_dir(const char *dir, const char *name, char *out, size_t n)
-{
-    if (!dir || !dir[0])
-        return false;
-    char p[PATH_MAX_LEN];
-    if (snprintf(p, sizeof p, "%s/%s", dir, name) >= (int)sizeof p)
-        return false;
-    if (access(p, R_OK) != 0)
-        return false;
-    if (strlen(p) >= n)
-        return false;
-    memcpy(out, p, strlen(p) + 1);
-    return true;
-}
-
-bool settings_find_asset(const char *name, char *out, size_t out_size)
-{
-    char d[PATH_MAX_LEN];
-    if (try_dir(getenv("RIBALTA_DATA"), name, out, out_size))
-        return true;
-    if (try_dir("./assets", name, out, out_size))
-        return true;
-    const char *base = SDL_GetBasePath(); /* di proprieta' di SDL */
-    if (base && snprintf(d, sizeof d, "%s/assets", base) < (int)sizeof d
-        && try_dir(d, name, out, out_size))
-        return true;
-    if (xdg_dir(d, sizeof d, "XDG_DATA_HOME", ".local/share") && try_dir(d, name, out, out_size))
-        return true;
-    return try_dir("/usr/share/ribalta", name, out, out_size);
 }

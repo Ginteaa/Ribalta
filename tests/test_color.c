@@ -1,4 +1,4 @@
-#include "../src/color.h"
+#include "core/color.h"
 #include <stdio.h>
 #include <string.h>
 

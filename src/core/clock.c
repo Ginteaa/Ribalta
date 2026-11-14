@@ -1,4 +1,4 @@
-#include "clock.h"
+#include "core/clock.h"
 #include <time.h>
 
 void clock_get(const Settings *s, ClockFace *out)

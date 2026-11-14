@@ -1,5 +1,5 @@
-#include "ui_settings.h"
-#include "color.h"
+#include "ui/ui_settings.h"
+#include "core/color.h"
 
 #include <math.h>
 #include <stdio.h>

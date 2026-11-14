@@ -3,7 +3,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <SDL3/SDL.h>
-#include "settings.h"
+#include "core/settings.h"
 
 /* Timer di studio — docs/01-specifiche-funzionali.md §1.2.
  * Tutti i tempi sono in ns da SDL_GetTicksNS() (monotono). Nessuna allocazione. */

@@ -2,7 +2,7 @@
 #define RIBALTA_CLOCK_H
 #include <stdbool.h>
 #include <stdint.h>
-#include "settings.h"
+#include "core/settings.h"
 
 typedef struct {
     int  values[3];          /* ore, minuti, [secondi]; ciascuno 0..99 */

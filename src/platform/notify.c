@@ -1,4 +1,4 @@
-#include "notify.h"
+#include "platform/notify.h"
 #include <SDL3/SDL.h>
 #include <spawn.h>
 #include <sys/types.h>

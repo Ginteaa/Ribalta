@@ -1,5 +1,6 @@
-#include "stats.h"
-#include "settings.h"
+#include "core/stats.h"
+#include "platform/paths.h"
+#include "core/settings.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -21,7 +22,7 @@ static long day_number(int year, int mon /*1-12*/, int mday)
 static bool csv_path(char *out, size_t n)
 {
     char dir[1024];
-    if (!settings_data_dir(dir, sizeof dir)) return false;
+    if (!paths_data_dir(dir, sizeof dir)) return false;
     int r = snprintf(out, n, "%s/sessions.csv", dir);
     return r > 0 && (size_t)r < n;
 }

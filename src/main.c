@@ -7,17 +7,18 @@
 #include <unistd.h>
 #include <SDL3/SDL.h>
 #include <SDL3_ttf/SDL_ttf.h>
-#include "clock.h"
-#include "color.h"
-#include "notify.h"
-#include "pomodoro.h"
-#include "render.h"
-#include "settings.h"
-#include "stats.h"
-#include "timer.h"
-#include "ui_color.h"
-#include "ui_settings.h"
-#include "ui_stats.h"
+#include "core/clock.h"
+#include "platform/paths.h"
+#include "core/color.h"
+#include "platform/notify.h"
+#include "core/pomodoro.h"
+#include "render/render.h"
+#include "core/settings.h"
+#include "core/stats.h"
+#include "core/timer.h"
+#include "ui/ui_color.h"
+#include "ui/ui_settings.h"
+#include "ui/ui_stats.h"
 
 #define CURSOR_HIDE_NS (2000ULL * SDL_NS_PER_MS)
 #define BLINK_PHASE_NS (300ULL * SDL_NS_PER_MS)
@@ -922,8 +923,8 @@ static bool app_open(App *a, const char *font_path)
     a->applied_accent = ~0u;
     char wav[1024];
     char icon[1024];
-    notify_init(settings_find_asset("ding.wav", wav, sizeof wav) ? wav : NULL,
-                settings_find_asset("ribalta.svg", icon, sizeof icon) ? icon : NULL);
+    notify_init(paths_find_asset("ding.wav", wav, sizeof wav) ? wav : NULL,
+                paths_find_asset("ribalta.svg", icon, sizeof icon) ? icon : NULL);
     if (!a->screensaver) {
         a->ui = ui_settings_create(a->ren, font_path);
         a->sui = ui_stats_create(a->ren, font_path);
@@ -1024,7 +1025,7 @@ int main(int argc, char **argv)
     settings_load(&app.cfg);
 
     char font[1024];
-    if (!settings_find_asset("font.ttf", font, sizeof font)) {
+    if (!paths_find_asset("font.ttf", font, sizeof font)) {
         fprintf(stderr, "ribalta: font.ttf not found (searched $RIBALTA_DATA, ./assets, "
                         "<exe>/assets, ~/.local/share/ribalta, /usr/share/ribalta)\n");
         return 1;

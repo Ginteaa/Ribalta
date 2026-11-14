@@ -1,5 +1,5 @@
-#include "ui_stats.h"
-#include "stats.h"
+#include "ui/ui_stats.h"
+#include "core/stats.h"
 
 #include <math.h>
 #include <stdio.h>

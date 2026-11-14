@@ -1,4 +1,4 @@
-#include "../src/timer.h"
+#include "core/timer.h"
 #include <stdio.h>
 
 static int fails;
