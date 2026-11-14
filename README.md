@@ -9,6 +9,7 @@
   <img alt="SDL3" src="https://img.shields.io/badge/SDL-3-orange?style=flat-square">
   <img alt="Linux" src="https://img.shields.io/badge/Linux-Wayland%20%C2%B7%20X11-success?style=flat-square">
   <img alt="RAM" src="https://img.shields.io/badge/RAM-~18%20MB-informational?style=flat-square">
+  <img alt="License: GPL-3.0" src="https://img.shields.io/badge/license-GPL--3.0-blue?style=flat-square">
 </p>
 
 <p align="center">
@@ -212,5 +213,13 @@ The design documents live in [`docs/`](docs/README.md):
 
 ## 📄 License
 
-The license for the Ribalta source code has not been chosen yet. The bundled IBM Plex Sans
-Condensed font is distributed under the SIL Open Font License 1.1.
+Copyright © 2026 Samuele
+
+Ribalta is free software: you can redistribute it and/or modify it under the terms of the
+**GNU General Public License** as published by the Free Software Foundation, either version 3 of
+the License, or (at your option) any later version. It is distributed in the hope that it will be
+useful, but WITHOUT ANY WARRANTY. See [`LICENSE`](LICENSE) for the full text
+(SPDX: `GPL-3.0-or-later`).
+
+The bundled IBM Plex Sans Condensed font keeps its own license, the SIL Open Font License 1.1
+([`assets/OFL.txt`](assets/OFL.txt)).
