@@ -509,17 +509,17 @@ void render_draw(Render *r, Uint64 now_ns)
         }
     }
     if (r->progress >= 0.0f) {
-        float bh = SDL_roundf(th * 0.006f);
-        if (bh < 2.0f) bh = 2.0f;
+        float bh = SDL_roundf(th * 0.012f);
+        if (bh < 3.0f) bh = 3.0f;
         float by = (float)(r->y0 + r->th) + th * 0.06f;
         const Uint8 g = r->gray;
         SDL_SetRenderDrawBlendMode(r->ren, SDL_BLENDMODE_BLEND);
         SDL_FRect track = { lx, by, total, bh };
-        SDL_SetRenderDrawColor(r->ren, g, g, g, 26);   /* 10% */
+        SDL_SetRenderDrawColor(r->ren, g, g, g, 51);   /* 20% */
         SDL_RenderFillRect(r->ren, &track);
         SDL_FRect fill = { lx, by, SDL_roundf(total * r->progress), bh };
         if (fill.w > 0.0f) {
-            SDL_SetRenderDrawColor(r->ren, g, g, g, 77); /* 30% */
+            SDL_SetRenderDrawColor(r->ren, g, g, g, 153); /* 60% */
             SDL_RenderFillRect(r->ren, &fill);
         }
         SDL_SetRenderDrawBlendMode(r->ren, SDL_BLENDMODE_NONE);

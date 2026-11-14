@@ -26,7 +26,7 @@ L'app ha una modalità attiva alla volta. All'avvio parte sempre in **Orologio**
   - Se la durata rimanente è ≥ 1 h → mostra `HH:MM` (i minuti si aggiornano a ogni minuto intero).
   - Se < 1 h → mostra `MM:SS`.
   - Se `show_seconds=true` → mostra sempre `HH:MM:SS`.
-  - Una sottile barra di avanzamento in basso (2 px, colore della cifra al 30%) indica il tempo trascorso.
+  - Una sottile barra di avanzamento sotto le tessere (≥3 px, colore della cifra al 60% su binario al 20%) indica il tempo trascorso.
 - **IN PAUSA**: le cifre si attenuano (opacità 50%), il tempo non scorre.
 - **FINITO**:
   - notifica desktop "Sessione di studio completata (2h30)" tramite `notify-send`;
