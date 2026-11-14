@@ -38,3 +38,10 @@ jobs:
           test -f _inst/share/ribalta/ding.wav
           test -f _inst/share/icons/hicolor/scalable/apps/ribalta.svg
           test -f _inst/share/icons/hicolor/48x48/apps/ribalta.png
+
+      - name: Uninstall keeps user data
+        run: |
+          echo "dummy,line" > _inst/share/ribalta/sessions.csv
+          make uninstall PREFIX="$PWD/_inst"
+          test -f _inst/share/ribalta/sessions.csv
+          test ! -e _inst/bin/ribalta

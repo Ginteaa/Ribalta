@@ -79,11 +79,35 @@ make release    # optimised build (LTO, stripped)
 make install    # installs to ~/.local (runs a release build first)
 ```
 
-`make install` puts the binary in `~/.local/bin/ribalta`, the launcher in
-`~/.local/share/applications/ribalta.desktop` and the assets (font, licence, chime, icon) in
-`~/.local/share/ribalta`. Use `PREFIX=/usr make install` (as root) for a system-wide install, and
-`make uninstall` (with the same `PREFIX`) to remove everything. Make sure `~/.local/bin` is in
-your `PATH`.
+`make install` builds, then copies the binary to `~/.local/bin/ribalta`, the launcher to
+`~/.local/share/applications/ribalta.desktop`, the icons to `~/.local/share/icons/hicolor` and the
+assets (font, licence, chime) to `~/.local/share/ribalta`. In a terminal it shows a banner and a
+progress bar; in logs or pipes it prints plain lines, like this:
+
+```text
+Checking requirements
+✓ C compiler (cc)
+✓ make
+✓ pkg-config
+✓ SDL3
+✓ SDL3_ttf
+
+[1/5] Building...
+✓ Building
+[2/5] Installing binary...
+✓ Installing binary
+[3/5] Installing assets...
+✓ Installing assets
+[4/5] Installing icons...
+✓ Installing icons
+[5/5] Desktop entry and icon cache...
+✓ Desktop entry and icon cache
+```
+
+Use `make V=1` for the full compiler commands during a normal build. Use
+`PREFIX=/usr make install` (as root) for a system-wide install. `make uninstall` (with the same
+`PREFIX`) removes only the installed files: **your settings and statistics are kept**. Make sure
+`~/.local/bin` is in your `PATH`.
 
 ## ⌨️ Keyboard shortcuts
 

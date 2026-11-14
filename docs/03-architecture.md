@@ -74,24 +74,48 @@ Checking resource use: `ps -o rss,pcpu -C ribalta`, `pidstat -p <pid> 1`, `/usr/
 ribalta/
 ├── Makefile
 ├── README.md
-├── docs/
-├── assets/
-│   ├── font.ttf          (IBM Plex Sans Condensed Bold, OFL) + OFL.txt
-│   └── ding.wav          (end-of-timer sound, short, royalty-free)
-└── src/
-    ├── main.c            SDL init, event loop, key dispatch, timeout selection
-    ├── app.h             shared App struct (global state, mode)
-    ├── clock.c/.h        local time → tile values, next change boundary
-    ├── timer.c/.h        timer state machine (SETUP/RUNNING/PAUSED/FINISHED)
-    ├── render.c/.h       layout, digit/tile textures, flip animation, progress bar
-    ├── font.c/.h         TTF loading, glyph rasterisation with SDL3_ttf → SDL_Texture
-    ├── settings.c/.h     read/write config.ini (XDG)
-    ├── ui_settings.c/.h  settings panel (overlay)
-    └── notify.c/.h       notify-send + SDL sound
+├── src/
+│   ├── main.c              CLI parsing, SDL init/shutdown, main loop, wait-timeout selection
+│   ├── app/
+│   │   ├── app.h           App struct, views, display model, shared constants
+│   │   ├── input.c/.h      keyboard and mouse handling, routing to the overlays
+│   │   ├── display.c/.h    builds and applies the on-screen model (tiles, colours, labels)
+│   │   └── session.c/.h    end of timer/Pomodoro, statistics logging, screen-lock handling
+│   ├── core/               pure logic, testable without a window
+│   │   ├── clock  timer  pomodoro  stats  settings  color   (.c/.h)
+│   ├── platform/           OS integration
+│   │   ├── notify.c/.h     notify-send + sound
+│   │   └── paths.c/.h      XDG config/data directories, asset lookup
+│   ├── render/
+│   │   └── render.c/.h     layout, digit/tile textures, flip animation, progress bar
+│   └── ui/                 overlay panels
+│       ├── ui_settings.c/.h
+│       ├── ui_stats.c/.h
+│       └── ui_color.c/.h
+├── assets/                 font, licence, chime, icon source
+│   ├── icons/              PNG icons (16 ... 512 px)
+│   └── ribalta.desktop     launcher entry
+├── tests/                  unit tests run by `make test` and the CI
+├── tools/
+│   ├── install.sh          `make install`: build, install, progress UI
+│   ├── uninstall.sh        `make uninstall`: removes only installed files, keeps user data
+│   └── icons.sh            regenerates the PNG icons from the SVG
+├── docs/                   specifications and design notes
+└── .github/workflows/      CI (build, tests, install/uninstall smoke test)
 ```
 
-(This is the original Phase 1–2 layout; later phases added further modules, e.g. for the Pomodoro
-and statistics.)
+Folder roles:
+
+- `src/app/`: application state and behaviour that ties the other layers together.
+- `src/core/`: logic with no SDL window or I/O dependency (time, timer, Pomodoro, statistics, settings, colours).
+- `src/platform/`: everything that talks to the operating system (notifications, directories).
+- `src/render/`: drawing only; textures and animation.
+- `src/ui/`: settings, statistics and colour-picker overlays.
+- `assets/`, `tests/`, `tools/`, `docs/`: resources, unit tests, install/maintenance scripts, documentation.
+
+Conventions: headers live next to their `.c`; includes are written from `src/`
+(e.g. `#include "core/timer.h"`). `make` prints short lines (`  CC   core/timer.c`);
+use `make V=1` to see the full compiler commands.
 
 Asset files are searched in this order: `$RIBALTA_DATA`, `./assets`, `<executable dir>/assets`,
 `~/.local/share/ribalta` (`$XDG_DATA_HOME/ribalta`), `/usr/share/ribalta`.
