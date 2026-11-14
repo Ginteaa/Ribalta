@@ -2,7 +2,7 @@ name: Flatpak
 
 on:
   push:
-    branches: [main, feat/flatpak]
+    branches: [main]
   pull_request:
   workflow_dispatch:
 
