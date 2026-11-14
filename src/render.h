@@ -1,0 +1,39 @@
+#ifndef FLIPCLOCK_RENDER_H
+#define FLIPCLOCK_RENDER_H
+#include <stdbool.h>
+#include <SDL3/SDL.h>
+
+/* Modulo di disegno: tessere, cifre pre-renderizzate, animazione flip.
+ * Vedi docs/02-design-grafico.md e docs/03-architettura-tecnica.md §2. */
+typedef struct Render Render;
+
+/* font_path: TTF usato per le cifre e per le etichette (AM/PM).
+ * Non crea ancora texture: serve una chiamata a render_resize. NULL su errore. */
+Render *render_create(SDL_Renderer *ren, const char *font_path);
+void    render_destroy(Render *r);
+
+/* Dimensione in PIXEL dell'area di disegno (SDL_GetCurrentRenderOutputSize).
+ * Ricalcola il layout e rigenera le texture delle cifre/tessere a quella misura. */
+void render_resize(Render *r, int pixel_w, int pixel_h);
+
+/* scale_pct 50..100, brightness_pct 20..100. Se cambiano, rigenera le texture. */
+void render_set_style(Render *r, int scale_pct, int brightness_pct);
+
+/* Imposta i valori mostrati (count 2 o 3, ogni valore 0..99).
+ * hide_leading_zero: la tessera 0 mostra una sola cifra se < 10.
+ * animate=true: le tessere il cui valore cambia avviano il flip (400 ms) da now_ns.
+ * Se count cambia rispetto a prima, il layout si aggiorna senza animazione.
+ * Valori uguali ai correnti: nessun effetto. */
+void render_set_tiles(Render *r, const int *values, int count, bool hide_leading_zero,
+                      bool animate, Uint64 now_ns);
+
+/* 0 = nascosto, 1 = AM, 2 = PM */
+void render_set_ampm(Render *r, int ampm);
+
+/* true se almeno una tessera sta ancora animando a now_ns */
+bool render_is_animating(const Render *r, Uint64 now_ns);
+
+/* Disegna l'intero fotogramma (clear + tessere). NON chiama SDL_RenderPresent. */
+void render_draw(Render *r, Uint64 now_ns);
+
+#endif

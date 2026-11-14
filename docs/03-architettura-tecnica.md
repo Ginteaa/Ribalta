@@ -6,7 +6,7 @@
 |---|---|---|
 | Linguaggio | **C17** | nessun runtime, binario piccolo, controllo totale della memoria |
 | Finestra / rendering / input / audio | **SDL3** (già installato, 3.4.x) | backend Wayland nativo, renderer GPU, un'unica dipendenza |
-| Rasterizzazione font | **stb_truetype** (header singolo, pubblico dominio, in `third_party/`) | `sdl3_ttf` non è installato; stb evita una dipendenza (FreeType + HarfBuzz) e serve solo per generare le texture una volta all'avvio |
+| Rasterizzazione font | **SDL3_ttf** (3.2.x) | API semplice; usato solo per generare le texture una volta all'avvio/resize. Il font viene chiuso dopo la generazione per liberare memoria |
 | Notifiche | processo `notify-send` (`fork`+`execvp`) | evita di linkare libnotify/GLib (diversi MB di RAM) |
 | Build | **Makefile** + `pkg-config` | semplice, nessun build system extra |
 
@@ -20,9 +20,16 @@
 | Tauri / webview | ~80–150 MB | media | motore web completo |
 | Electron | ~150–300 MB | media/alta | Chromium intero |
 
-> Parte della RAM di SDL3 dipende dal driver GPU (contesto GL/Vulkan). Se necessario si può forzare
-> il renderer `software` (`SDL_HINT_RENDER_DRIVER=software`): meno RAM, un po' più di CPU solo
-> durante il flip. Va misurato in Fase 1 e scelto il migliore come default.
+> **Misure Fase 1** (Wayland/niri, 65 s inclusi un flip, PSS da `/proc/<pid>/smaps_rollup`):
+>
+> | Renderer SDL | PSS | RSS | CPU in 65 s |
+> |---|---|---|---|
+> | `gpu` (SDL_GPU / Vulkan) — **default** | ~17 MB | ~27 MB | ~50 ms |
+> | `opengl` | ~37 MB | ~103 MB | ~40 ms |
+> | `software` | RSS ~113 MB (carica comunque EGL) | | |
+>
+> Ordine impostato: `gpu,opengl,opengles2,software`; `SDL_RENDER_DRIVER=<nome>` lo sovrascrive.
+> Binario release: ~27 KB.
 
 ## 2. Strategia per consumare pochissime risorse
 
@@ -34,7 +41,7 @@
    cambia dimensione/esposizione, si apre il pannello. Durante il flip si usa il vsync
    (`SDL_SetRenderVSync(renderer, 1)`), ~24 frame per 400 ms, poi si torna a dormire.
 3. **Texture pre-renderizzate.** All'avvio (e a ogni resize) si generano le texture delle cifre
-   `0–9` alla dimensione esatta con stb_truetype, e la texture della tessera vuota. Durante il flip
+   `0–9` alla dimensione esatta con SDL3_ttf, e la texture della tessera vuota. Durante il flip
    si compongono solo rettangoli già in GPU: zero rasterizzazione per frame.
    Le texture si rigenerano solo al resize (con debounce di 150 ms).
 4. **Tempo corretto senza drift.**
@@ -56,17 +63,15 @@ Fliqlo_linux/
 ├── README.md
 ├── docs/
 ├── assets/
-│   ├── font.ttf          (OFL) + OFL.txt
+│   ├── font.ttf          (IBM Plex Sans Bold, OFL) + OFL.txt
 │   └── ding.wav          (suono fine timer, breve, libero da diritti)
-├── third_party/
-│   └── stb_truetype.h
 └── src/
     ├── main.c            init SDL, loop eventi, dispatch tasti, scelta del timeout
     ├── app.h             struct App condivisa (stato globale, modalità)
     ├── clock.c/.h        lettura ora locale → valori delle tessere, prossimo confine
     ├── timer.c/.h        macchina a stati del timer (IMPOSTAZIONE/IN CORSO/IN PAUSA/FINITO)
     ├── render.c/.h       layout, texture cifre/tessere, animazione flip, barra avanzamento
-    ├── font.c/.h         caricamento TTF, rasterizzazione glifi con stb_truetype → SDL_Texture
+    ├── font.c/.h         caricamento TTF, rasterizzazione glifi con SDL3_ttf → SDL_Texture
     ├── settings.c/.h     lettura/scrittura config.ini (XDG)
     ├── ui_settings.c/.h  pannello impostazioni (overlay)
     └── notify.c/.h       notify-send + suono SDL
@@ -114,9 +119,9 @@ Uint32 clock_ms_to_next_change(const Settings *s);
 
 ```make
 CC      ?= cc
-PKGS    := sdl3
+PKGS    := sdl3 sdl3-ttf
 CFLAGS  ?= -std=c17 -Wall -Wextra -Wpedantic -O2
-CFLAGS  += $(shell pkg-config --cflags $(PKGS)) -Ithird_party
+CFLAGS  += $(shell pkg-config --cflags $(PKGS))
 LDLIBS  += $(shell pkg-config --libs $(PKGS)) -lm
 SRC     := $(wildcard src/*.c)
 OBJ     := $(SRC:src/%.c=build/%.o)

@@ -86,6 +86,6 @@ Il cursore del mouse si nasconde dopo 2 s di inattività in schermo intero.
 | CPU a riposo (tra un'animazione e l'altra) | ~0% — il processo dorme in attesa di eventi |
 | CPU durante il flip | breve picco, animazione ≤ 400 ms |
 | Tempo di avvio | < 200 ms |
-| Dipendenze runtime | solo SDL3 (+ `notify-send` opzionale) |
+| Dipendenze runtime | SDL3 + SDL3_ttf (+ `notify-send` opzionale) |
 | Precisione | il cambio di minuto avviene entro 50 ms dal minuto reale |
 | Piattaforme | Linux Wayland (prioritario), X11 |
