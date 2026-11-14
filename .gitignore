@@ -6,3 +6,9 @@ build/
 # file locale per Claude Code (importa AGENTS.md), non versionato
 CLAUDE.md
 docs/plans/
+
+# build Flatpak
+build-flatpak/
+.flatpak-builder/
+*.flatpak
+repo-flatpak/

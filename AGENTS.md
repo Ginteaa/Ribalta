@@ -41,13 +41,16 @@ src/
 ├── core/         pure logic, no window needed: clock, timer, pomodoro, stats, settings, color
 ├── platform/     notify.c (notify-send + chime) · paths.c (XDG dirs, asset lookup)
 │                 fonts.c (system font list, fontconfig only while needed)
+│                 gpu.c (Flatpak only: Vulkan driver filter, saves ~40 MB)
 ├── render/       render.c — tiles, pre-rendered glyphs, flip animation
 └── ui/           overlays: ui_settings, ui_stats, ui_color (colour picker), ui_font (font menu)
 assets/           font (IBM Plex Sans Condensed, OFL), chime, icon (svg + icons/NxN.png), .desktop
 tests/            unit tests (plain C, no display): test_timer, test_color, test_settings, test_fonts
 tools/            install.sh / uninstall.sh (pretty installer), icons.sh (PNG icons from the SVG)
+packaging/flatpak/  Flatpak manifest + AppStream metainfo (io.github.ginteaa.Ribalta)
 docs/             design documents (see the map above)
-.github/workflows/build.yml   CI: Arch container, -Werror build, tests, release, install/uninstall checks
+.github/workflows/build.yml     CI: Arch container, -Werror build, tests, release, install/uninstall checks
+.github/workflows/flatpak.yml   CI: builds the Flatpak bundle (ribalta.flatpak artifact)
 ```
 
 Conventions: each `.h` lives next to its `.c`; includes are written from `src/`
@@ -64,6 +67,7 @@ Conventions: each `.h` lives next to its `.c`; includes are written from `src/`
 | `make debug` | ASan + UBSan build |
 | `make release` | LTO + stripped binary |
 | `make install PREFIX=/tmp/...` | installer test — **never** install into the user's real `~/.local` unless asked |
+| `make install-files PREFIX=... APPID=...` | install without building (used by the Flatpak manifest) |
 | `make icons` | regenerate `assets/icons/*.png` from `assets/ribalta.svg` |
 
 Runtime knobs: `SDL_RENDER_DRIVER=<name>` (default order gpu, opengl, opengles2, software),

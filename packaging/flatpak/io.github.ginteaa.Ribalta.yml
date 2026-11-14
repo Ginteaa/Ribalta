@@ -1,0 +1,32 @@
+# Flatpak di Ribalta. Il runtime freedesktop 25.08 contiene già SDL3, SDL3_ttf, fontconfig e
+# notify-send: nessun modulo extra da compilare.
+#   flatpak-builder --user --install --force-clean build-flatpak packaging/flatpak/io.github.ginteaa.Ribalta.yml
+id: io.github.ginteaa.Ribalta
+runtime: org.freedesktop.Platform
+runtime-version: '25.08'
+sdk: org.freedesktop.Sdk
+command: ribalta
+finish-args:
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --share=ipc
+  - --device=dri
+  - --socket=pulseaudio
+  - --talk-name=org.freedesktop.Notifications
+  # app_id Wayland / classe X11 uguali all'id dell'app (icona e nome giusti nel launcher)
+  - --env=SDL_APP_ID=io.github.ginteaa.Ribalta
+modules:
+  - name: ribalta
+    buildsystem: simple
+    build-commands:
+      - make release
+      - make install-files PREFIX=/app APPID=io.github.ginteaa.Ribalta
+      - install -Dm644 packaging/flatpak/io.github.ginteaa.Ribalta.metainfo.xml /app/share/metainfo/io.github.ginteaa.Ribalta.metainfo.xml
+    sources:
+      - type: dir
+        path: ../..
+        skip:
+          - build
+          - build-flatpak
+          - .flatpak-builder
+          - ribalta

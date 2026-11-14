@@ -89,6 +89,10 @@ bool paths_find_asset(const char *name, char *out, size_t out_size)
     if (base && snprintf(d, sizeof d, "%s/assets", base) < (int)sizeof d
         && try_dir(d, name, out, out_size))
         return true;
+    /* installazione con prefisso (es. Flatpak: /app/bin/ribalta -> /app/share/ribalta) */
+    if (base && snprintf(d, sizeof d, "%s/../share/ribalta", base) < (int)sizeof d
+        && try_dir(d, name, out, out_size))
+        return true;
     if (xdg_dir(d, sizeof d, "XDG_DATA_HOME", ".local/share") && try_dir(d, name, out, out_size))
         return true;
     return try_dir("/usr/share/ribalta", name, out, out_size);

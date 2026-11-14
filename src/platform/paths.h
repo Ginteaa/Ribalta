@@ -18,7 +18,7 @@ bool paths_data_dir(char *out, size_t out_size);
 bool paths_mkdir_p(const char *path);
 
 /* Cerca un file asset (es. "font.ttf") in ordine:
- * $RIBALTA_DATA, ./assets, <dir dell'eseguibile>/assets,
+ * $RIBALTA_DATA, ./assets, <dir dell'eseguibile>/assets, <dir dell'eseguibile>/../share/ribalta,
  * $XDG_DATA_HOME/ribalta (fallback ~/.local/share/ribalta), /usr/share/ribalta.
  * Scrive il percorso trovato in out. Ritorna false se non trovato. */
 bool paths_find_asset(const char *name, char *out, size_t out_size);

@@ -10,6 +10,7 @@
 
 <p align="center">
   <a href="https://github.com/Ginteaa/Ribalta/actions/workflows/build.yml"><img alt="build" src="https://github.com/Ginteaa/Ribalta/actions/workflows/build.yml/badge.svg"></a>
+  <a href="https://github.com/Ginteaa/Ribalta/actions/workflows/flatpak.yml"><img alt="flatpak" src="https://github.com/Ginteaa/Ribalta/actions/workflows/flatpak.yml/badge.svg"></a>
   <img alt="C17" src="https://img.shields.io/badge/language-C17-blue?style=flat-square">
   <img alt="SDL3" src="https://img.shields.io/badge/SDL-3-orange?style=flat-square">
   <img alt="Linux" src="https://img.shields.io/badge/Linux-Wayland%20%C2%B7%20X11-success?style=flat-square">
@@ -56,6 +57,43 @@ original and the project is not affiliated with Fliqlo.
 | <img src="docs/images/stats.png" alt="Statistics panel" width="420"><br>**Statistics** overlay (`I`, sample data) | <img src="docs/images/colors.png" alt="Colour picker" width="420"><br>**Colour picker**: live preview of the digit colour |
 
 ## 📦 Installation
+
+### Install with Flatpak
+
+The Flatpak package works on any distribution, including Ubuntu 24.04 and Linux Mint 22, whose
+repositories do not ship SDL3. The runtime provides SDL3, SDL3_ttf, fontconfig and `notify-send`, so
+nothing else has to be installed. Ribalta is not on Flathub yet.
+
+1. On Ubuntu, Flatpak is not installed by default (Mint already has it):
+
+```sh
+sudo apt install flatpak
+flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+```
+
+2. Download `ribalta.flatpak` from the artifacts of the latest successful **Flatpak** workflow run
+   (GitHub, *Actions* tab; the artifact is a zip that contains the `.flatpak` file).
+3. Install and run it (the `org.freedesktop.Platform` 25.08 runtime is fetched from Flathub):
+
+```sh
+flatpak install --user ribalta.flatpak
+flatpak run io.github.ginteaa.Ribalta
+```
+
+To build the package locally:
+
+```sh
+flatpak install --user flathub org.freedesktop.Sdk//25.08
+flatpak-builder --user --install --force-clean build-flatpak packaging/flatpak/io.github.ginteaa.Ribalta.yml
+```
+
+Inside the sandbox the configuration and the data live in `~/.var/app/io.github.ginteaa.Ribalta/`
+(`config/ribalta/config.ini`, `data/ribalta/sessions.csv`). The system fonts are visible to the digit-font menu.
+
+Packagers can use `make install-files PREFIX=... APPID=...`, which installs the files without
+building (used by the Flatpak manifest).
+
+### Install from source
 
 **Dependencies**
 

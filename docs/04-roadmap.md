@@ -90,7 +90,17 @@ accumulate error (±1 s over 1 h); settings survive a restart.
   overlay (search field, scrolling list, "12:34" preview, live preview on the tiles).
 - `fontconfig` added to the install checks and CI; `tests/test_fonts.c`.
 
+## Phase 6 — Flatpak package ✅
+
+- Manifest `packaging/flatpak/io.github.ginteaa.Ribalta.yml` on `org.freedesktop.Platform` 25.08
+  (SDL3, SDL3_ttf, fontconfig and `notify-send` come from the runtime).
+- AppStream metainfo, app-id `io.github.ginteaa.Ribalta` (also set as `SDL_APP_ID`).
+- `make install-files` target; `paths.c` also finds assets in `<exe dir>/../share/ribalta`.
+- GitHub Actions workflow `flatpak.yml` builds the `ribalta.flatpak` bundle.
+
 ## Future ideas
+- Publish the Flatpak on Flathub.
+- Snap package.
 - Colour themes (light, amber, terminal green) built on the digit colour.
 - Choice of monitor in fullscreen.
 - AUR package (`PKGBUILD`).

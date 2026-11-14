@@ -100,7 +100,8 @@ ribalta/
 │   ├── platform/           OS integration
 │   │   ├── notify.c/.h     notify-send + sound
 │   │   ├── paths.c/.h      XDG config/data directories, asset lookup
-│   │   └── fonts.c/.h      installed font list (fontconfig), ring stepping; no state kept
+│   │   ├── fonts.c/.h      installed font list (fontconfig), ring stepping; no state kept
+│   │   └── gpu.c/.h        Flatpak only: load just the Vulkan drivers for the installed GPUs
 │   ├── render/
 │   │   └── render.c/.h     layout, digit/tile textures, flip animation, progress bar
 │   └── ui/                 overlay panels
@@ -116,8 +117,9 @@ ribalta/
 │   ├── install.sh          `make install`: build, install, progress UI
 │   ├── uninstall.sh        `make uninstall`: removes only installed files, keeps user data
 │   └── icons.sh            regenerates the PNG icons from the SVG
+├── packaging/flatpak/      Flatpak manifest and AppStream metainfo
 ├── docs/                   specifications and design notes
-└── .github/workflows/      CI (build, tests, install/uninstall smoke test)
+└── .github/workflows/      CI (build, tests, install/uninstall smoke test, Flatpak bundle)
 ```
 
 Folder roles:
@@ -170,6 +172,48 @@ void tile_set(Tile *t, int v, Uint64 now, bool animate);
 void   clock_values(const Settings *s, int out[3], bool *pm);
 Uint32 clock_ms_to_next_change(const Settings *s);
 ```
+
+## Packaging
+
+- **Flatpak**: `packaging/flatpak/io.github.ginteaa.Ribalta.yml` builds with `make release` and
+  `make install-files PREFIX=/app APPID=io.github.ginteaa.Ribalta`; the AppStream metainfo is
+  installed next to it. The CI workflow `flatpak.yml` produces the `ribalta.flatpak` bundle.
+- **Dependencies**: the `org.freedesktop.Platform` 25.08 runtime already ships SDL3, SDL3_ttf,
+  fontconfig and `notify-send`, so the manifest needs no extra modules.
+- **Permissions** (`finish-args`):
+  - `--socket=wayland`, `--socket=fallback-x11`: show the window on Wayland, or on X11 as fallback.
+  - `--share=ipc`: required by X11 shared memory.
+  - `--device=dri`: GPU rendering for the SDL renderer.
+  - `--socket=pulseaudio`: play the end-of-timer chime.
+  - `--talk-name=org.freedesktop.Notifications`: desktop notifications via `notify-send`.
+  - `--env=SDL_APP_ID=io.github.ginteaa.Ribalta`: Wayland app_id / X11 class equal to the app id,
+    so the launcher shows the right icon and name.
+- **Asset lookup order** (`paths.c`): `$RIBALTA_DATA`, `./assets`, `<exe dir>/assets`,
+  `<exe dir>/../share/ribalta` (prefix installs such as `/app`), `$XDG_DATA_HOME/ribalta`,
+  `/usr/share/ribalta`.
+- **`make install-files`** (for packagers): plain, quiet `install` commands for the binary, assets,
+  icons and desktop file, honouring `PREFIX`, `DESTDIR` and `APPID` (renames the desktop file and
+  icons, and sets `Icon=`/`StartupWMClass=`). It does not compile: run `make` or `make release` first.
+  `make install` stays the interactive installer (`tools/install.sh`).
+- **Vulkan drivers in the sandbox** (`platform/gpu.c`): the runtime's GL extension ships every Mesa
+  Vulkan driver (radeon, lvp, nouveau, …) and the Vulkan loader loads all of them, including
+  `libLLVM`. Inside Flatpak (`$FLATPAK_ID` set) Ribalta reads the PCI vendors from
+  `/sys/class/drm/card*/device/vendor` and sets `VK_LOADER_DRIVERS_SELECT` to the matching drivers
+  only, before `SDL_Init`. It does nothing if the user already set `VK_LOADER_DRIVERS_SELECT`,
+  `VK_DRIVER_FILES` or `VK_ICD_FILENAMES`, or if no vendor is recognised.
+- **Notifications** inside the sandbox go through the notification portal (libnotify does this
+  automatically); the portal ignores the app name and icon passed to `notify-send`.
+
+> **Flatpak measurements** (Intel, `gpu` renderer, idle clock, PSS):
+>
+> | Situation | PSS | RSS |
+> |---|---|---|
+> | All Mesa Vulkan drivers loaded (no filter) | ~70 MB | — |
+> | `VK_LOADER_DRIVERS_SELECT=*intel*` (automatic) | ~27.5 MB | ~27.5 MB |
+> | Native build, for comparison | ~18 MB | ~28.5 MB |
+>
+> RSS is the same as native; PSS is higher only because the runtime's libraries are not shared
+> with host processes. CPU at idle: ~20 ms in 65 s.
 
 ## 4. Makefile
 

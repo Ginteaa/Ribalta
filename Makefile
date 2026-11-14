@@ -48,6 +48,23 @@ release: clean
 install:
 	@./tools/install.sh "$(PREFIX)"
 
+# installazione semplice e silenziosa per chi impacchetta (Flatpak, distribuzioni):
+#   make install-files PREFIX=/app DESTDIR=... APPID=io.github.ginteaa.Ribalta
+# APPID rinomina .desktop e icone; vuoto = "ribalta". Non compila: serve prima make / make release.
+APPID   ?= ribalta
+ICON_SIZES := 16 22 24 32 48 64 128 256 512
+install-files:
+	install -Dm755 $(BIN) $(DESTDIR)$(PREFIX)/bin/$(BIN)
+	for f in font.ttf OFL.txt ding.wav ribalta.svg; do \
+	  install -Dm644 assets/$$f $(DESTDIR)$(PREFIX)/share/ribalta/$$f; done
+	for s in $(ICON_SIZES); do \
+	  install -Dm644 assets/icons/$${s}x$${s}.png \
+	    $(DESTDIR)$(PREFIX)/share/icons/hicolor/$${s}x$${s}/apps/$(APPID).png; done
+	install -Dm644 assets/ribalta.svg $(DESTDIR)$(PREFIX)/share/icons/hicolor/scalable/apps/$(APPID).svg
+	install -d $(DESTDIR)$(PREFIX)/share/applications
+	sed -e 's/^Icon=.*/Icon=$(APPID)/' -e 's/^StartupWMClass=.*/StartupWMClass=$(APPID)/' \
+	  assets/ribalta.desktop > $(DESTDIR)$(PREFIX)/share/applications/$(APPID).desktop
+
 # rimuove solo i file installati: configurazione e statistiche dell'utente restano
 uninstall:
 	@./tools/uninstall.sh "$(PREFIX)"
@@ -73,4 +90,4 @@ test: $(addprefix build/tests/,$(TESTS))
 icons:
 	./tools/icons.sh
 
-.PHONY: all debug release install uninstall clean icons test
+.PHONY: all debug release install install-files uninstall clean icons test

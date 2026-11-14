@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.ginteaa.Ribalta</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+  <name>Ribalta</name>
+  <summary>Tiny flip clock and study timer</summary>
+  <developer id="io.github.ginteaa">
+    <name>Ginteaa</name>
+  </developer>
+  <description>
+    <p>
+      Ribalta shows the time on animated flip tiles and doubles as a study companion. It is written
+      in C with SDL3 and stays very light: about 18 MB of RAM and almost no CPU when idle.
+    </p>
+    <ul>
+      <li>Flip clock with optional seconds and 12/24-hour format</li>
+      <li>Study timer, also typed with the number keys</li>
+      <li>Pomodoro cycles with automatic breaks</li>
+      <li>Study statistics saved as CSV</li>
+      <li>Custom digit colour and any installed font for the digits</li>
+      <li>Fullscreen and screensaver mode, desktop notifications and a chime</li>
+    </ul>
+  </description>
+  <launchable type="desktop-id">io.github.ginteaa.Ribalta.desktop</launchable>
+  <url type="homepage">https://github.com/Ginteaa/Ribalta</url>
+  <url type="bugtracker">https://github.com/Ginteaa/Ribalta/issues</url>
+  <url type="vcs-browser">https://github.com/Ginteaa/Ribalta</url>
+  <screenshots>
+    <screenshot type="default">
+      <caption>Flip clock</caption>
+      <image>https://raw.githubusercontent.com/Ginteaa/Ribalta/main/docs/images/clock.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Pomodoro</caption>
+      <image>https://raw.githubusercontent.com/Ginteaa/Ribalta/main/docs/images/pomodoro.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Settings</caption>
+      <image>https://raw.githubusercontent.com/Ginteaa/Ribalta/main/docs/images/settings.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Study statistics</caption>
+      <image>https://raw.githubusercontent.com/Ginteaa/Ribalta/main/docs/images/stats.png</image>
+    </screenshot>
+  </screenshots>
+  <categories>
+    <category>Utility</category>
+    <category>Clock</category>
+  </categories>
+  <keywords>
+    <keyword>clock</keyword>
+    <keyword>flip clock</keyword>
+    <keyword>timer</keyword>
+    <keyword>pomodoro</keyword>
+    <keyword>study</keyword>
+  </keywords>
+  <supports>
+    <control>keyboard</control>
+    <control>pointing</control>
+  </supports>
+  <content_rating type="oars-1.1"/>
+  <releases>
+    <release version="0.5.0" date="2026-11-14">
+      <description>
+        <p>First packaged release: flip clock, study timer, Pomodoro, statistics, digit colour and font picker.</p>
+      </description>
+    </release>
+  </releases>
+</component>

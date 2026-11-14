@@ -14,6 +14,7 @@
 #include "app/display.h"
 #include "app/input.h"
 #include "app/session.h"
+#include "platform/gpu.h"
 #include "platform/paths.h"
 #include "platform/notify.h"
 
@@ -147,6 +148,7 @@ static void main_loop(App *a)
 
 static bool app_init(void)
 {
+    gpu_limit_vulkan_drivers(); /* solo in Flatpak: evita di caricare driver Vulkan inutili */
     SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "wayland,x11");
     SDL_SetHint(SDL_HINT_APP_ID, "ribalta");
     SDL_SetHint(SDL_HINT_VIDEO_ALLOW_SCREENSAVER, "1");
