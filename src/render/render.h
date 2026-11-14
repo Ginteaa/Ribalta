@@ -61,6 +61,15 @@ void render_set_digit_color(Render *r, Uint8 red, Uint8 green, Uint8 blue);
  * Economico come render_set_digit_color (nessuna texture ricreata). */
 void render_set_accent(Render *r, Uint8 red, Uint8 green, Uint8 blue);
 
+/* --- Font delle cifre --- */
+
+/* Cambia il TTF di cifre ed etichette e rigenera glifi e facce alla misura corrente
+ * (nessuna animazione; colore, stile e valori mostrati restano). Costoso: va chiamata solo quando
+ * il font cambia (anteprima del menu font, conferma, ←/→ nelle impostazioni).
+ * Se il file non si apre ritorna false e lascia il font precedente intatto. Stesso percorso del
+ * font attuale: nessun effetto, ritorna true. */
+bool render_set_font(Render *r, const char *font_path);
+
 /* true se almeno una tessera sta ancora animando a now_ns */
 bool render_is_animating(const Render *r, Uint64 now_ns);
 

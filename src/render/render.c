@@ -374,6 +374,25 @@ void render_resize(Render *r, int pixel_w, int pixel_h)
     rebuild(r);
 }
 
+bool render_set_font(Render *r, const char *font_path)
+{
+    if (!r || !font_path || !font_path[0]) return false;
+    if (strcmp(font_path, r->font_path) == 0) return true;
+    /* verifica prima che il nuovo file si apra: in caso di errore non cambia nulla */
+    TTF_Font *probe = TTF_OpenFont(font_path, 24.0f);
+    if (!probe) {
+        SDL_Log("render: font open failed: %s", SDL_GetError());
+        return false;
+    }
+    TTF_CloseFont(probe);
+    char *copy = SDL_strdup(font_path);
+    if (!copy) return false;
+    SDL_free(r->font_path);
+    r->font_path = copy;
+    rebuild(r); /* no-op se la misura non e' ancora nota; conserva colore, valori, etichette */
+    return true;
+}
+
 void render_set_style(Render *r, int scale_pct, int brightness_pct)
 {
     if (!r) return;

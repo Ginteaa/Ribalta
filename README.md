@@ -38,6 +38,7 @@ original and the project is not affiliated with Fliqlo.
 - 🕰️ **Flip clock** `HH:MM`, with optional seconds and 12h/24h format; only the tiles that change flip
 - ⏳ **Study timer** from 0h01 to 23h59, keeps running while you look at the clock; type the duration with the digit keys, microwave style (`1` `3` `0` → `01:30`)
 - 🍅 **Pomodoro** with study, short break and long break phases (breaks turn the digits blue, or amber if you picked a blue colour)
+- 🔤 **Digit font**: keep the bundled font or pick any installed font from a searchable drop-down menu with live preview
 - 🎨 **Digit colour** with a built-in colour picker (palette, HEX field, recent colours, live preview); the accent applies to digits, progress bar and labels
 - 📊 **Study statistics**: today, last 7 days, month, streak, completed sessions
 - ⚙️ **Settings overlay** (`S`), changes apply live and are saved to a plain `config.ini`
@@ -59,16 +60,17 @@ original and the project is not affiliated with Fliqlo.
 **Dependencies**
 
 - `sdl3` and `sdl3_ttf` (SDL3 ≥ 3.2 and SDL3_ttf ≥ 3.2; build and runtime)
+- `fontconfig` (build and runtime): lists the installed fonts for the digit-font menu
 - `libnotify` (optional): provides `notify-send` for desktop notifications
 
 On Arch Linux:
 
 ```sh
-sudo pacman -S sdl3 sdl3_ttf libnotify
+sudo pacman -S sdl3 sdl3_ttf fontconfig libnotify
 ```
 
 On other distributions install the equivalent SDL3 and SDL3_ttf development packages
-(`pkg-config` must find `sdl3` and `sdl3-ttf`), plus a C compiler and `make`.
+(`pkg-config` must find `sdl3`, `sdl3-ttf` and `fontconfig`), plus a C compiler and `make`.
 
 **Build and install**
 
@@ -91,6 +93,7 @@ Checking requirements
 ✓ pkg-config
 ✓ SDL3
 ✓ SDL3_ttf
+✓ fontconfig
 
 [1/5] Building...
 ✓ Building
@@ -124,7 +127,7 @@ Use `make V=1` for the full compiler commands during a normal build. Use
 | `I` | Open / close the statistics panel |
 | `← →` / `↑ ↓` | Timer in setup: select hours or minutes / adjust them (hours ±1, minutes ±1, `Shift` = ±10 min). Panels: navigate and change values |
 | `S` | Open / close the settings panel |
-| `Esc` | Cancel timer entry (keeps the previous duration); close the panel or the colour picker; otherwise leave fullscreen |
+| `Esc` | Cancel timer entry (keeps the previous duration); close the panel, the colour picker or the font menu; otherwise leave fullscreen |
 | `Q` / `Ctrl+Q` | Quit |
 
 `ribalta --help` lists the command-line options.
@@ -153,12 +156,21 @@ edit it by hand: the settings panel (`S`) changes everything live and saves on c
 | `pomodoro_auto_continue` | `true` | Start the next phase automatically |
 | `digit_color` | `#b7b7b7` | Digit colour `#rrggbb`; also tints the progress bar and labels (accent) |
 | `recent_colors` | empty | Up to 5 recently used colours, comma separated (`#rrggbb,#rrggbb`) |
+| `font_family` | empty | Name of the digit font (e.g. `DejaVu Sans`); empty = bundled font |
+| `font_file` | empty | Path of the digit font file; empty = bundled font. The value runs to the end of the line (spaces allowed) |
 
 The **Digit colour** row of the settings panel shows a swatch and the HEX code: `←`/`→` step through
 the palette, `Enter` opens the colour picker (saturation/value square, hue bar, HEX field, palette
 grid, recent colours; mouse or keyboard: `Tab` changes zone, `Enter` applies, `Esc` cancels). The
 digits preview the colour live. During Pomodoro breaks the digits are blue (`#6fa8dc`), or amber
 (`#ffb347`) if the chosen colour is already blue; the accent stays your colour.
+
+The **Digit font** row (right after the colour) shows the font name: `←`/`→` switch to the previous or
+next installed font, `Enter` opens the font menu: type to filter, `↑`/`↓`/`PgUp`/`PgDn`/`Home`/`End`
+or the mouse wheel to move, click to select, `Enter` (or double click) applies and saves, `Esc` clears
+the filter, then restores the previous font. The tiles preview the selected font after a short pause.
+At startup the saved `font_file` is opened directly (no font lookup); if the file is missing Ribalta
+prints a warning on stderr and uses the bundled font, leaving the setting untouched.
 
 ## 🍅 Pomodoro
 

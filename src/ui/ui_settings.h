@@ -28,6 +28,12 @@ bool ui_settings_key(SettingsUI *ui, SDL_Keycode key, SDL_Keymod mod, Settings *
  * palette (color_palette_step) modificando s->digit_color e ui_settings_key ritorna true. */
 bool ui_settings_take_color_request(SettingsUI *ui);
 
+/* Riga "Font cifre" (subito dopo "Colore cifre"): mostra s->font_family o FONT_BUNDLED_NAME se
+ * vuoto. Invio chiede di aprire il menu dei font: ritorna true UNA volta (main apre ui_font).
+ * ←/→ sulla riga passano al font successivo/precedente (fonts_step) scrivendo s->font_family e
+ * s->font_file; ui_settings_key ritorna true (main allora chiama render_set_font). */
+bool ui_settings_take_font_request(SettingsUI *ui);
+
 /* Disegna overlay + pannello sopra il fotogramma corrente. Non chiama Present. */
 void ui_settings_draw(SettingsUI *ui, const Settings *s);
 

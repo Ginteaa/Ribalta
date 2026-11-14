@@ -116,6 +116,104 @@ static void color_mouse(App *a, const SDL_Event *ev)
     color_result(a, ui_color_mouse(a->cui, &copy));
 }
 
+bool input_font_open(const App *a)
+{
+    return a->fui && ui_font_is_open(a->fui);
+}
+
+/* Applica a Render il font `file` ("" = incluso). Ritorna false se non si apre (font precedente
+ * intatto). Se è già quello in uso non fa nulla. */
+static bool font_set(App *a, const char *file)
+{
+    const char *path = file && file[0] ? file : a->bundled_font;
+    if (strcmp(path, a->render_font) == 0)
+        return true;
+    if (!render_set_font(a->render, path))
+        return false;
+    snprintf(a->render_font, sizeof a->render_font, "%s", path);
+    a->dirty = true;
+    return true;
+}
+
+/* Come font_set, ma su errore ripiega sul font incluso. */
+static void font_set_or_bundled(App *a, const char *file)
+{
+    if (!font_set(a, file))
+        font_set(a, "");
+}
+
+static void open_font(App *a)
+{
+    int w, h;
+    if (!a->fui)
+        return;
+    pixel_size(a, &w, &h);
+    ui_font_open(a->fui, w, h, a->cfg.font_file);
+    a->font_preview_at = 0;
+    a->dirty = true;
+}
+
+/* Chiude il menu; con apply conferma la voce selezionata, altrimenti ripristina il font iniziale. */
+static void font_finish(App *a, bool apply)
+{
+    a->font_preview_at = 0;
+    if (!input_font_open(a))
+        return;
+    if (apply) {
+        char fam[sizeof a->cfg.font_family], file[sizeof a->cfg.font_file];
+        snprintf(fam, sizeof fam, "%s", ui_font_family(a->fui));
+        snprintf(file, sizeof file, "%s", ui_font_file(a->fui));
+        if (font_set(a, file)) {
+            snprintf(a->cfg.font_family, sizeof a->cfg.font_family, "%s", fam);
+            snprintf(a->cfg.font_file, sizeof a->cfg.font_file, "%s", file);
+            settings_save(&a->cfg);
+        } else {
+            font_set_or_bundled(a, a->cfg.font_file);
+        }
+    } else {
+        font_set_or_bundled(a, ui_font_original_file(a->fui));
+    }
+    ui_font_close(a->fui);
+    a->dirty = true;
+}
+
+/* Scaduta la pausa sulla voce: anteprima del font selezionato sulle tessere. */
+void input_font_preview_apply(App *a)
+{
+    a->font_preview_at = 0;
+    if (!input_font_open(a))
+        return;
+    font_set(a, ui_font_file(a->fui));
+    a->dirty = true;
+}
+
+static void font_result(App *a, UiFontResult r)
+{
+    switch (r) {
+    case UIFONT_CHANGED:
+        a->font_preview_at = SDL_GetTicksNS() + FONT_PREVIEW_NS;
+        a->dirty = true;
+        break;
+    case UIFONT_APPLY:
+        font_finish(a, true);
+        break;
+    case UIFONT_CANCEL:
+        font_finish(a, false);
+        break;
+    default:
+        break;
+    }
+    if (a->fui && ui_font_dirty(a->fui))
+        a->dirty = true;
+}
+
+static void font_mouse(App *a, const SDL_Event *ev)
+{
+    SDL_Event copy = *ev;
+    SDL_ConvertEventToRenderCoordinates(a->ren, &copy);
+    font_result(a, ui_font_mouse(a->fui, &copy));
+}
+
 bool input_stats_open(const App *a)
 {
     return a->sui && ui_stats_is_open(a->sui);
@@ -175,10 +273,21 @@ static void on_key_panel(App *a, const SDL_KeyboardEvent *k)
         return;
     }
     int old = a->cfg.timer_default_minutes;
-    if (ui_settings_key(a->ui, k->key, k->mod, &a->cfg))
+    char old_fam[sizeof a->cfg.font_family], old_file[sizeof a->cfg.font_file];
+    memcpy(old_fam, a->cfg.font_family, sizeof old_fam);
+    memcpy(old_file, a->cfg.font_file, sizeof old_file);
+    if (ui_settings_key(a->ui, k->key, k->mod, &a->cfg)) {
+        if (strcmp(old_file, a->cfg.font_file) != 0 && !font_set(a, a->cfg.font_file)) {
+            /* il file non si apre: si tiene il font precedente e le stringhe precedenti */
+            memcpy(a->cfg.font_family, old_fam, sizeof old_fam);
+            memcpy(a->cfg.font_file, old_file, sizeof old_file);
+        }
         settings_changed(a, old);
+    }
     if (a->cui && ui_settings_take_color_request(a->ui))
         open_color(a);
+    if (a->fui && ui_settings_take_font_request(a->ui))
+        open_font(a);
     a->dirty = true;
 }
 
@@ -335,6 +444,8 @@ static void on_key(App *a, const SDL_KeyboardEvent *k)
     if (k->key == SDLK_Q && !k->repeat) {
         if (input_color_open(a))
             color_finish(a); /* annulla l'anteprima */
+        if (input_font_open(a))
+            font_finish(a, false); /* ripristina il font */
         if (input_panel_open(a))
             settings_save(&a->cfg);
         a->running = false;
@@ -342,6 +453,10 @@ static void on_key(App *a, const SDL_KeyboardEvent *k)
     }
     if (input_color_open(a)) {
         color_result(a, ui_color_key(a->cui, k->key, k->mod));
+        return;
+    }
+    if (input_font_open(a)) {
+        font_result(a, ui_font_key(a->fui, k->key, k->mod));
         return;
     }
     if (input_stats_open(a)) {
@@ -403,6 +518,12 @@ void input_handle_event(App *a, const SDL_Event *ev)
     case SDL_EVENT_MOUSE_BUTTON_UP:
         if (input_color_open(a))
             color_mouse(a, ev);
+        else if (input_font_open(a))
+            font_mouse(a, ev);
+        break;
+    case SDL_EVENT_MOUSE_WHEEL:
+        if (input_font_open(a))
+            font_mouse(a, ev);
         break;
     case SDL_EVENT_KEY_DOWN:
     case SDL_EVENT_MOUSE_BUTTON_DOWN:
@@ -410,6 +531,11 @@ void input_handle_event(App *a, const SDL_Event *ev)
         if (ev->type != SDL_EVENT_KEY_DOWN && input_color_open(a)) {
             input_cursor_activity(a);
             color_mouse(a, ev);
+            break;
+        }
+        if (ev->type != SDL_EVENT_KEY_DOWN && input_font_open(a)) {
+            input_cursor_activity(a);
+            font_mouse(a, ev);
             break;
         }
         if (a->screensaver) {

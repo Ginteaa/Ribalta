@@ -12,6 +12,7 @@
 #include "core/timer.h"
 #include "render/render.h"
 #include "ui/ui_color.h"
+#include "ui/ui_font.h"
 #include "ui/ui_settings.h"
 #include "ui/ui_stats.h"
 
@@ -26,6 +27,9 @@
 
 /* Animazione flip a 30 fps invece di 60: dimezza la CPU durante i flip
  * (misurato ~1,4 ms CPU per fotogramma con il renderer gpu). */
+/* Pausa sulla voce del menu font prima dell'anteprima sulle tessere (riaprire il font è costoso). */
+#define FONT_PREVIEW_NS (150ULL * SDL_NS_PER_MS)
+
 #define ANIM_FRAME_NS (SDL_NS_PER_SECOND / 30)
 
 typedef enum { VIEW_CLOCK, VIEW_TIMER, VIEW_POMODORO } View;
@@ -54,6 +58,10 @@ typedef struct {
     ColorUI      *cui;               /* selettore colore (NULL in screensaver) */
     bool          preview_active;    /* anteprima dal vivo del selettore (non salvata) */
     uint32_t      preview_color;
+    FontUI       *fui;               /* menu dei font (NULL in screensaver) */
+    Uint64        font_preview_at;   /* scadenza anteprima font (0 = nessuna); entra nel timeout di attesa */
+    char          bundled_font[1024];/* font incluso (assets/font.ttf): fallback e testo dei pannelli */
+    char          render_font[1024]; /* file attualmente usato da Render per le cifre */
     TimerEntry    entry;             /* inserimento durata da tastiera (stile microonde) */
     bool          entry_active;
     bool          screensaver;

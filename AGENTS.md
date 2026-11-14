@@ -9,9 +9,9 @@ is organised and how work is split between agents.
 ## What Ribalta is
 
 A lightweight **flip clock and study timer for Linux** (Wayland and X11), written in **C17 + SDL3 +
-SDL3_ttf**. Features: flip clock (HH:MM, optional seconds, 12/24h), study timer (also typed with the
+SDL3_ttf + fontconfig**. Features: flip clock (HH:MM, optional seconds, 12/24h), study timer (also typed with the
 digit keys, microwave style), Pomodoro, study statistics (CSV), settings overlay, colour picker for
-the digits, screensaver mode, desktop notifications.
+the digits, digit-font menu (system fonts via fontconfig), screensaver mode, desktop notifications.
 
 **The top requirement is resource usage:** ~18 MB of RAM and ~0% CPU when idle. Every change must
 preserve that (see *Engineering rules* below).
@@ -40,10 +40,11 @@ src/
 │                 display.c (what the tiles show) · session.c (timer/Pomodoro end, stats, inhibit)
 ├── core/         pure logic, no window needed: clock, timer, pomodoro, stats, settings, color
 ├── platform/     notify.c (notify-send + chime) · paths.c (XDG dirs, asset lookup)
+│                 fonts.c (system font list, fontconfig only while needed)
 ├── render/       render.c — tiles, pre-rendered glyphs, flip animation
-└── ui/           overlays: ui_settings, ui_stats, ui_color (colour picker)
+└── ui/           overlays: ui_settings, ui_stats, ui_color (colour picker), ui_font (font menu)
 assets/           font (IBM Plex Sans Condensed, OFL), chime, icon (svg + icons/NxN.png), .desktop
-tests/            unit tests (plain C, no display): test_timer, test_color, test_settings
+tests/            unit tests (plain C, no display): test_timer, test_color, test_settings, test_fonts
 tools/            install.sh / uninstall.sh (pretty installer), icons.sh (PNG icons from the SVG)
 docs/             design documents (see the map above)
 .github/workflows/build.yml   CI: Arch container, -Werror build, tests, release, install/uninstall checks
@@ -98,7 +99,8 @@ Typical cycle for a feature:
 - **Draw only when something changed**; flips are paced at 30 fps.
 - **No allocations in the main loop or per frame.** Glyphs are pre-rendered once; colours are applied
   with `SDL_SetTextureColorMod` (changing colour must not re-open the font).
-- **Load on demand.** Fonts for overlays and the audio subsystem exist only while needed.
+- **Load on demand.** Fonts for overlays, the fontconfig font list and the audio subsystem exist only
+  while needed.
 - **Measure** after any change that could affect resources: idle PSS (~18 MB) and CPU over 65 s
   (≈ tens of ms per minute). Document new numbers in `docs/03-architecture.md`.
 - **User data is sacred:** never delete or overwrite `~/.config/ribalta/` or
@@ -107,7 +109,9 @@ Typical cycle for a feature:
 - **GUI tests must not disturb the user.** Prefer offscreen rendering
   (`SDL_HINT_VIDEO_DRIVER=offscreen` or `SDL_CreateSoftwareRenderer`) for previews. When the real app
   must run, use a temporary config, a separate `XDG_RUNTIME_DIR` (the single-instance lock would
-  otherwise stop it if the user has Ribalta open), fake `notify-send` and `SDL_AUDIO_DRIVER=dummy`.
+  otherwise stop it if the user has Ribalta open; then pass `WAYLAND_DISPLAY` as an absolute path,
+  e.g. `$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY` taken before the override, or no window appears), fake
+  `notify-send` and `SDL_AUDIO_DRIVER=dummy`.
 - **Language:** code comments and UI strings are in Italian; README, docs and installer output in English.
 
 ## Git conventions

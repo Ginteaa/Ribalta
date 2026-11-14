@@ -5,7 +5,7 @@
 #   make debug      ASan + UBSan             make icons      rigenera le PNG dell'icona
 
 CC      ?= cc
-PKGS    := sdl3 sdl3-ttf
+PKGS    := sdl3 sdl3-ttf fontconfig
 CFLAGS  ?= -std=c17 -Wall -Wextra -Wpedantic -O2
 override CFLAGS += $(shell pkg-config --cflags $(PKGS)) -D_POSIX_C_SOURCE=200809L -Isrc
 override LDLIBS += $(shell pkg-config --libs $(PKGS)) -lm
@@ -59,7 +59,7 @@ clean:
 
 # test unitari (senza display): ogni tests/test_*.c è un programma a sé, fallisce al primo errore
 TESTS       := $(patsubst tests/%.c,%,$(wildcard tests/test_*.c))
-TEST_COMMON := src/core/settings.c src/core/color.c src/core/timer.c src/platform/paths.c
+TEST_COMMON := src/core/settings.c src/core/color.c src/core/timer.c src/platform/paths.c src/platform/fonts.c
 
 build/tests/%: tests/%.c $(TEST_COMMON)
 	$(call say,CC,tests/$*.c)

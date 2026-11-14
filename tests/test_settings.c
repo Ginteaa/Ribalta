@@ -74,6 +74,33 @@ int main(void) {
     settings_push_recent(&s, 5);
     CHECK(s.recent_count == 5 && s.recent_colors[0] == 5 && s.recent_colors[1] == 7);
 
+    /* font: round-trip con spazi e percorso; chiavi mancanti -> vuoto */
+    settings_defaults(&s);
+    CHECK(s.font_family[0] == '\0' && s.font_file[0] == '\0');
+    snprintf(s.font_family, sizeof s.font_family, "DejaVu Sans Mono");
+    snprintf(s.font_file, sizeof s.font_file, "/usr/share/fonts/TTF/My Font Bold.ttf");
+    CHECK(settings_save(&s));
+    CHECK(settings_load(&l));
+    CHECK(!strcmp(l.font_family, "DejaVu Sans Mono"));
+    CHECK(!strcmp(l.font_file, "/usr/share/fonts/TTF/My Font Bold.ttf"));
+    write_cfg(dir, "scale=80\n");
+    CHECK(settings_load(&l));
+    CHECK(l.font_family[0] == '\0' && l.font_file[0] == '\0');
+    /* CRLF e spazi finali tagliati */
+    write_cfg(dir, "font_family=Foo Bar  \r\nfont_file=/a/b c.ttf\r\n");
+    CHECK(settings_load(&l));
+    CHECK(!strcmp(l.font_family, "Foo Bar") && !strcmp(l.font_file, "/a/b c.ttf"));
+    /* valore troppo lungo ignorato */
+    {
+        char big[900], body[1000];
+        memset(big, 'x', sizeof big - 1);
+        big[sizeof big - 1] = 0;
+        snprintf(body, sizeof body, "font_family=Ok\nfont_file=%s\n", big);
+        write_cfg(dir, body);
+        CHECK(settings_load(&l));
+        CHECK(!strcmp(l.font_family, "Ok") && l.font_file[0] == '\0');
+    }
+
     char cmd[600];
     snprintf(cmd, sizeof cmd, "rm -rf '%s'", dir);
     if (system(cmd) != 0) { /* ignora */ }

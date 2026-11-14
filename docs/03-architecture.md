@@ -7,6 +7,7 @@
 | Language | **C17** | no runtime, small binary, full control over memory |
 | Window / rendering / input / audio | **SDL3** (3.4.x at the time of writing) | native Wayland backend, GPU renderer, a single dependency |
 | Font rasterisation | **SDL3_ttf** (3.2.x) | simple API; used only to generate textures once at startup/resize. The font is closed after generation to free memory |
+| Font list | **fontconfig** | lists installed scalable fonts that contain the digits; used **only while the font menu is open** (or on ←/→ in the settings row), then released with `FcFini`. Startup opens `font_file` directly, without fontconfig |
 | Notifications | `notify-send` process (`fork`+`execvp`) | avoids linking libnotify/GLib (several MB of RAM) |
 | Build | **Makefile** + `pkg-config` | simple, no extra build system |
 
@@ -39,6 +40,15 @@
 > Measured cost ≈ 1.2–1.4 ms of CPU per frame. For the absolute minimum: `show_seconds=false`
 > or `animations=false`.
 >
+> **Phase 5 measurements** (font menu, `gpu` renderer, PSS):
+>
+> | Situation | PSS |
+> |---|---|
+> | Idle at startup | ~18 MB (unchanged; no fontconfig at startup) |
+> | Font menu open (127 families listed) | ~23.5 MB |
+> | After closing the menu | ~20 MB (`FcFini` + `malloc_trim`); opening/closing the settings panel alone already settled at ~22 MB before this phase |
+> | After switching to another font | +1–2 MB, stable on repeated switches |
+>
 > Renderer order: `gpu,opengl,opengles2,software`; `SDL_RENDER_DRIVER=<name>` overrides it.
 > Release binary: ~60 KB (stripped, LTO; the ~27 KB figure measured in Phase 1 predates the
 > later features).
@@ -61,6 +71,10 @@
    - Clock: `clock_gettime(CLOCK_REALTIME)` + `localtime_r`; the wait timeout is computed
      up to the next minute/second boundary, +5 ms margin.
    - Timer: `SDL_GetTicksNS()` (monotonic); the end instant is stored instead of decrementing a counter.
+   Changing the digit font (`render_set_font`) rebuilds glyphs and faces once; the font menu defers
+   the live preview with a wait-timeout deadline (`font_preview_at`, ~150 ms), never with polling.
+   The font list and the menu fonts exist only while the menu is open; `fonts_free` calls `FcFini`
+   and `malloc_trim(0)` so the memory goes back to the system (see the Phase 5 measurements).
 5. **No extra threads**, no dynamic allocation in the main loop.
 6. **SDL hints**: `SDL_HINT_VIDEO_DRIVER="wayland,x11"`, `SDL_HINT_APP_ID="ribalta"`,
    `SDL_HINT_VIDEO_ALLOW_SCREENSAVER="1"` (except while a timer is running, Phase 3).
@@ -85,13 +99,15 @@ ribalta/
 │   │   ├── clock  timer  pomodoro  stats  settings  color   (.c/.h)
 │   ├── platform/           OS integration
 │   │   ├── notify.c/.h     notify-send + sound
-│   │   └── paths.c/.h      XDG config/data directories, asset lookup
+│   │   ├── paths.c/.h      XDG config/data directories, asset lookup
+│   │   └── fonts.c/.h      installed font list (fontconfig), ring stepping; no state kept
 │   ├── render/
 │   │   └── render.c/.h     layout, digit/tile textures, flip animation, progress bar
 │   └── ui/                 overlay panels
 │       ├── ui_settings.c/.h
 │       ├── ui_stats.c/.h
-│       └── ui_color.c/.h
+│       ├── ui_color.c/.h
+│       └── ui_font.c/.h    digit-font menu (search field, list, preview)
 ├── assets/                 font, licence, chime, icon source
 │   ├── icons/              PNG icons (16 ... 512 px)
 │   └── ribalta.desktop     launcher entry
@@ -110,7 +126,7 @@ Folder roles:
 - `src/core/`: logic with no SDL window or I/O dependency (time, timer, Pomodoro, statistics, settings, colours).
 - `src/platform/`: everything that talks to the operating system (notifications, directories).
 - `src/render/`: drawing only; textures and animation.
-- `src/ui/`: settings, statistics and colour-picker overlays.
+- `src/ui/`: settings, statistics, colour-picker and font-menu overlays.
 - `assets/`, `tests/`, `tools/`, `docs/`: resources, unit tests, install/maintenance scripts, documentation.
 
 Conventions: headers live next to their `.c`; includes are written from `src/`
@@ -159,7 +175,7 @@ Uint32 clock_ms_to_next_change(const Settings *s);
 
 ```make
 CC      ?= cc
-PKGS    := sdl3 sdl3-ttf
+PKGS    := sdl3 sdl3-ttf fontconfig
 CFLAGS  ?= -std=c17 -Wall -Wextra -Wpedantic -O2
 CFLAGS  += $(shell pkg-config --cflags $(PKGS))
 LDLIBS  += $(shell pkg-config --libs $(PKGS)) -lm

@@ -32,6 +32,8 @@ void settings_defaults(Settings *s)
     s->recent_count = 0;
     for (int i = 0; i < RECENT_COLORS_MAX; i++)
         s->recent_colors[i] = 0;
+    s->font_family[0] = '\0';
+    s->font_file[0] = '\0';
 }
 
 /* ---- parsing ---- */
@@ -79,6 +81,14 @@ static void parse_recent(Settings *s, char *v)
     }
 }
 
+/* Stringa fino a fine riga (spazi interni conservati); troppo lunga -> ignorata. */
+static void parse_str(const char *v, char *dst, size_t cap)
+{
+    if (strlen(v) >= cap)
+        return;
+    memcpy(dst, v, strlen(v) + 1);
+}
+
 static void apply_kv(Settings *s, const char *k, char *v)
 {
     if (!strcmp(k, "show_seconds")) parse_bool(v, &s->show_seconds);
@@ -101,6 +111,8 @@ static void apply_kv(Settings *s, const char *k, char *v)
             s->digit_color = c;
     }
     else if (!strcmp(k, "recent_colors")) parse_recent(s, v);
+    else if (!strcmp(k, "font_family")) parse_str(v, s->font_family, sizeof s->font_family);
+    else if (!strcmp(k, "font_file")) parse_str(v, s->font_file, sizeof s->font_file);
 }
 
 bool settings_load(Settings *s)
@@ -112,7 +124,7 @@ bool settings_load(Settings *s)
     FILE *f = fopen(path, "r");
     if (!f)
         return false;
-    char line[512];
+    char line[1024];
     while (fgets(line, sizeof line, f)) {
         char *p = trim(line);
         if (*p == '#' || *p == '\0')
@@ -159,6 +171,8 @@ bool settings_save(const Settings *s)
     char hex[8];
     color_format_hex(s->digit_color, hex);
     fprintf(f, "digit_color=%s\n", hex);
+    fprintf(f, "font_family=%s\n", s->font_family);
+    fprintf(f, "font_file=%s\n", s->font_file);
     if (s->recent_count > 0) {
         fprintf(f, "recent_colors=");
         for (int i = 0; i < s->recent_count && i < RECENT_COLORS_MAX; i++) {

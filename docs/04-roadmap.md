@@ -81,6 +81,15 @@ accumulate error (±1 s over 1 h); settings survive a restart.
 - Pomodoro breaks keep blue digits (amber if the chosen colour is blue).
 - Automated tests (`make test`).
 
+## Phase 5 — Digit font picker ✅
+
+- `font_family` / `font_file` settings; empty = bundled font. Startup opens `font_file` directly
+  (no fontconfig), with a stderr warning and fallback to the bundled font if it is missing.
+- `src/platform/fonts.c` (fontconfig, used only while needed) and `render_set_font`.
+- "Digit font" row in the settings panel (←/→ next/previous, Enter opens the menu) and the font menu
+  overlay (search field, scrolling list, "12:34" preview, live preview on the tiles).
+- `fontconfig` added to the install checks and CI; `tests/test_fonts.c`.
+
 ## Future ideas
 - Colour themes (light, amber, terminal green) built on the digit colour.
 - Choice of monitor in fullscreen.

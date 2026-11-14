@@ -80,17 +80,19 @@ check "pkg-config" command -v pkg-config
 if command -v pkg-config >/dev/null 2>&1; then
   check "SDL3" pkg-config --exists sdl3
   check "SDL3_ttf" pkg-config --exists sdl3-ttf
+  check "fontconfig" pkg-config --exists fontconfig
 else
   fail "SDL3 (cannot check without pkg-config)"
   fail "SDL3_ttf (cannot check without pkg-config)"
+  fail "fontconfig (cannot check without pkg-config)"
 fi
 if [ "$missing" = 1 ]; then
   printf '\n%sSome requirements are missing.%s\n' "$YEL" "$RST"
-  printf '  Arch Linux:        sudo pacman -S base-devel sdl3 sdl3_ttf\n'
-  printf '  Debian / Ubuntu:   install a C compiler, make, pkg-config and the SDL3 and\n'
-  printf '                     SDL3_ttf development packages (>= 3.2)\n'
-  printf '  Fedora:            install a C compiler, make, pkgconf and the SDL3 and\n'
-  printf '                     SDL3_ttf development packages (>= 3.2)\n'
+  printf '  Arch Linux:        sudo pacman -S base-devel sdl3 sdl3_ttf fontconfig\n'
+  printf '  Debian / Ubuntu:   install a C compiler, make, pkg-config and the SDL3, SDL3_ttf\n'
+  printf '                     (>= 3.2) and fontconfig (libfontconfig-dev) development packages\n'
+  printf '  Fedora:            install a C compiler, make, pkgconf and the SDL3, SDL3_ttf\n'
+  printf '                     (>= 3.2) and fontconfig (fontconfig-devel) development packages\n'
   exit 1
 fi
 printf '\n'

@@ -27,6 +27,11 @@ typedef struct {
     uint32_t digit_color;                        /* default 0xb7b7b7 */
     uint32_t recent_colors[RECENT_COLORS_MAX];   /* il più recente per primo */
     int      recent_count;                       /* 0..RECENT_COLORS_MAX */
+    /* Font delle cifre. Entrambi vuoti = font incluso (default). Nel file: font_family=DejaVu Sans,
+     * font_file=/usr/share/fonts/... (valore fino a fine riga, spazi interni conservati; un valore
+     * troppo lungo viene ignorato). All'avvio si apre font_file senza fontconfig. */
+    char     font_family[128];
+    char     font_file[512];
 } Settings;
 
 void settings_defaults(Settings *s);

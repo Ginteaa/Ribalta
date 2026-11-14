@@ -70,12 +70,30 @@ Every change is applied immediately and saved when the panel is closed.
 | `animations` | bool | `true` | If false, digits change without animation (minimum power use) |
 | `digit_color` | colour | `#b7b7b7` | Digit colour (`#rrggbb`); also the accent of progress bar and labels |
 | `recent_colors` | list | empty | Up to 5 recent colours, comma separated, most recent first |
+| `font_family` | string | empty | Digit font family shown in the panel; empty = bundled font ("Ribalta (IBM Plex Sans Condensed)") |
+| `font_file` | string | empty | Digit font file; empty = bundled font. Both values run to the end of the line (inner spaces kept, CR/trailing blanks trimmed); a value that is too long (family > 127, file > 511 bytes) is ignored. The keys are always written |
 
 The "Digit colour" row shows a swatch and the HEX value; ←/→ step through the palette and Enter
 opens a **colour picker** overlay (saturation/value square, hue bar, HEX field with read-only
 RGB/HSV, palette grid, recent colours; mouse and keyboard). The digits preview the colour live;
 Enter applies, saves and adds it to the recents, Esc restores the previous colour. In Pomodoro
 breaks the digits are blue `#6fa8dc` (amber `#ffb347` if the chosen colour is bluish).
+
+The "Digit font" row (right after "Digit colour", 16 rows in total) shows `font_family`, or the bundled
+font name when empty (ellipsised if too wide). ←/→ move to the previous/next font of the ring
+[bundled font, installed fonts…] and apply it immediately. Enter opens the **font menu** (fontconfig
+is queried only while it is open): a search field filtering the list (case-insensitive substring),
+a scrolling list of the font families that contain the digits 0–9 (first entry: the bundled font),
+a "12:34" preview drawn in the selected font and a key hint. Keys: ↑/↓ entry, PgUp/PgDn page,
+Home/End first/last, letters, digits, space and `-` edit the filter, Backspace deletes, mouse wheel
+scrolls, click selects, double click or Enter applies and saves, Esc clears the filter, then
+cancels and restores the font the menu was opened with. The tiles preview the selected font once the
+selection rests for ~150 ms (no polling: the pause is a wait-timeout deadline).
+
+Startup: if `font_file` is non-empty and readable (`access(R_OK)`, no fontconfig) it is used for the
+digits; otherwise a warning `ribalta: font non trovato: <path>, uso il font incluso` goes to stderr, the
+bundled font is used and the setting is left untouched. Panels, labels and the font menu itself always
+use the bundled font.
 
 The Pomodoro keys (`pomodoro_work`, `pomodoro_break`, `pomodoro_long_break`, `pomodoro_cycles`,
 `pomodoro_auto_continue`) are described in [04-roadmap.md](04-roadmap.md), section 3.1.
@@ -98,7 +116,7 @@ If the file does not exist it is created on the first save.
 | `0`–`9` / keypad, `Backspace` | Timer in setup: type the duration (microwave style), delete a digit |
 | `↑ ↓ ← →` | Timer in setup: adjust duration. Panels: navigate |
 | `S` | Open/close the settings panel |
-| `Esc` | Cancel timer entry; close the colour picker, or the panel (settings or statistics); otherwise leave fullscreen; otherwise nothing |
+| `Esc` | Cancel timer entry; close the font menu or the colour picker, or the panel (settings or statistics); otherwise leave fullscreen; otherwise nothing |
 | `Q` / `Ctrl+Q` | Quit |
 
 The mouse cursor hides after 2 s of inactivity in fullscreen.
@@ -117,6 +135,6 @@ The mouse cursor hides after 2 s of inactivity in fullscreen.
 | CPU at rest (between animations) | ~0% — the process sleeps waiting for events |
 | CPU during a flip | short spike, animation ≤ 400 ms |
 | Startup time | < 200 ms |
-| Runtime dependencies | SDL3 + SDL3_ttf (+ optional `notify-send`) |
+| Runtime dependencies | SDL3 + SDL3_ttf + fontconfig (+ optional `notify-send`) |
 | Accuracy | the minute change happens within 50 ms of the real minute |
 | Platforms | Linux Wayland (primary), X11 |

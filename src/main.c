@@ -36,6 +36,8 @@ static void apply_resize(App *a)
             ui_stats_resize(a->sui, w, h);
         if (input_color_open(a))
             ui_color_resize(a->cui, w, h);
+        if (input_font_open(a))
+            ui_font_resize(a->fui, w, h);
     }
     a->resized = false;
 }
@@ -77,6 +79,8 @@ static int32_t wait_timeout_ms(const App *a, Uint64 now)
     ms = min_u32(ms, notify_ms_to_next_poll());
     if (a->cursor_deadline)
         ms = min_u32(ms, until_ms(a->cursor_deadline, now));
+    if (a->font_preview_at)
+        ms = min_u32(ms, until_ms(a->font_preview_at, now));
     return ms > 0x7fffffffu ? 0x7fffffff : (int32_t)ms;
 }
 
@@ -105,6 +109,8 @@ static void main_loop(App *a)
             apply_resize(a);
         now = SDL_GetTicksNS();
         input_cursor_tick(a, now);
+        if (a->font_preview_at && now >= a->font_preview_at)
+            input_font_preview_apply(a);
         if (timer_update(&a->timer, now))
             session_on_timer_finished(a, now);
         PomoPhase fin;
@@ -127,6 +133,8 @@ static void main_loop(App *a)
             render_draw(a->render, now);
             if (input_color_open(a))
                 ui_color_draw(a->cui);
+            else if (input_font_open(a))
+                ui_font_draw(a->fui);
             else if (input_panel_open(a))
                 ui_settings_draw(a->ui, &a->cfg);
             else if (input_stats_open(a))
@@ -156,7 +164,7 @@ static bool app_init(void)
     return true;
 }
 
-static bool app_open(App *a, const char *font_path)
+static bool app_open(App *a)
 {
     SDL_WindowFlags fl = SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY;
     if (a->cfg.start_fullscreen || a->screensaver)
@@ -175,9 +183,14 @@ static bool app_open(App *a, const char *font_path)
     if (getenv("RIBALTA_DEBUG"))
         fprintf(stderr, "ribalta: renderer=%s\n", SDL_GetRendererName(a->ren));
 
-    a->render = render_create(a->ren, font_path);
+    a->render = render_create(a->ren, a->render_font);
+    if (!a->render && strcmp(a->render_font, a->bundled_font) != 0) {
+        fprintf(stderr, "ribalta: font non utilizzabile: %s, uso il font incluso\n", a->render_font);
+        snprintf(a->render_font, sizeof a->render_font, "%s", a->bundled_font);
+        a->render = render_create(a->ren, a->render_font);
+    }
     if (!a->render) {
-        fprintf(stderr, "ribalta: render_create failed (%s)\n", font_path);
+        fprintf(stderr, "ribalta: render_create failed (%s)\n", a->render_font);
         return false;
     }
     render_set_style(a->render, a->cfg.scale, a->cfg.brightness);
@@ -191,9 +204,10 @@ static bool app_open(App *a, const char *font_path)
     notify_init(paths_find_asset("ding.wav", wav, sizeof wav) ? wav : NULL,
                 paths_find_asset("ribalta.svg", icon, sizeof icon) ? icon : NULL);
     if (!a->screensaver) {
-        a->ui = ui_settings_create(a->ren, font_path);
-        a->sui = ui_stats_create(a->ren, font_path);
-        a->cui = ui_color_create(a->ren, font_path);
+        a->ui = ui_settings_create(a->ren, a->bundled_font);
+        a->sui = ui_stats_create(a->ren, a->bundled_font);
+        a->cui = ui_color_create(a->ren, a->bundled_font);
+        a->fui = ui_font_create(a->ren, a->bundled_font, a->bundled_font);
     }
     display_update(a, SDL_GetTicksNS());
     a->dirty = true;
@@ -216,6 +230,8 @@ static void app_close(App *a)
         ui_stats_destroy(a->sui);
     if (a->cui)
         ui_color_destroy(a->cui);
+    if (a->fui)
+        ui_font_destroy(a->fui);
     if (a->render)
         render_destroy(a->render);
     if (a->ren)
@@ -289,14 +305,22 @@ int main(int argc, char **argv)
     app.screensaver = screensaver;
     settings_load(&app.cfg);
 
-    char font[1024];
-    if (!paths_find_asset("font.ttf", font, sizeof font)) {
+    if (!paths_find_asset("font.ttf", app.bundled_font, sizeof app.bundled_font)) {
         fprintf(stderr, "ribalta: font.ttf not found (searched $RIBALTA_DATA, ./assets, "
                         "<exe>/assets, ~/.local/share/ribalta, /usr/share/ribalta)\n");
         return 1;
     }
+    /* font delle cifre: quello scelto se il file è leggibile (niente fontconfig all'avvio),
+     * altrimenti l'incluso; l'impostazione non viene cancellata */
+    snprintf(app.render_font, sizeof app.render_font, "%s", app.bundled_font);
+    if (app.cfg.font_file[0]) {
+        if (access(app.cfg.font_file, R_OK) == 0)
+            snprintf(app.render_font, sizeof app.render_font, "%s", app.cfg.font_file);
+        else
+            fprintf(stderr, "ribalta: font non trovato: %s, uso il font incluso\n", app.cfg.font_file);
+    }
     int rc = 1;
-    if (app_init() && app_open(&app, font)) {
+    if (app_init() && app_open(&app)) {
         main_loop(&app);
         if (!app.screensaver) {
             Uint64 now = SDL_GetTicksNS();

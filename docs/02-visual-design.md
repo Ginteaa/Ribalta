@@ -130,6 +130,28 @@ The `TIMER` label (or `PAUSA` when paused) is small, top-left, at 50% opacity.
 "Animations", "Esc to close".)
 
 Overlay background `#000000` at 75%, panel `#1a1a1a`, text `#b7b7b7`, selected entry in white.
+The panel has 16 rows; "Digit font" ("Font cifre") follows "Digit colour" and its value is ellipsised
+with `...` when it does not fit the value column.
+
+### Font menu (overlay)
+
+Same style as the colour picker: light overlay, panel on the right, tiles left visible for the live preview.
+```
+┌──────────────────────────────┐
+│ FONT CIFRE                   │
+│ ┌──────────────────────────┐ │
+│ │ cerca: dej█              │ │ ← search field
+│ └──────────────────────────┘ │
+│ ▸ DejaVu Sans                │ ← selected row (white, highlighted)
+│   DejaVu Sans Mono           │
+│   DejaVu Serif               │ ← scrolling list, visible rows only
+│                              │
+│        12:34                 │ ← preview in the selected font
+│ ↑↓ scegli · Invio ok · Esc   │ ← hint
+└──────────────────────────────┘
+```
+The first entry is always the bundled font ("Ribalta (IBM Plex Sans Condensed)"). Panel text uses the
+bundled font; only the "12:34" preview uses the selected one.
 
 ## 5. Font
 

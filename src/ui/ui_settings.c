@@ -1,5 +1,6 @@
 #include "ui/ui_settings.h"
 #include "core/color.h"
+#include "platform/fonts.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -7,7 +8,7 @@
 #include <string.h>
 #include <SDL3_ttf/SDL_ttf.h>
 
-enum { ROW_COUNT = 15, ROW_COLOR = 7 };
+enum { ROW_COUNT = 16, ROW_COLOR = 7, ROW_FONT = 8 };
 
 typedef struct {
     SDL_Texture *tex;
@@ -26,6 +27,7 @@ struct SettingsUI {
     bool          have_shown;
     bool          arrows;      /* il font ha le frecce */
     bool          color_req;   /* Invio sulla riga colore */
+    bool          font_req;    /* Invio sulla riga font */
 
     float         pw, ph, px, py, pitch, pad;
     SDL_Texture  *panel_tex;
@@ -38,7 +40,7 @@ struct SettingsUI {
 
 static const char *const k_labels[ROW_COUNT] = {
     "Mostra secondi", "Formato 24 ore", "Timer predefinito", "Suono fine timer",
-    "Notifica fine timer", "Dimensione", "Luminosità", "Colore cifre", "Schermo intero all'avvio", "Animazioni",
+    "Notifica fine timer", "Dimensione", "Luminosità", "Colore cifre", "Font cifre", "Schermo intero all'avvio", "Animazioni",
     "Pomodoro: studio", "Pomodoro: riposo", "Pomodoro: riposo lungo", "Pomodoro: cicli",
     "Pomodoro: avvio automatico"
 };
@@ -95,12 +97,13 @@ static void fmt_value(int row, const Settings *s, char *buf, size_t n)
     case 5: snprintf(buf, n, "%d%%", s->scale); break;
     case 6: snprintf(buf, n, "%d%%", s->brightness); break;
     case 7: { char hx[8]; color_format_hex(s->digit_color, hx); snprintf(buf, n, "%s", hx); break; }
-    case 8: snprintf(buf, n, "%s", s->start_fullscreen ? "sì" : "no"); break;
-    case 9: snprintf(buf, n, "%s", s->animations ? "sì" : "no"); break;
-    case 10: snprintf(buf, n, "%d min", s->pomodoro_work); break;
-    case 11: snprintf(buf, n, "%d min", s->pomodoro_break); break;
-    case 12: snprintf(buf, n, "%d min", s->pomodoro_long_break); break;
-    case 13: snprintf(buf, n, "%d", s->pomodoro_cycles); break;
+    case ROW_FONT: snprintf(buf, n, "%s", s->font_family[0] ? s->font_family : FONT_BUNDLED_NAME); break;
+    case 9: snprintf(buf, n, "%s", s->start_fullscreen ? "sì" : "no"); break;
+    case 10: snprintf(buf, n, "%s", s->animations ? "sì" : "no"); break;
+    case 11: snprintf(buf, n, "%d min", s->pomodoro_work); break;
+    case 12: snprintf(buf, n, "%d min", s->pomodoro_break); break;
+    case 13: snprintf(buf, n, "%d min", s->pomodoro_long_break); break;
+    case 14: snprintf(buf, n, "%d", s->pomodoro_cycles); break;
     default: snprintf(buf, n, "%s", s->pomodoro_auto_continue ? "sì" : "no"); break;
     }
 }
@@ -130,6 +133,26 @@ static SDL_Texture *make_panel(SettingsUI *ui, int w, int h, float radius, Uint8
     SDL_DestroySurface(s);
     if (t) SDL_SetTextureScaleMode(t, SDL_SCALEMODE_LINEAR);
     return t;
+}
+
+/* Accorcia (in place) un testo UTF-8 con "..." finché entra in maxw pixel. */
+static void ellipsize(TTF_Font *font, char *buf, float maxw)
+{
+    int w = 0, h = 0;
+    if (!TTF_GetStringSize(font, buf, 0, &w, &h) || (float)w <= maxw)
+        return;
+    size_t n = strlen(buf);
+    while (n > 0) {
+        n--;
+        while (n > 0 && ((unsigned char)buf[n] & 0xC0) == 0x80)
+            n--; /* mai a metà di un carattere UTF-8 */
+        char tmp[192];
+        snprintf(tmp, sizeof tmp, "%.*s...", (int)n, buf);
+        if (!TTF_GetStringSize(font, tmp, 0, &w, &h) || (float)w <= maxw || n == 0) {
+            snprintf(buf, 192, "%s", tmp);
+            return;
+        }
+    }
 }
 
 static void rebuild(SettingsUI *ui, const Settings *s)
@@ -177,9 +200,15 @@ static void rebuild(SettingsUI *ui, const Settings *s)
                    ui->arrows ? "↑↓ scegli · ←→ cambia · Esc chiudi"
                               : "su/giù scegli · sx/dx cambia · Esc chiudi", dim);
     }
-    char buf[64];
+    /* larghezza disponibile per il valore della riga font: il pannello meno la sua etichetta */
+    int lw = 0, lh = 0;
+    TTF_GetStringSize(ui->font, k_labels[ROW_FONT], 0, &lw, &lh);
+    float vmax = (pw - 2.0f * ui->pad) - (float)lw - ui->pad * 1.5f;
+    char buf[192];
     for (int i = 0; i < ROW_COUNT; i++) {
         fmt_value(i, s, buf, sizeof buf);
+        if (i == ROW_FONT)
+            ellipsize(ui->font, buf, vmax);
         label_make(ui, &ui->label[i][0], k_labels[i], norm);
         label_make(ui, &ui->label[i][1], k_labels[i], sel);
         label_make(ui, &ui->value[i][0], buf, norm);
@@ -264,6 +293,7 @@ bool ui_settings_key(SettingsUI *ui, SDL_Keycode key, SDL_Keymod mod, Settings *
     case SDLK_KP_ENTER:
     case SDLK_SPACE:
         if (ui->sel == ROW_COLOR) { ui->color_req = true; return false; }
+        if (ui->sel == ROW_FONT) { ui->font_req = true; return false; }
         dir = 1;
         break;
     default: return false;
@@ -278,14 +308,22 @@ bool ui_settings_key(SettingsUI *ui, SDL_Keycode key, SDL_Keymod mod, Settings *
     case 4: s->timer_notify = !s->timer_notify; break;
     case 5: s->scale = clampi(s->scale + dir * (shift ? 10 : 5), 50, 100); break;
     case 6: s->brightness = clampi(s->brightness + dir * (shift ? 20 : 10), 20, 100); break;
-    case 8: s->start_fullscreen = !s->start_fullscreen; break;
-    case 9: s->animations = !s->animations; break;
-    case 10: s->pomodoro_work = clampi(s->pomodoro_work + dir * (shift ? 5 : 1), 1, 180); break;
-    case 11: s->pomodoro_break = clampi(s->pomodoro_break + dir * (shift ? 5 : 1), 1, 60); break;
-    case 12: s->pomodoro_long_break = clampi(s->pomodoro_long_break + dir * (shift ? 5 : 1), 1, 120); break;
-    case 13: s->pomodoro_cycles = clampi(s->pomodoro_cycles + dir, 1, 12); break;
-    case 14: s->pomodoro_auto_continue = !s->pomodoro_auto_continue; break;
+    case 9: s->start_fullscreen = !s->start_fullscreen; break;
+    case 10: s->animations = !s->animations; break;
+    case 11: s->pomodoro_work = clampi(s->pomodoro_work + dir * (shift ? 5 : 1), 1, 180); break;
+    case 12: s->pomodoro_break = clampi(s->pomodoro_break + dir * (shift ? 5 : 1), 1, 60); break;
+    case 13: s->pomodoro_long_break = clampi(s->pomodoro_long_break + dir * (shift ? 5 : 1), 1, 120); break;
+    case 14: s->pomodoro_cycles = clampi(s->pomodoro_cycles + dir, 1, 12); break;
+    case 15: s->pomodoro_auto_continue = !s->pomodoro_auto_continue; break;
     case ROW_COLOR: s->digit_color = color_palette_step(s->digit_color, dir); break;
+    case ROW_FONT: {
+        FontEntry e;
+        if (fonts_step(s->font_file, dir, &e)) {
+            snprintf(s->font_family, sizeof s->font_family, "%s", e.family);
+            snprintf(s->font_file, sizeof s->font_file, "%s", e.file);
+        }
+        break;
+    }
     default: break;
     }
     bool changed = memcmp(&old, s, sizeof old) != 0;
@@ -297,6 +335,13 @@ bool ui_settings_take_color_request(SettingsUI *ui)
 {
     if (!ui || !ui->color_req) return false;
     ui->color_req = false;
+    return true;
+}
+
+bool ui_settings_take_font_request(SettingsUI *ui)
+{
+    if (!ui || !ui->font_req) return false;
+    ui->font_req = false;
     return true;
 }
 
