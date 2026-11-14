@@ -1,0 +1,4 @@
+build/
+/flipclock
+*.o
+*.d
