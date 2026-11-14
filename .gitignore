@@ -2,6 +2,7 @@ build/
 /ribalta
 *.o
 *.d
+AGENTS.md
 
 # file locale per Claude Code (importa AGENTS.md), non versionato
 CLAUDE.md
