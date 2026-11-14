@@ -5,6 +5,7 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/Ginteaa/Ribalta/actions/workflows/build.yml"><img alt="build" src="https://github.com/Ginteaa/Ribalta/actions/workflows/build.yml/badge.svg"></a>
   <img alt="C17" src="https://img.shields.io/badge/language-C17-blue?style=flat-square">
   <img alt="SDL3" src="https://img.shields.io/badge/SDL-3-orange?style=flat-square">
   <img alt="Linux" src="https://img.shields.io/badge/Linux-Wayland%20%C2%B7%20X11-success?style=flat-square">

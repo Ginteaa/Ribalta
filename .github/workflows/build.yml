@@ -1,0 +1,35 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    # Arch Linux: SDL3 e SDL3_ttf sono disponibili come pacchetti ufficiali
+    container: archlinux:latest
+    steps:
+      - name: Install dependencies
+        run: pacman -Syu --noconfirm --needed base-devel sdl3 sdl3_ttf pkgconf
+
+      - uses: actions/checkout@v4
+
+      - name: Build (warnings are errors)
+        run: make CFLAGS="-std=c17 -Wall -Wextra -Wpedantic -O2 -Werror"
+
+      - name: Release build (LTO, stripped)
+        run: make release
+
+      - name: Smoke test
+        run: ./ribalta --help
+
+      - name: Install into a temporary prefix
+        run: |
+          make install PREFIX="$PWD/_inst"
+          test -x _inst/bin/ribalta
+          test -f _inst/share/applications/ribalta.desktop
+          test -f _inst/share/ribalta/font.ttf
+          test -f _inst/share/ribalta/ding.wav
