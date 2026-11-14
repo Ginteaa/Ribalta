@@ -48,7 +48,7 @@ Ogni tessera che cambia valore (es. `12` → `13`) è composta da 4 metà:
 - `top_old`, `bottom_old` — metà superiore e inferiore del valore vecchio
 - `top_new`, `bottom_new` — metà superiore e inferiore del valore nuovo
 
-Sequenza (durata totale `D = 400 ms`, `t ∈ [0,1]`):
+Sequenza (durata totale `D = 400 ms`, disegnata a 30 fps, `t ∈ [0,1]`):
 
 1. **Sfondo fisso**: disegna `top_new` sopra e `bottom_old` sotto.
 2. **Fase A (`t` 0 → 0.5)**: la metà `top_old` "cade" verso il centro: viene disegnata con altezza

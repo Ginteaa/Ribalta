@@ -22,6 +22,11 @@ void settings_defaults(Settings *s)
     s->brightness = 100;
     s->start_fullscreen = false;
     s->animations = true;
+    s->pomodoro_work = 25;
+    s->pomodoro_break = 5;
+    s->pomodoro_long_break = 15;
+    s->pomodoro_cycles = 4;
+    s->pomodoro_auto_continue = true;
 }
 
 /* ---- percorsi ---- */
@@ -93,6 +98,11 @@ static void apply_kv(Settings *s, const char *k, const char *v)
     else if (!strcmp(k, "brightness")) parse_int(v, &s->brightness, 20, 100);
     else if (!strcmp(k, "start_fullscreen")) parse_bool(v, &s->start_fullscreen);
     else if (!strcmp(k, "animations")) parse_bool(v, &s->animations);
+    else if (!strcmp(k, "pomodoro_work")) parse_int(v, &s->pomodoro_work, 1, 180);
+    else if (!strcmp(k, "pomodoro_break")) parse_int(v, &s->pomodoro_break, 1, 60);
+    else if (!strcmp(k, "pomodoro_long_break")) parse_int(v, &s->pomodoro_long_break, 1, 120);
+    else if (!strcmp(k, "pomodoro_cycles")) parse_int(v, &s->pomodoro_cycles, 1, 12);
+    else if (!strcmp(k, "pomodoro_auto_continue")) parse_bool(v, &s->pomodoro_auto_continue);
 }
 
 bool settings_load(Settings *s)
@@ -160,8 +170,24 @@ bool settings_save(const Settings *s)
     fprintf(f, "brightness=%d\n", s->brightness);
     fprintf(f, "start_fullscreen=%s\n", B(s->start_fullscreen));
     fprintf(f, "animations=%s\n", B(s->animations));
+    fprintf(f, "pomodoro_work=%d\n", s->pomodoro_work);
+    fprintf(f, "pomodoro_break=%d\n", s->pomodoro_break);
+    fprintf(f, "pomodoro_long_break=%d\n", s->pomodoro_long_break);
+    fprintf(f, "pomodoro_cycles=%d\n", s->pomodoro_cycles);
+    fprintf(f, "pomodoro_auto_continue=%s\n", B(s->pomodoro_auto_continue));
 #undef B
     return fclose(f) == 0;
+}
+
+bool settings_data_dir(char *out, size_t out_size)
+{
+    char d[PATH_MAX_LEN];
+    if (!xdg_dir(d, sizeof d, "XDG_DATA_HOME", ".local/share") || strlen(d) >= out_size)
+        return false;
+    if (!mkdir_p(d))
+        return false;
+    memcpy(out, d, strlen(d) + 1);
+    return true;
 }
 
 /* ---- asset ---- */

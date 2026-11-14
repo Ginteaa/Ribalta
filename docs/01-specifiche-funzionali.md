@@ -69,11 +69,14 @@ Se il file non esiste viene creato al primo salvataggio.
 |---|---|
 | `F` / `F11` / doppio clic | Schermo intero on/off |
 | `T` | Alterna la vista Orologio / Timer (il timer attivo continua in background) |
-| `Spazio` / `Invio` | Timer: avvia / pausa / riprendi |
-| `R` | Timer: reset alla durata impostata |
+| `P` | Alterna la vista Orologio / Pomodoro (da Timer a Pomodoro e viceversa si passa direttamente) |
+| `Spazio` / `Invio` | Timer o Pomodoro: avvia / pausa / riprendi |
+| `R` | Timer: reset alla durata impostata. Pomodoro: azzera tutto (STUDIO 1/N, fermo) |
+| `N` | Pomodoro: salta alla fase successiva |
+| `I` | Apre/chiude il pannello statistiche di studio |
 | `↑ ↓ ← →` | Timer in impostazione: regola durata. Pannello: naviga |
 | `S` | Apre/chiude il pannello impostazioni |
-| `Esc` | Chiude il pannello; altrimenti esce dallo schermo intero; altrimenti nulla |
+| `Esc` | Chiude il pannello (impostazioni o statistiche); altrimenti esce dallo schermo intero; altrimenti nulla |
 | `Q` / `Ctrl+Q` | Esci |
 
 Il cursore del mouse si nasconde dopo 2 s di inattività in schermo intero.

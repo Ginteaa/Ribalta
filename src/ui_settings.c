@@ -6,7 +6,7 @@
 #include <string.h>
 #include <SDL3_ttf/SDL_ttf.h>
 
-enum { ROW_COUNT = 9 };
+enum { ROW_COUNT = 14 };
 
 typedef struct {
     SDL_Texture *tex;
@@ -34,7 +34,9 @@ struct SettingsUI {
 
 static const char *const k_labels[ROW_COUNT] = {
     "Mostra secondi", "Formato 24 ore", "Timer predefinito", "Suono fine timer",
-    "Notifica fine timer", "Dimensione", "Luminosità", "Schermo intero all'avvio", "Animazioni"
+    "Notifica fine timer", "Dimensione", "Luminosità", "Schermo intero all'avvio", "Animazioni",
+    "Pomodoro: studio", "Pomodoro: riposo", "Pomodoro: riposo lungo", "Pomodoro: cicli",
+    "Pomodoro: avvio automatico"
 };
 
 static int clampi(int v, int lo, int hi) { return v < lo ? lo : (v > hi ? hi : v); }
@@ -87,7 +89,12 @@ static void fmt_value(int row, const Settings *s, char *buf, size_t n)
     case 5: snprintf(buf, n, "%d%%", s->scale); break;
     case 6: snprintf(buf, n, "%d%%", s->brightness); break;
     case 7: snprintf(buf, n, "%s", s->start_fullscreen ? "sì" : "no"); break;
-    default: snprintf(buf, n, "%s", s->animations ? "sì" : "no"); break;
+    case 8: snprintf(buf, n, "%s", s->animations ? "sì" : "no"); break;
+    case 9: snprintf(buf, n, "%d min", s->pomodoro_work); break;
+    case 10: snprintf(buf, n, "%d min", s->pomodoro_break); break;
+    case 11: snprintf(buf, n, "%d min", s->pomodoro_long_break); break;
+    case 12: snprintf(buf, n, "%d", s->pomodoro_cycles); break;
+    default: snprintf(buf, n, "%s", s->pomodoro_auto_continue ? "sì" : "no"); break;
     }
 }
 
@@ -261,6 +268,11 @@ bool ui_settings_key(SettingsUI *ui, SDL_Keycode key, SDL_Keymod mod, Settings *
     case 6: s->brightness = clampi(s->brightness + dir * (shift ? 20 : 10), 20, 100); break;
     case 7: s->start_fullscreen = !s->start_fullscreen; break;
     case 8: s->animations = !s->animations; break;
+    case 9: s->pomodoro_work = clampi(s->pomodoro_work + dir * (shift ? 5 : 1), 1, 180); break;
+    case 10: s->pomodoro_break = clampi(s->pomodoro_break + dir * (shift ? 5 : 1), 1, 60); break;
+    case 11: s->pomodoro_long_break = clampi(s->pomodoro_long_break + dir * (shift ? 5 : 1), 1, 120); break;
+    case 12: s->pomodoro_cycles = clampi(s->pomodoro_cycles + dir, 1, 12); break;
+    case 13: s->pomodoro_auto_continue = !s->pomodoro_auto_continue; break;
     default: break;
     }
     bool changed = memcmp(&old, s, sizeof old) != 0;

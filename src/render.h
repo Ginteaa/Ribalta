@@ -44,6 +44,16 @@ void render_set_progress(Render *r, float p);
  * selezione in impostazione timer (0.4 sulla non selezionata), lampeggio a fine timer. */
 void render_set_tile_alpha(Render *r, int tile, float alpha);
 
+/* --- Fase 3 --- */
+
+/* Etichetta con testo libero (es. "STUDIO 2/4 · IN PAUSA"); NULL o "" la nasconde.
+ * Ha la precedenza su render_set_label. La texture si ricrea solo se il testo cambia. */
+void render_set_label_text(Render *r, const char *text);
+
+/* Colore base delle cifre (prima della luminosità). Default 0xb7b7b7; pausa Pomodoro 0x6fa8dc.
+ * Se cambia, rigenera le texture delle cifre e le facce (nessuna animazione). */
+void render_set_digit_color(Render *r, Uint8 red, Uint8 green, Uint8 blue);
+
 /* true se almeno una tessera sta ancora animando a now_ns */
 bool render_is_animating(const Render *r, Uint64 now_ns);
 

@@ -26,31 +26,47 @@ errore (±1 s su 1 h); le impostazioni sopravvivono a un riavvio.
 
 ## Fase 3 — Aggiunte
 
-### 3.1 Modalità Pomodoro
-- Nuova modalità (tasto `P`): cicli studio/pausa configurabili.
-- Preset: 25/5 e 50/10, più personalizzato; pausa lunga (15–30 min) ogni N cicli (default 4).
-- Durante la pausa le cifre diventano blu tenue (`#6fa8dc`); etichetta `STUDIO 2/4` / `PAUSA`.
-- Notifica e suono a ogni passaggio studio ↔ pausa; avvio automatico della fase successiva
-  configurabile (`pomodoro_auto_continue`).
-- Nuove chiavi: `pomodoro_work`, `pomodoro_break`, `pomodoro_long_break`, `pomodoro_cycles`,
-  `pomodoro_auto_continue`.
+### 3.1 Modalità Pomodoro (tasto `P`)
+- `P` alterna la vista Pomodoro (come `T` per il timer; `T`/`P` da una vista all'altra passano
+  direttamente). Timer e Pomodoro sono indipendenti e possono girare entrambi in background.
+- Ciclo: STUDIO (`pomodoro_work`, default 25 min) → RIPOSO (`pomodoro_break`, 5) → … ; dopo
+  `pomodoro_cycles` (default 4) sessioni di studio il riposo è RIPOSO LUNGO (`pomodoro_long_break`, 15),
+  poi il ciclo ricomincia da 1.
+- Tasti nella vista: `Spazio`/`Invio` avvia/pausa, `N` salta alla fase successiva, `R` azzera tutto
+  (fase STUDIO 1/N, fermo).
+- Etichetta: `STUDIO 2/4`, `RIPOSO`, `RIPOSO LUNGO`; in pausa si aggiunge ` · IN PAUSA` e le tessere
+  vanno al 50%. Durante RIPOSO/RIPOSO LUNGO le cifre diventano blu tenue `#6fa8dc`.
+- A fine fase: notifica ("Fine studio — riposo di 5 min" / "Riposo finito — si torna a studiare")
+  + suono; se `pomodoro_auto_continue=true` (default) la fase successiva parte da sola, altrimenti
+  resta ferma pronta a partire. La vista non cambia (niente lampeggio, resta sul Pomodoro).
+- Nuove chiavi config (anche nel pannello impostazioni): `pomodoro_work` (1..180),
+  `pomodoro_break` (1..60), `pomodoro_long_break` (1..120), `pomodoro_cycles` (1..12),
+  `pomodoro_auto_continue` (bool).
 
-### 3.2 Statistiche di studio
-- Ogni sessione di timer/Pomodoro (anche interrotta, se ≥ 1 min) viene aggiunta a
-  `~/.local/share/flipclock/sessions.csv` (`$XDG_DATA_HOME`):
-  `inizio_iso8601,durata_secondi,tipo(timer|pomodoro),completata(0|1)`.
-- Schermata statistiche (tasto `I`): ore di studio oggi, ultimi 7 giorni (barre semplici
-  disegnate con rettangoli), totale del mese, giorni consecutivi di studio (streak).
-- Il file viene letto solo quando si apre la schermata (niente in memoria nel resto del tempo).
+### 3.2 Statistiche di studio (tasto `I`)
+- File `$XDG_DATA_HOME/flipclock/sessions.csv` (fallback `~/.local/share/flipclock/`), una riga
+  per sessione: `inizio_iso8601_locale,durata_secondi,tipo,completata` con tipo `timer|pomodoro`.
+  Prima riga di intestazione se il file è nuovo.
+- Cosa si registra (solo tempo di studio, mai i riposi), se la durata studiata è ≥ 60 s:
+  - timer: a fine timer (completata=1); su `R` o all'uscita dall'app con timer avviato (completata=0);
+  - pomodoro: a fine fase STUDIO (1); su `N`/`R`/uscita durante uno STUDIO avviato (0).
+  - Durata = tempo effettivamente trascorso, pause escluse.
+- `I` apre/chiude un pannello in overlay (stile pannello impostazioni): **Oggi**, **Ultimi 7 giorni**
+  (barre orizzontali per giorno, etichetta giorno abbreviato in italiano e `1h 25m`), **Questo mese**,
+  **Giorni consecutivi** (streak: giorni consecutivi fino a oggi, o fino a ieri se oggi ancora 0),
+  **Sessioni completate** totali. `Esc`/`I` chiude.
+- Il file viene letto solo all'apertura del pannello; font e texture solo mentre è aperto.
 
 ### 3.3 Modalità screensaver
-- Opzione `--screensaver`: avvio diretto a schermo intero, esce con qualsiasi tasto o movimento del mouse.
-- Avvio automatico dopo inattività tramite `swayidle` (o equivalente per niri), es.
-  `swayidle timeout 300 'flipclock --screensaver' resume 'pkill -x flipclock'`
-  — documentato nel README con un esempio di configurazione niri.
-- Con timer o Pomodoro attivo l'app chiama `SDL_DisableScreenSaver()` (usa idle-inhibit su Wayland)
-  così lo schermo non si spegne durante lo studio; ripristinato a fine sessione.
-- Opzionale in seguito: supporto diretto a `ext-idle-notify-v1` senza swayidle.
+- `flipclock --screensaver`: schermo intero, cursore nascosto subito; esce con qualsiasi tasto,
+  clic o movimento del mouse (ignorando gli eventi del primo secondo). Non salva nulla.
+- `flipclock --help` mostra le opzioni.
+- Avvio automatico dopo inattività con `swayidle` (README con esempio per niri:
+  `spawn-at-startup "swayidle" "-w" "timeout" "300" "flipclock --screensaver"`).
+  Se flipclock è già aperto, l'istanza screensaver esce subito (istanza singola).
+- **Blocco dello spegnimento schermo**: mentre un timer o un Pomodoro è IN CORSO l'app chiama
+  `SDL_DisableScreenSaver()` (idle-inhibit su Wayland); quando nessuno è in corso
+  `SDL_EnableScreenSaver()`.
 
 ## Idee future
 - Temi colore (chiaro, ambra, verde terminale).

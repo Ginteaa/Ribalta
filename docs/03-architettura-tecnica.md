@@ -28,6 +28,17 @@
 > | `opengl` | ~37 MB | ~103 MB | ~40 ms |
 > | `software` | RSS ~113 MB (carica comunque EGL) | | |
 >
+> **Misure Fase 3** (renderer `gpu`, finestra visibile):
+>
+> | Situazione | CPU |
+> |---|---|
+> | Orologio HH:MM (un flip al minuto) | ~40 ms al minuto (~0,07%) |
+> | Secondi visibili (orologio con secondi, timer/Pomodoro sotto l'ora) | ~2,2% (era ~3% a 60 fps) |
+> | Finestra non in vista (es. altra colonna in niri) | ~0,15% anche con i secondi |
+>
+> Costo misurato ≈ 1,2–1,4 ms di CPU per fotogramma. Per il minimo assoluto: `show_seconds=false`
+> oppure `animations=false`.
+>
 > Ordine impostato: `gpu,opengl,opengles2,software`; `SDL_RENDER_DRIVER=<nome>` lo sovrascrive.
 > Binario release: ~27 KB.
 
@@ -38,8 +49,9 @@
    `SDL_WaitEventTimeout(&ev, ms_al_prossimo_cambio)`: il processo dorme fino al prossimo
    minuto (o secondo, se visibili) o a un input. Niente polling a 60 fps.
 2. **Render solo quando serve.** Si ridisegna solo se: parte/continua un'animazione, la finestra
-   cambia dimensione/esposizione, si apre il pannello. Durante il flip si usa il vsync
-   (`SDL_SetRenderVSync(renderer, 1)`), ~24 frame per 400 ms, poi si torna a dormire.
+   cambia dimensione/esposizione, si apre un pannello. Durante il flip l'animazione è limitata a
+   **30 fps** (il loop dorme in `SDL_WaitEventTimeout` tra un fotogramma e l'altro, vsync attivo):
+   ~12 fotogrammi per flip, poi si torna a dormire.
 3. **Texture pre-renderizzate.** All'avvio (e a ogni resize) si generano le texture delle cifre
    `0–9` alla dimensione esatta con SDL3_ttf, e la texture della tessera vuota. Durante il flip
    si compongono solo rettangoli già in GPU: zero rasterizzazione per frame.

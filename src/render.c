@@ -42,7 +42,11 @@ struct Render {
     float lbl_w[2], lbl_h[2];
     SDL_Texture *tag[2];     /* TIMER, PAUSA */
     float tag_w[2], tag_h[2];
-    Uint8 gray;              /* grigio delle cifre (con luminosita') */
+    Uint8 gray;              /* grigio delle etichette/barra (con luminosita') */
+    Uint8 dig_rgb[3];        /* colore base cifre (prima della luminosita') */
+    char text[64];           /* etichetta a testo libero ("" = assente) */
+    SDL_Texture *txt;
+    float txt_w, txt_h;
 
     Tile tile[MAX_TILES];
     int vals[MAX_TILES];
@@ -67,6 +71,8 @@ static void free_textures(Render *r)
         if (r->lbl[i]) SDL_DestroyTexture(r->lbl[i]);
         r->lbl[i] = NULL;
     }
+    if (r->txt) SDL_DestroyTexture(r->txt);
+    r->txt = NULL;
     for (int i = 0; i < 2; i++) {
         if (r->tag[i]) SDL_DestroyTexture(r->tag[i]);
         r->tag[i] = NULL;
@@ -89,6 +95,7 @@ Render *render_create(SDL_Renderer *ren, const char *font_path)
     r->scale = 100;
     r->bright = 100;
     r->progress = -1.0f;
+    r->dig_rgb[0] = r->dig_rgb[1] = r->dig_rgb[2] = 0xb7;
     for (int i = 0; i < MAX_TILES; i++) r->alpha[i] = 1.0f;
     return r;
 }
@@ -142,12 +149,49 @@ static TTF_Font *open_font_for(const char *path, Uint32 ref, float target, int *
     return f;
 }
 
+/* (Ri)crea la texture dell'etichetta a testo libero (stessi parametri di TIMER/PAUSA). */
+static void build_text(Render *r)
+{
+    if (r->txt) SDL_DestroyTexture(r->txt);
+    r->txt = NULL;
+    if (!r->text[0] || r->th <= 0) return;
+    TTF_Font *f = open_font_for(r->font_path, 'A', r->th * 0.06f, NULL);
+    if (!f) return;
+    char buf[64];
+    SDL_strlcpy(buf, r->text, sizeof buf);
+    if (!TTF_FontHasGlyph(f, 0xB7)) { /* punto mediano assente: sostituisci con "-" */
+        char *o = buf;
+        for (const char *p = r->text; *p && o < buf + sizeof buf - 1; ) {
+            if ((Uint8)p[0] == 0xC2 && (Uint8)p[1] == 0xB7) { *o++ = '-'; p += 2; }
+            else *o++ = *p++;
+        }
+        *o = '\0';
+    }
+    const float b = (float)r->bright / 100.0f;
+    const Uint8 g = (Uint8)(0xb7 * b + 0.5f);
+    const SDL_Color col = { g, g, g, 255 };
+    SDL_Surface *s = TTF_RenderText_Blended(f, buf, 0, col);
+    if (s) {
+        r->txt_w = (float)s->w;
+        r->txt_h = (float)s->h;
+        r->txt = SDL_CreateTextureFromSurface(r->ren, s);
+        SDL_DestroySurface(s);
+        if (r->txt) {
+            SDL_SetTextureBlendMode(r->txt, SDL_BLENDMODE_BLEND);
+            SDL_SetTextureAlphaMod(r->txt, 128);
+        }
+    }
+    TTF_CloseFont(f);
+}
+
 static bool build_glyphs(Render *r)
 {
     const float b = (float)r->bright / 100.0f;
     const Uint8 g = (Uint8)(0xb7 * b + 0.5f);
     const SDL_Color col = { g, g, g, 255 };
     r->gray = g;
+    const SDL_Color dcol = { (Uint8)(r->dig_rgb[0] * b + 0.5f), (Uint8)(r->dig_rgb[1] * b + 0.5f),
+                             (Uint8)(r->dig_rgb[2] * b + 0.5f), 255 };
 
     /* cifre */
     int top_off = 0;
@@ -183,7 +227,7 @@ static bool build_glyphs(Render *r)
     }
     maxw = 0;
     for (int d = 0; d < 10; d++) {
-        SDL_Surface *s = TTF_RenderGlyph_Blended(f, (Uint32)('0' + d), col);
+        SDL_Surface *s = TTF_RenderGlyph_Blended(f, (Uint32)('0' + d), dcol);
         if (!s) continue;
         r->dig_w[d] = (float)s->w * sx;
         r->dig_h[d] = (float)s->h;
@@ -234,6 +278,7 @@ static bool build_glyphs(Render *r)
         }
         TTF_CloseFont(f);
     }
+    build_text(r);
     return true;
 }
 
@@ -382,6 +427,30 @@ void render_set_label(Render *r, RenderLabel label)
     if (r) r->label = (label == LABEL_TIMER || label == LABEL_PAUSA) ? label : LABEL_NONE;
 }
 
+void render_set_label_text(Render *r, const char *text)
+{
+    if (!r) return;
+    char buf[sizeof r->text];
+    SDL_strlcpy(buf, text ? text : "", sizeof buf);
+    /* se troncato, non lasciare un carattere UTF-8 spezzato */
+    size_t n = SDL_strlen(buf);
+    if (text && SDL_strlen(text) >= sizeof buf) {
+        while (n > 0 && ((Uint8)text[n] & 0xC0) == 0x80) n--;
+        buf[n] = '\0';
+    }
+    if (SDL_strcmp(buf, r->text) == 0) return;
+    SDL_strlcpy(r->text, buf, sizeof r->text);
+    build_text(r);
+}
+
+void render_set_digit_color(Render *r, Uint8 red, Uint8 green, Uint8 blue)
+{
+    if (!r) return;
+    if (r->dig_rgb[0] == red && r->dig_rgb[1] == green && r->dig_rgb[2] == blue) return;
+    r->dig_rgb[0] = red; r->dig_rgb[1] = green; r->dig_rgb[2] = blue;
+    rebuild(r); /* azzera anche i flip in corso e ridisegna le facce */
+}
+
 void render_set_progress(Render *r, float p)
 {
     if (!r) return;
@@ -501,7 +570,10 @@ void render_draw(Render *r, Uint64 now_ns)
     const float lx = (float)r->x0;
     const float total = (float)(r->count * r->tw + (r->count - 1) * r->gap);
     const float th = (float)r->th;
-    if (r->label != LABEL_NONE) {
+    if (r->txt) {
+        SDL_FRect dst = { lx, (float)r->y0 - th * 0.05f - r->txt_h, r->txt_w, r->txt_h };
+        SDL_RenderTexture(r->ren, r->txt, NULL, &dst);
+    } else if (r->label != LABEL_NONE) {
         int k = r->label == LABEL_TIMER ? 0 : 1;
         if (r->tag[k]) {
             SDL_FRect dst = { lx, (float)r->y0 - th * 0.05f - r->tag_h[k], r->tag_w[k], r->tag_h[k] };

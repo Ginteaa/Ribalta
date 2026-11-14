@@ -14,6 +14,12 @@ typedef struct {
     int  brightness;            /* default 100, range 20..100 */
     bool start_fullscreen;      /* default false */
     bool animations;            /* default true  */
+    /* Fase 3 — Pomodoro (docs/04-roadmap.md §3.1) */
+    int  pomodoro_work;          /* default 25, range 1..180 */
+    int  pomodoro_break;         /* default 5,  range 1..60  */
+    int  pomodoro_long_break;    /* default 15, range 1..120 */
+    int  pomodoro_cycles;        /* default 4,  range 1..12  */
+    bool pomodoro_auto_continue; /* default true */
 } Settings;
 
 void settings_defaults(Settings *s);
@@ -30,6 +36,10 @@ bool settings_save(const Settings *s);
  * $FLIPCLOCK_DATA, ./assets, <dir dell'eseguibile>/assets,
  * $XDG_DATA_HOME/flipclock (fallback ~/.local/share/flipclock), /usr/share/flipclock.
  * Scrive il percorso trovato in out. Ritorna false se non trovato. */
+/* Directory dati: $XDG_DATA_HOME/flipclock (fallback ~/.local/share/flipclock), creata se manca.
+ * Ritorna false su errore. */
+bool settings_data_dir(char *out, size_t out_size);
+
 bool settings_find_asset(const char *name, char *out, size_t out_size);
 
 #endif

@@ -26,6 +26,7 @@ void timer_reset(Timer *t);                          /* -> SETUP, stessa durata 
 bool timer_update(Timer *t, Uint64 now);
 
 Uint64 timer_remaining_ns(const Timer *t, Uint64 now); /* SETUP: durata intera */
+Uint64 timer_elapsed_ns(const Timer *t, Uint64 now);  /* durata - rimanente (pause escluse); 0 in SETUP */
 float  timer_progress(const Timer *t, Uint64 now);     /* 0..1 tempo trascorso; 0 in SETUP */
 
 /* Valori da mostrare sulle tessere (arrotondati per eccesso all'unità visibile):

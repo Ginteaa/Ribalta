@@ -3,21 +3,29 @@
 #include <string.h>
 #include <fcntl.h>
 #include <sys/file.h>
+#include <time.h>
 #include <unistd.h>
 #include <SDL3/SDL.h>
 #include <SDL3_ttf/SDL_ttf.h>
 #include "clock.h"
 #include "notify.h"
+#include "pomodoro.h"
 #include "render.h"
 #include "settings.h"
+#include "stats.h"
 #include "timer.h"
 #include "ui_settings.h"
+#include "ui_stats.h"
 
 #define CURSOR_HIDE_NS (2000ULL * SDL_NS_PER_MS)
 #define BLINK_PHASE_NS (300ULL * SDL_NS_PER_MS)
 #define BLINK_PHASES   6
+#define SAVER_GRACE_NS (1000ULL * SDL_NS_PER_MS)
+#define SAVER_MOVE_PX  8.0f   /* movimento reale minimo per uscire dallo screensaver */
+#define COLOR_DEFAULT  0xb7b7b7u
+#define COLOR_BREAK    0x6fa8dcu
 
-typedef enum { VIEW_CLOCK, VIEW_TIMER } View;
+typedef enum { VIEW_CLOCK, VIEW_TIMER, VIEW_POMODORO } View;
 
 /* Stato desiderato/applicato di tessere, etichetta e opacità. */
 typedef struct {
@@ -26,6 +34,8 @@ typedef struct {
     RenderLabel label;
     bool        has_progress;
     float       alpha[2];   /* tessere 0 e 1; la 2 (secondi) segue la 1 */
+    Uint32      color;      /* colore base delle cifre 0xRRGGBB */
+    char        text[40];   /* etichetta libera (Pomodoro); "" = nessuna */
 } Display;
 
 typedef struct {
@@ -35,6 +45,14 @@ typedef struct {
     Settings      cfg;
     SettingsUI   *ui;
     Timer         timer;
+    Pomodoro      pomo;
+    StatsUI      *sui;
+    bool          screensaver;
+    Uint64        start_ns;          /* avvio app (grazia screensaver) */
+    float         saver_moved;       /* movimento mouse accumulato dopo la grazia */
+    time_t        timer_start;       /* inizio sessione timer (0 = nessuna) */
+    time_t        pomo_start;        /* inizio sessione STUDIO (0 = nessuna) */
+    bool          inhibit;           /* SDL_DisableScreenSaver attivo */
     int           timer_sel;         /* 0 = ore, 1 = minuti (SETUP) */
     View          view;
     bool          blink_active;
@@ -47,6 +65,7 @@ typedef struct {
     bool          was_animating;
     bool          cursor_hidden;
     Uint64        cursor_deadline;   /* 0 = nessuna scadenza pendente */
+    Uint32        applied_color;
 } App;
 
 static bool is_fullscreen(const App *a)
@@ -66,6 +85,8 @@ static void cursor_show(App *a)
 /* Da chiamare su movimento mouse o ingresso in fullscreen. */
 static void cursor_activity(App *a)
 {
+    if (a->screensaver)
+        return; /* cursore sempre nascosto */
     cursor_show(a);
     if (is_fullscreen(a))
         a->cursor_deadline = SDL_GetTicksNS() + CURSOR_HIDE_NS;
@@ -100,11 +121,38 @@ static void pixel_size(const App *a, int *w, int *h)
     SDL_GetCurrentRenderOutputSize(a->ren, w, h);
 }
 
+static void close_panel(App *a);
+
+static bool stats_open(const App *a)
+{
+    return a->sui && ui_stats_is_open(a->sui);
+}
+
+static void close_stats(App *a)
+{
+    ui_stats_close(a->sui);
+    a->dirty = true;
+}
+
+static void open_stats(App *a)
+{
+    int w, h;
+    if (!a->sui)
+        return;
+    if (panel_open(a))
+        close_panel(a);
+    pixel_size(a, &w, &h);
+    ui_stats_open(a->sui, w, h);
+    a->dirty = true;
+}
+
 static void open_panel(App *a)
 {
     int w, h;
     if (!a->ui)
         return;
+    if (stats_open(a))
+        close_stats(a);
     pixel_size(a, &w, &h);
     ui_settings_open(a->ui, w, h);
     a->dirty = true;
@@ -122,6 +170,7 @@ static void settings_changed(App *a, int old_default_minutes)
     render_set_style(a->render, a->cfg.scale, a->cfg.brightness);
     if (a->timer.state == TIMER_SETUP && a->cfg.timer_default_minutes != old_default_minutes)
         timer_init(&a->timer, a->cfg.timer_default_minutes);
+    pomo_apply_settings(&a->pomo, &a->cfg);
     a->has_shown = false; /* riapplica il volto (24h/12h, secondi) senza animazione */
     a->dirty = true;
 }
@@ -136,6 +185,43 @@ static void on_key_panel(App *a, const SDL_KeyboardEvent *k)
     if (ui_settings_key(a->ui, k->key, k->mod, &a->cfg))
         settings_changed(a, old);
     a->dirty = true;
+}
+
+/* --- Statistiche (roadmap §3.2): nulla in modalità screensaver --- */
+
+static void log_session(const App *a, time_t start, Uint64 elapsed_ns, const char *type, bool completed)
+{
+    if (a->screensaver)
+        return;
+    long secs = (long)(elapsed_ns / SDL_NS_PER_SECOND);
+    stats_append(start ? start : time(NULL) - secs, secs, type, completed);
+}
+
+/* Timer interrotto (R / uscita): da chiamare PRIMA di resettarlo. */
+static void log_timer_partial(const App *a, Uint64 now)
+{
+    if (a->timer.state != TIMER_SETUP)
+        log_session(a, a->timer_start, timer_elapsed_ns(&a->timer, now), "timer", false);
+}
+
+/* STUDIO avviato e interrotto (N / R / uscita): da chiamare PRIMA di cambiare fase. */
+static void log_pomo_partial(const App *a, Uint64 now)
+{
+    if (a->pomo.phase == POMO_WORK && a->pomo.timer.state != TIMER_SETUP)
+        log_session(a, a->pomo_start, timer_elapsed_ns(&a->pomo.timer, now), "pomodoro", false);
+}
+
+/* Inizio sessione: istante di prima transizione SETUP -> RUNNING (rilevata a ogni giro). */
+static void track_starts(App *a)
+{
+    if (a->timer.state == TIMER_SETUP)
+        a->timer_start = 0;
+    else if (!a->timer_start)
+        a->timer_start = time(NULL);
+    if (a->pomo.phase != POMO_WORK || a->pomo.timer.state == TIMER_SETUP)
+        a->pomo_start = 0;
+    else if (!a->pomo_start)
+        a->pomo_start = time(NULL);
 }
 
 static void set_view(App *a, View v)
@@ -158,8 +244,10 @@ static void on_key_timer(App *a, const SDL_KeyboardEvent *k)
             timer_toggle(t, SDL_GetTicksNS());
         break;
     case SDLK_R:
-        if (!k->repeat)
+        if (!k->repeat) {
+            log_timer_partial(a, SDL_GetTicksNS());
             timer_reset(t);
+        }
         break;
     case SDLK_LEFT:
         if (t->state == TIMER_SETUP)
@@ -180,12 +268,55 @@ static void on_key_timer(App *a, const SDL_KeyboardEvent *k)
     }
 }
 
+/* Tasti della vista Pomodoro. */
+static void on_key_pomo(App *a, const SDL_KeyboardEvent *k)
+{
+    Pomodoro *p = &a->pomo;
+    if (k->repeat)
+        return;
+    Uint64 now = SDL_GetTicksNS();
+    switch (k->key) {
+    case SDLK_SPACE:
+    case SDLK_RETURN:
+    case SDLK_KP_ENTER:
+        timer_toggle(&p->timer, now);
+        break;
+    case SDLK_N: {
+        bool was_running = p->timer.state == TIMER_RUNNING;
+        log_pomo_partial(a, now);
+        pomo_next(p, &a->cfg, was_running, now);
+        break;
+    }
+    case SDLK_R:
+        log_pomo_partial(a, now);
+        pomo_init(p, &a->cfg);
+        break;
+    default:
+        break;
+    }
+}
+
 static void on_key(App *a, const SDL_KeyboardEvent *k)
 {
+    if (a->screensaver)
+        return;
     if (k->key == SDLK_Q && !k->repeat) {
         if (panel_open(a))
             settings_save(&a->cfg);
         a->running = false;
+        return;
+    }
+    if (stats_open(a)) {
+        if (k->repeat)
+            return;
+        if (k->key == SDLK_ESCAPE || k->key == SDLK_I)
+            close_stats(a);
+        else if (k->key == SDLK_S)
+            open_panel(a);
+        return;
+    }
+    if (panel_open(a) && !k->repeat && k->key == SDLK_I) {
+        open_stats(a);
         return;
     }
     if (panel_open(a)) {
@@ -194,6 +325,8 @@ static void on_key(App *a, const SDL_KeyboardEvent *k)
     }
     if (a->view == VIEW_TIMER)
         on_key_timer(a, k);
+    else if (a->view == VIEW_POMODORO)
+        on_key_pomo(a, k);
     if (k->repeat)
         return;
     switch (k->key) {
@@ -208,8 +341,14 @@ static void on_key(App *a, const SDL_KeyboardEvent *k)
     case SDLK_S:
         open_panel(a);
         break;
+    case SDLK_I:
+        open_stats(a);
+        break;
     case SDLK_T:
-        set_view(a, a->view == VIEW_CLOCK ? VIEW_TIMER : VIEW_CLOCK);
+        set_view(a, a->view == VIEW_TIMER ? VIEW_CLOCK : VIEW_TIMER);
+        break;
+    case SDLK_P:
+        set_view(a, a->view == VIEW_POMODORO ? VIEW_CLOCK : VIEW_POMODORO);
         break;
     default:
         break;
@@ -223,14 +362,27 @@ static void handle_event(App *a, const SDL_Event *ev)
         a->running = false;
         break;
     case SDL_EVENT_KEY_DOWN:
-        on_key(a, &ev->key);
-        break;
     case SDL_EVENT_MOUSE_BUTTON_DOWN:
-        if (ev->button.button == SDL_BUTTON_LEFT && ev->button.clicks == 2)
-            toggle_fullscreen(a);
-        break;
     case SDL_EVENT_MOUSE_MOTION:
-        cursor_activity(a);
+        if (a->screensaver) {
+            if (SDL_GetTicksNS() - a->start_ns < SAVER_GRACE_NS)
+                break;
+            /* ignora i movimenti "finti" (ingresso del puntatore, finestra che compare):
+             * esce solo con tasto, clic o uno spostamento reale del mouse */
+            if (ev->type == SDL_EVENT_MOUSE_MOTION) {
+                a->saver_moved += SDL_fabsf(ev->motion.xrel) + SDL_fabsf(ev->motion.yrel);
+                if (a->saver_moved < SAVER_MOVE_PX)
+                    break;
+            }
+            a->running = false;
+            break;
+        }
+        if (ev->type == SDL_EVENT_KEY_DOWN)
+            on_key(a, &ev->key);
+        else if (ev->type == SDL_EVENT_MOUSE_MOTION)
+            cursor_activity(a);
+        else if (ev->button.button == SDL_BUTTON_LEFT && ev->button.clicks == 2)
+            toggle_fullscreen(a);
         break;
     case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
     case SDL_EVENT_RENDER_TARGETS_RESET:
@@ -282,6 +434,16 @@ static void build_timer_display(const App *a, Uint64 now, Display *d)
     }
 }
 
+static void build_pomo_display(const App *a, Uint64 now, Display *d)
+{
+    const Pomodoro *p = &a->pomo;
+    timer_face(&p->timer, &a->cfg, now, d->face.values, &d->face.count);
+    pomo_label(p, &a->cfg, d->text, sizeof d->text);
+    d->has_progress = p->timer.state != TIMER_SETUP;
+    d->alpha[0] = d->alpha[1] = p->timer.state == TIMER_PAUSED ? 0.5f : 1.0f;
+    d->color = p->phase == POMO_WORK ? COLOR_DEFAULT : COLOR_BREAK;
+}
+
 static void build_blink_display(const App *a, Uint64 now, Display *d)
 {
     unsigned phase = (unsigned)((now - a->blink_start) / BLINK_PHASE_NS);
@@ -298,8 +460,11 @@ static void build_display(const App *a, Uint64 now, Display *d)
     d->view = a->view;
     d->alpha[0] = d->alpha[1] = 1.0f;
     d->label = LABEL_NONE;
+    d->color = COLOR_DEFAULT;
     if (a->view == VIEW_CLOCK) {
         clock_get(&a->cfg, &d->face);
+    } else if (a->view == VIEW_POMODORO) {
+        build_pomo_display(a, now, d);
     } else if (a->blink_active) {
         build_blink_display(a, now, d);
     } else {
@@ -311,7 +476,7 @@ static bool display_equal(const Display *x, const Display *y)
 {
     return x->view == y->view && x->label == y->label && x->has_progress == y->has_progress &&
            x->alpha[0] == y->alpha[0] && x->alpha[1] == y->alpha[1] &&
-           face_equal(&x->face, &y->face);
+           x->color == y->color && strcmp(x->text, y->text) == 0 && face_equal(&x->face, &y->face);
 }
 
 static void apply_alpha(App *a, const Display *d)
@@ -328,13 +493,18 @@ static void apply_display(App *a, const Display *d, Uint64 now)
 {
     bool animate = a->cfg.animations && a->has_shown && a->shown.view == d->view;
     const ClockFace *f = &d->face;
+    if (d->color != a->applied_color) {
+        render_set_digit_color(a->render, (Uint8)(d->color >> 16), (Uint8)(d->color >> 8), (Uint8)d->color);
+        a->applied_color = d->color;
+    }
     render_set_tiles(a->render, f->values, f->count, f->hide_leading_zero, animate, now);
     render_set_ampm(a->render, f->ampm);
     render_set_label(a->render, d->label);
+    render_set_label_text(a->render, d->text[0] ? d->text : NULL);
     apply_alpha(a, d);
     float p = -1.0f;
     if (d->has_progress)
-        p = timer_progress(&a->timer, now);
+        p = timer_progress(d->view == VIEW_POMODORO ? &a->pomo.timer : &a->timer, now);
     render_set_progress(a->render, p);
     a->shown = *d;
     a->has_shown = true;
@@ -354,6 +524,7 @@ static void update_display(App *a, Uint64 now)
 /* Fine timer: notifiche, vista Timer a 00:00 e lampeggio. */
 static void on_timer_finished(App *a, Uint64 now)
 {
+    log_session(a, a->timer_start, (Uint64)a->timer.minutes * 60 * SDL_NS_PER_SECOND, "timer", true);
     if (a->cfg.timer_notify) {
         int m = a->timer.minutes;
         char body[96];
@@ -365,6 +536,25 @@ static void on_timer_finished(App *a, Uint64 now)
     a->view = VIEW_TIMER;
     a->blink_active = true;
     a->blink_start = now;
+}
+
+/* Fine fase Pomodoro: log dello STUDIO, notifica e suono; la vista non cambia. */
+static void on_pomo_finished(App *a, PomoPhase finished)
+{
+    const char *msg = "Riposo finito \u2014 si torna a studiare";
+    char body[96];
+    if (finished == POMO_WORK) {
+        log_session(a, a->pomo_start, (Uint64)a->cfg.pomodoro_work * 60 * SDL_NS_PER_SECOND, "pomodoro", true);
+        if (a->pomo.phase == POMO_LONG_BREAK)
+            snprintf(body, sizeof body, "Fine studio \u2014 riposo lungo di %d min", a->cfg.pomodoro_long_break);
+        else
+            snprintf(body, sizeof body, "Fine studio \u2014 riposo di %d min", a->cfg.pomodoro_break);
+        msg = body;
+    }
+    if (a->cfg.timer_notify)
+        notify_desktop("flipclock", msg);
+    if (a->cfg.timer_sound)
+        notify_sound();
 }
 
 static void blink_tick(App *a, Uint64 now)
@@ -383,6 +573,8 @@ static void apply_resize(App *a)
         render_resize(a->render, w, h);
         if (panel_open(a))
             ui_settings_resize(a->ui, w, h);
+        if (stats_open(a))
+            ui_stats_resize(a->sui, w, h);
     }
     a->resized = false;
 }
@@ -418,6 +610,8 @@ static int32_t wait_timeout_ms(const App *a, Uint64 now)
     uint32_t ms = clock_ms_to_next_change(&a->cfg);
     if (a->timer.state == TIMER_RUNNING)
         ms = min_u32(ms, timer_ms_to_next_change(&a->timer, &a->cfg, now));
+    if (a->pomo.timer.state == TIMER_RUNNING)
+        ms = min_u32(ms, timer_ms_to_next_change(&a->pomo.timer, &a->cfg, now));
     ms = min_u32(ms, blink_ms(a, now));
     ms = min_u32(ms, notify_ms_to_next_poll());
     if (a->cursor_deadline)
@@ -425,12 +619,35 @@ static int32_t wait_timeout_ms(const App *a, Uint64 now)
     return ms > 0x7fffffffu ? 0x7fffffff : (int32_t)ms;
 }
 
+/* Blocca lo spegnimento schermo finché timer o Pomodoro sono IN CORSO (solo al cambio di stato). */
+static void set_inhibit(App *a)
+{
+    bool want = a->timer.state == TIMER_RUNNING || a->pomo.timer.state == TIMER_RUNNING;
+    if (want == a->inhibit)
+        return;
+    a->inhibit = want;
+    if (want)
+        SDL_DisableScreenSaver();
+    else
+        SDL_EnableScreenSaver();
+}
+
+/* Animazione flip a 30 fps invece di 60: dimezza la CPU durante i flip
+ * (misurato ~1,4 ms CPU per fotogramma con il renderer gpu). */
+#define ANIM_FRAME_NS (SDL_NS_PER_SECOND / 30)
+
 static void main_loop(App *a)
 {
+    Uint64 next_frame = 0;
     while (a->running) {
         Uint64 now = SDL_GetTicksNS();
         if (render_is_animating(a->render, now)) {
+            /* dorme fino al prossimo fotogramma, restando reattivo agli eventi */
+            SDL_Event ev;
+            if (next_frame > now && SDL_WaitEventTimeout(&ev, (Sint32)until_ms(next_frame, now)))
+                handle_event(a, &ev);
             drain_events(a);
+            next_frame = SDL_GetTicksNS() + ANIM_FRAME_NS;
         } else {
             SDL_Event ev;
             if (SDL_WaitEventTimeout(&ev, wait_timeout_ms(a, now)))
@@ -446,6 +663,11 @@ static void main_loop(App *a)
         cursor_tick(a, now);
         if (timer_update(&a->timer, now))
             on_timer_finished(a, now);
+        PomoPhase fin;
+        if (pomo_update(&a->pomo, &a->cfg, now, &fin))
+            on_pomo_finished(a, fin);
+        track_starts(a);
+        set_inhibit(a);
         blink_tick(a, now);
         notify_poll();
         update_display(a, now);
@@ -461,6 +683,8 @@ static void main_loop(App *a)
             render_draw(a->render, now);
             if (panel_open(a))
                 ui_settings_draw(a->ui, &a->cfg);
+            else if (stats_open(a))
+                ui_stats_draw(a->sui);
             SDL_RenderPresent(a->ren);
             a->dirty = false;
         }
@@ -489,7 +713,7 @@ static bool app_init(void)
 static bool app_open(App *a, const char *font_path)
 {
     SDL_WindowFlags fl = SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY;
-    if (a->cfg.start_fullscreen)
+    if (a->cfg.start_fullscreen || a->screensaver)
         fl |= SDL_WINDOW_FULLSCREEN;
     a->win = SDL_CreateWindow("flipclock", 960, 400, fl);
     if (!a->win) {
@@ -513,13 +737,23 @@ static bool app_open(App *a, const char *font_path)
     render_set_style(a->render, a->cfg.scale, a->cfg.brightness);
     apply_resize(a);
     timer_init(&a->timer, a->cfg.timer_default_minutes);
+    pomo_init(&a->pomo, &a->cfg);
+    a->applied_color = COLOR_DEFAULT;
     char wav[1024];
     notify_init(settings_find_asset("ding.wav", wav, sizeof wav) ? wav : NULL);
-    a->ui = ui_settings_create(a->ren, font_path);
+    if (!a->screensaver) {
+        a->ui = ui_settings_create(a->ren, font_path);
+        a->sui = ui_stats_create(a->ren, font_path);
+    }
     update_display(a, SDL_GetTicksNS());
     a->dirty = true;
-    if (a->cfg.start_fullscreen)
+    a->start_ns = SDL_GetTicksNS();
+    if (a->screensaver) {
+        SDL_HideCursor();
+        a->cursor_hidden = true;
+    } else if (a->cfg.start_fullscreen) {
         cursor_activity(a);
+    }
     return true;
 }
 
@@ -528,6 +762,8 @@ static void app_close(App *a)
     notify_shutdown();
     if (a->ui)
         ui_settings_destroy(a->ui);
+    if (a->sui)
+        ui_stats_destroy(a->sui);
     if (a->render)
         render_destroy(a->render);
     if (a->ren)
@@ -556,8 +792,39 @@ static bool acquire_single_instance(void)
     return true; /* fd lasciato aperto di proposito */
 }
 
-int main(void)
+static void usage(FILE *out)
 {
+    fputs("Uso: flipclock [opzioni]\n"
+          "\n"
+          "Orologio flip con timer di studio, Pomodoro e statistiche.\n"
+          "\n"
+          "Opzioni:\n"
+          "  --screensaver   schermo intero, esce con tasto, clic o movimento del mouse\n"
+          "  -h, --help      mostra questo aiuto\n"
+          "\n"
+          "Tasti:\n"
+          "  F/F11 schermo intero   T timer   P Pomodoro   S impostazioni   I statistiche\n"
+          "  Spazio/Invio avvia/pausa   R reset   N fase successiva (Pomodoro)\n"
+          "  Q esci   Esc chiude pannello / esce dallo schermo intero\n",
+          out);
+}
+
+int main(int argc, char **argv)
+{
+    bool screensaver = false;
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "--screensaver") == 0) {
+            screensaver = true;
+        } else if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
+            usage(stdout);
+            return 0;
+        } else {
+            fprintf(stderr, "flipclock: opzione sconosciuta: %s\n\n", argv[i]);
+            usage(stderr);
+            return 2;
+        }
+    }
+
     if (!acquire_single_instance()) {
         fprintf(stderr, "flipclock: già in esecuzione\n");
         return 0;
@@ -566,6 +833,7 @@ int main(void)
     App app;
     memset(&app, 0, sizeof app);
     app.running = true;
+    app.screensaver = screensaver;
     settings_load(&app.cfg);
 
     char font[1024];
@@ -577,6 +845,11 @@ int main(void)
     int rc = 1;
     if (app_init() && app_open(&app, font)) {
         main_loop(&app);
+        if (!app.screensaver) {
+            Uint64 now = SDL_GetTicksNS();
+            log_timer_partial(&app, now);
+            log_pomo_partial(&app, now);
+        }
         rc = 0;
     }
     app_close(&app);

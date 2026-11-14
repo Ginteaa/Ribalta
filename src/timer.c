@@ -67,6 +67,13 @@ bool timer_update(Timer *t, Uint64 now) {
     return false;
 }
 
+Uint64 timer_elapsed_ns(const Timer *t, Uint64 now) {
+    if (t->state == TIMER_SETUP) return 0;
+    Uint64 total = duration_ns(t);
+    Uint64 rem = timer_remaining_ns(t, now);
+    return rem >= total ? 0 : total - rem;
+}
+
 float timer_progress(const Timer *t, Uint64 now) {
     if (t->state == TIMER_SETUP) return 0.0f;
     Uint64 total = duration_ns(t);
