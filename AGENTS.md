@@ -12,6 +12,8 @@ A lightweight **flip clock and study timer for Linux** (Wayland and X11), writte
 SDL3_ttf + fontconfig**. Features: flip clock (HH:MM, optional seconds, 12/24h), study timer (also typed with the
 digit keys, microwave style), Pomodoro, study statistics (CSV), settings overlay, colour picker for
 the digits, digit-font menu (system fonts via fontconfig), screensaver mode, desktop notifications.
+Shipped as a native build (`make install`) and as a Flatpak (`packaging/flatpak/`, app id
+`io.github.ginteaa.Ribalta`) for distributions without SDL3.
 
 **The top requirement is resource usage:** ~18 MB of RAM and ~0% CPU when idle. Every change must
 preserve that (see *Engineering rules* below).

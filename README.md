@@ -25,7 +25,8 @@
 **Ribalta** is a lightweight flip clock for Linux (Wayland and X11), written in C17 with SDL3 and
 SDL3_ttf. It shows the time on animated flip tiles and doubles as a study companion: a countdown
 timer that keeps running in the background, a Pomodoro mode, study statistics and a screensaver
-mode.
+mode. Install it natively from source or as a **Flatpak**, which runs on any distribution
+(including Ubuntu 24.04 and Linux Mint 22, which do not ship SDL3).
 
 The name is Italian: *ribalta* means "flip over" (as in a tile turning) and also "the stage"
 (the limelight). The look is inspired by the classic flip-clock style, but the code and artwork are
@@ -47,6 +48,7 @@ original and the project is not affiliated with Fliqlo.
 - 💡 **Keeps the screen awake** while a timer or Pomodoro is running (idle-inhibit)
 - 🔔 **Desktop notification and chime** when a session or phase ends
 - 🔒 **Single instance** and 🖥️ **HiDPI** support, resizable window, fullscreen
+- 📦 **Two ways to install**: native build (`make install`) or Flatpak for any distribution
 
 ## 📸 Screenshots
 
@@ -58,11 +60,22 @@ original and the project is not affiliated with Fliqlo.
 
 ## 📦 Installation
 
+There are two ways to install Ribalta; both are maintained and built by the CI:
+
+| | Native (from source) | Flatpak |
+|---|---|---|
+| Works on | distributions that ship SDL3 ≥ 3.2 (Arch, Fedora, openSUSE Tumbleweed…) | any distribution with Flatpak, including Ubuntu 24.04 and Mint 22 |
+| Memory at idle (PSS) | ~18 MB | ~25 MB (the runtime's libraries are not shared with the host) |
+| Settings and statistics | `~/.config/ribalta/`, `~/.local/share/ribalta/` | `~/.var/app/io.github.ginteaa.Ribalta/` |
+
+If your distribution ships SDL3, the native build is the lightest choice. The two installs can live
+side by side; they keep separate settings and statistics.
+
 ### Install with Flatpak
 
-The Flatpak package works on any distribution, including Ubuntu 24.04 and Linux Mint 22, whose
-repositories do not ship SDL3. The runtime provides SDL3, SDL3_ttf, fontconfig and `notify-send`, so
-nothing else has to be installed. Ribalta is not on Flathub yet.
+The `org.freedesktop.Platform` 25.08 runtime provides SDL3, fontconfig and `notify-send`; FreeType
+and SDL3_ttf are built into the package. Nothing else has to be installed. Ribalta is not on
+Flathub yet.
 
 1. On Ubuntu, Flatpak is not installed by default (Mint already has it):
 
@@ -71,8 +84,9 @@ sudo apt install flatpak
 flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
 ```
 
-2. Download `ribalta.flatpak` from the artifacts of the latest successful **Flatpak** workflow run
-   (GitHub, *Actions* tab; the artifact is a zip that contains the `.flatpak` file).
+2. Open the latest successful run of the [**Flatpak** workflow](https://github.com/Ginteaa/Ribalta/actions/workflows/flatpak.yml)
+   and download the `ribalta-x86_64.flatpak` artifact (you must be signed in to GitHub). It is a
+   zip: extract `ribalta.flatpak` from it.
 3. Install and run it (the `org.freedesktop.Platform` 25.08 runtime is fetched from Flathub):
 
 ```sh
@@ -98,7 +112,8 @@ building (used by the Flatpak manifest).
 **Dependencies**
 
 - `sdl3` and `sdl3_ttf` (SDL3 ≥ 3.2 and SDL3_ttf ≥ 3.2; build and runtime)
-- `fontconfig` (build and runtime): lists the installed fonts for the digit-font menu
+- `fontconfig`: headers at build time; the library is loaded only when the digit-font menu opens
+  (without it the menu lists just the bundled font)
 - `libnotify` (optional): provides `notify-send` for desktop notifications
 
 On Arch Linux:
@@ -261,7 +276,7 @@ Measured on Wayland (niri) with the default `gpu` renderer and the window visibl
 
 | Metric | Value |
 |---|---|
-| Memory (PSS) at idle | ~17–19 MB |
+| Memory (PSS) at idle | ~17–19 MB native, ~25 MB Flatpak |
 | CPU, `HH:MM` clock (one flip per minute) | ~40 ms per minute (~0.07%) |
 | CPU while seconds are visible | ~2.2% |
 | CPU when the window is not in view | ~0.15%, even with seconds |
@@ -282,8 +297,9 @@ is tried in the order `gpu, opengl, opengles2, software`; override it with
   runs or a panel opens.
 - **Monotonic timer**: timers store their end instant from a monotonic clock, so system time
   changes and NTP adjustments do not affect them.
-- **Load on demand**: the font and the audio are loaded only when needed (for example while a
-  panel is open or a chime plays), and notifications use `notify-send` instead of linking libnotify.
+- **Load on demand**: the overlay font, the audio and fontconfig are loaded only when needed (for
+  example while a panel is open, a chime plays or the font menu lists the system fonts), and
+  notifications use `notify-send` instead of linking libnotify.
 
 ## 📚 Documentation
 
@@ -298,7 +314,8 @@ The design documents live in [`docs/`](docs/README.md):
 
 - **IBM Plex Sans Condensed** font, licensed under the SIL Open Font License 1.1
   (see [`assets/OFL.txt`](assets/OFL.txt))
-- [SDL3](https://libsdl.org) and SDL3_ttf for windowing, rendering, input and audio
+- [SDL3](https://libsdl.org) and SDL3_ttf for windowing, rendering, input and audio;
+  [FreeType](https://freetype.org) and [fontconfig](https://www.freedesktop.org/wiki/Software/fontconfig/) for fonts
 - The chime sound (`assets/ding.wav`) was generated for this project
 
 ## 📄 License
