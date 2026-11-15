@@ -22,8 +22,8 @@ jobs:
             suffix: x86_64
     runs-on: ${{ matrix.runner }}
     env:
-      SDL_VIDEO_DRIVER: offscreen
-      SDL_RENDER_DRIVER: software
+      # niente driver offscreen: su macOS cerca EGL. I runner hanno una sessione grafica, quindi
+      # l'avvio di prova usa Cocoa e il renderer scelto dall'app, come su un Mac vero.
       SDL_AUDIO_DRIVER: dummy
     steps:
       - uses: actions/checkout@v4
@@ -40,7 +40,7 @@ jobs:
       - name: Smoke test
         run: ./ribalta --help
 
-      - name: Offscreen run
+      - name: Test run (Cocoa)
         run: |
           export XDG_CONFIG_HOME="$(mktemp -d)" XDG_DATA_HOME="$(mktemp -d)"
           RIBALTA_DEBUG=1 ./ribalta > run.log 2>&1 &
@@ -62,7 +62,7 @@ jobs:
           fi
           codesign --verify --deep build/Ribalta.app
 
-      - name: Offscreen run of the bundle
+      - name: Test run of the bundle
         run: |
           # fuori dal repo: gli asset devono venire da Contents/Resources, non da ./assets
           app="$PWD/build/Ribalta.app"
