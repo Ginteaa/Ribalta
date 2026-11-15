@@ -178,8 +178,10 @@ Uint32 clock_ms_to_next_change(const Settings *s);
 - **Flatpak**: `packaging/flatpak/io.github.ginteaa.Ribalta.yml` builds with `make release` and
   `make install-files PREFIX=/app APPID=io.github.ginteaa.Ribalta`; the AppStream metainfo is
   installed next to it. The CI workflow `flatpak.yml` produces the `ribalta.flatpak` bundle.
-- **Dependencies**: the `org.freedesktop.Platform` 25.08 runtime ships SDL3, fontconfig and
-  `notify-send`. FreeType 2.13.3 and SDL3_ttf 3.2.2 are built by the manifest as **static, minimal**
+- **Dependencies**: the `org.freedesktop.Platform` 25.08 runtime ships fontconfig and
+  `notify-send`. **SDL3 3.4.20** is built by the manifest as a shared library (no joystick, haptic,
+  hidapi, sensor, camera): the runtime's SDL 3.2.30 crashes in `SDL_RenderPresent` with the `gpu`
+  (Vulkan) renderer as soon as the window is resized or maximised. FreeType 2.13.3 and SDL3_ttf 3.2.2 are built by the manifest as **static, minimal**
   libraries (no harfbuzz, png, brotli, bzip2, zlib, plutosvg): the runtime's SDL3_ttf would load
   harfbuzz → glib, pcre2, graphite, png, brotli at startup (~3 MB). Ribalta only draws digits and
   Latin labels, so no shaping is needed. The app is linked with `PKGFLAGS=--static` and
@@ -217,6 +219,7 @@ Uint32 clock_ms_to_next_change(const Settings *s);
 > | All Mesa Vulkan drivers loaded (no filter) | ~70 MB | — |
 > | `VK_LOADER_DRIVERS_SELECT=*intel*` (automatic) | ~27.5 MB | ~27.5 MB |
 > | + static minimal FreeType/SDL3_ttf, fontconfig via `dlopen` | **~24.9 MB** | ~24.9 MB |
+> | + bundled SDL 3.4.20 (same-session measurement: 21.9 → 22.1 MB) | ~+0.2 MB | — |
 > | Native build, for comparison | ~18.8 MB | ~28.4 MB |
 >
 > RSS is lower than native; PSS is higher only because the runtime's libraries (Mesa Vulkan driver,

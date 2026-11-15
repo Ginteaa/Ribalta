@@ -73,8 +73,8 @@ side by side; they keep separate settings and statistics.
 
 ### Install with Flatpak
 
-The `org.freedesktop.Platform` 25.08 runtime provides SDL3, fontconfig and `notify-send`; FreeType
-and SDL3_ttf are built into the package. Nothing else has to be installed. Ribalta is not on
+The `org.freedesktop.Platform` 25.08 runtime provides fontconfig and `notify-send`; SDL3 3.4,
+FreeType and SDL3_ttf are built into the package. Nothing else has to be installed. Ribalta is not on
 Flathub yet.
 
 1. On Ubuntu, Flatpak is not installed by default (Mint already has it):
