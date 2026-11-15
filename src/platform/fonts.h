@@ -2,7 +2,8 @@
 #define RIBALTA_FONTS_H
 #include <stdbool.h>
 
-/* Elenco dei font di sistema (fontconfig), usato SOLO mentre serve (menu font aperto o ←/→ sulla
+/* Elenco dei font di sistema (Linux: fontconfig in fonts.c; macOS: CoreText in fonts_mac.c; la
+ * parte comune è in fonts_common.c), usato SOLO mentre serve (menu font aperto o ←/→ sulla
  * riga "Font cifre"): all'avvio l'app apre direttamente Settings.font_file senza fontconfig.
  * Ogni chiamata a fonts_list va chiusa con fonts_free, che libera anche la cache (FcFini). */
 
@@ -31,6 +32,9 @@ bool fonts_list(FontList *out);
 
 /* Libera la lista (out torna vuota) e chiama FcFini. Sicura su una lista vuota. */
 void fonts_free(FontList *l);
+
+/* Ordina per family (case-insensitive, poi esatto). Per le implementazioni di fonts_list. */
+void fonts_sort(FontList *l);
 
 /* Indice della voce con quel file, -1 se assente (file vuoto o NULL -> -1). */
 int fonts_find(const FontList *l, const char *file);

@@ -9,7 +9,9 @@
 
 #define PATH_MAX_LEN 1024
 
-/* <$env>/ribalta, oppure ~/<home_sub>/ribalta se la variabile manca o non è assoluta */
+/* <$env>/ribalta, oppure ~/<home_sub>/ribalta se la variabile manca o non è assoluta.
+ * macOS: senza la variabile, configurazione e dati stanno insieme in
+ * ~/Library/Application Support/Ribalta (le variabili XDG restano valide, es. per i test). */
 static bool xdg_dir(char *out, size_t n, const char *env, const char *home_sub)
 {
     const char *x = getenv(env);
@@ -18,7 +20,12 @@ static bool xdg_dir(char *out, size_t n, const char *env, const char *home_sub)
     const char *h = getenv("HOME");
     if (!h || !h[0])
         return false;
+#ifdef __APPLE__
+    (void)home_sub;
+    return snprintf(out, n, "%s/Library/Application Support/Ribalta", h) < (int)n;
+#else
     return snprintf(out, n, "%s/%s/ribalta", h, home_sub) < (int)n;
+#endif
 }
 
 bool paths_config_dir(char *out, size_t out_size)

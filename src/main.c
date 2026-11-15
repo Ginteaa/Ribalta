@@ -149,12 +149,18 @@ static void main_loop(App *a)
 static bool app_init(void)
 {
     gpu_limit_vulkan_drivers(); /* solo in Flatpak: evita di caricare driver Vulkan inutili */
+#ifdef __linux__
     SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "wayland,x11");
+#endif
     SDL_SetHint(SDL_HINT_APP_ID, "ribalta");
     SDL_SetHint(SDL_HINT_VIDEO_ALLOW_SCREENSAVER, "1");
-    /* "gpu" (SDL_GPU/Vulkan) misurato: ~17 MB PSS contro ~37 MB di opengl.
-     * La variabile d'ambiente SDL_RENDER_DRIVER ha comunque la precedenza. */
+    /* "gpu" (SDL_GPU: Vulkan su Linux, Metal su macOS) misurato su Linux: ~17 MB PSS contro
+     * ~37 MB di opengl. La variabile d'ambiente SDL_RENDER_DRIVER ha comunque la precedenza. */
+#ifdef __APPLE__
+    SDL_SetHint(SDL_HINT_RENDER_DRIVER, "gpu,metal,opengl,software");
+#else
     SDL_SetHint(SDL_HINT_RENDER_DRIVER, "gpu,opengl,opengles2,software");
+#endif
     if (!SDL_Init(SDL_INIT_VIDEO)) {
         fprintf(stderr, "ribalta: SDL_Init: %s\n", SDL_GetError());
         return false;
@@ -244,12 +250,15 @@ static void app_close(App *a)
     SDL_Quit();
 }
 
-/* Istanza singola: lock esclusivo su $XDG_RUNTIME_DIR/ribalta.lock (fallback /tmp).
+/* Istanza singola: lock esclusivo su $XDG_RUNTIME_DIR/ribalta.lock (fallback $TMPDIR, poi /tmp;
+ * su macOS XDG_RUNTIME_DIR di solito manca e TMPDIR è la cartella temporanea dell'utente).
  * Il descrittore resta aperto per tutta la vita del processo; il kernel rilascia
  * il lock all'uscita, anche in caso di crash. Ritorna false se un'altra istanza è attiva. */
 static bool acquire_single_instance(void)
 {
     const char *dir = getenv("XDG_RUNTIME_DIR");
+    if (!dir || !*dir)
+        dir = getenv("TMPDIR");
     char path[512];
     snprintf(path, sizeof path, "%s/ribalta.lock", (dir && *dir) ? dir : "/tmp");
     int fd = open(path, O_RDWR | O_CREAT | O_CLOEXEC, 0600);

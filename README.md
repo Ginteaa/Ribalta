@@ -26,7 +26,8 @@
 SDL3_ttf. It shows the time on animated flip tiles and doubles as a study companion: a countdown
 timer that keeps running in the background, a Pomodoro mode, study statistics and a screensaver
 mode. Install it natively from source or as a **Flatpak**, which runs on any distribution
-(including Ubuntu 24.04 and Linux Mint 22, which do not ship SDL3).
+(including Ubuntu 24.04 and Linux Mint 22, which do not ship SDL3). An **experimental macOS build**
+is also available.
 
 The name is Italian: *ribalta* means "flip over" (as in a tile turning) and also "the stage"
 (the limelight). The look is inspired by the classic flip-clock style, but the code and artwork are
@@ -106,6 +107,34 @@ Inside the sandbox the configuration and the data live in `~/.var/app/io.github.
 
 Packagers can use `make install-files PREFIX=... APPID=...`, which installs the files without
 building (used by the Flatpak manifest).
+
+### macOS (experimental)
+
+The macOS port is new and tested only by the CI so far: feedback is welcome. Settings and statistics
+live in `~/Library/Application Support/Ribalta/`. Notifications are shown through `osascript`, so
+macOS lists them under *Script Editor*.
+
+**Download.** The `macos` workflow builds `Ribalta-macos-arm64.zip` (Apple Silicon) and
+`Ribalta-macos-x86_64.zip` (Intel), with SDL3 bundled; tagged releases have them attached. The app is
+signed ad hoc but **not notarised** (that needs a paid Apple Developer account), so macOS blocks the
+first launch:
+
+1. Unzip and move `Ribalta.app` to *Applications*.
+2. Open it once; when macOS refuses, go to *System Settings → Privacy & Security* and click
+   **Open Anyway** (or run `xattr -dr com.apple.quarantine /Applications/Ribalta.app`).
+
+**Build from source** (nothing to approve: a locally built app is not quarantined), with
+[Homebrew](https://brew.sh) and the Xcode command-line tools:
+
+```sh
+brew install sdl3 sdl3_ttf pkg-config
+git clone https://github.com/Ginteaa/Ribalta.git && cd Ribalta
+make install    # builds build/Ribalta.app and copies it to ~/Applications
+```
+
+`make app` only builds `build/Ribalta.app`. Such a bundle links Homebrew's SDL3, so it runs on the Mac
+that built it; `BUNDLE_LIBS=1 make app` (needs `brew install dylibbundler`) copies the libraries
+inside, as the CI does.
 
 ### Install from source
 

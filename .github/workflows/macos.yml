@@ -1,0 +1,88 @@
+name: macos
+
+on:
+  push:
+    branches: [main, feat/macos]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write   # allegare gli zip alla release sui tag v*
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-14
+            suffix: arm64
+          - runner: macos-15-intel
+            suffix: x86_64
+    runs-on: ${{ matrix.runner }}
+    env:
+      SDL_VIDEO_DRIVER: offscreen
+      SDL_RENDER_DRIVER: software
+      SDL_AUDIO_DRIVER: dummy
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: brew install sdl3 sdl3_ttf pkg-config dylibbundler
+
+      - name: Build (warnings are errors)
+        run: make CFLAGS="-std=c17 -Wall -Wextra -Wpedantic -O2 -Werror"
+
+      - name: Unit tests
+        run: make test
+
+      - name: Smoke test
+        run: ./ribalta --help
+
+      - name: Offscreen run
+        run: |
+          export XDG_CONFIG_HOME="$(mktemp -d)" XDG_DATA_HOME="$(mktemp -d)"
+          ./ribalta &
+          pid=$!
+          sleep 3
+          kill -0 "$pid"
+          kill "$pid"
+
+      - name: Build Ribalta.app (libraries bundled)
+        run: BUNDLE_LIBS=1 make app
+
+      - name: No Homebrew paths left in the bundle
+        run: |
+          files="build/Ribalta.app/Contents/MacOS/ribalta $(ls build/Ribalta.app/Contents/Frameworks/*.dylib)"
+          otool -L $files
+          if otool -L $files | grep -E '/opt/homebrew|/usr/local'; then
+            echo "Homebrew paths still linked" >&2; exit 1
+          fi
+          codesign --verify --deep build/Ribalta.app
+
+      - name: Offscreen run of the bundle
+        run: |
+          # fuori dal repo: gli asset devono venire da Contents/Resources, non da ./assets
+          app="$PWD/build/Ribalta.app"
+          export XDG_CONFIG_HOME="$(mktemp -d)" XDG_DATA_HOME="$(mktemp -d)"
+          cd "$(mktemp -d)"
+          "$app/Contents/MacOS/ribalta" &
+          pid=$!
+          sleep 3
+          kill -0 "$pid"
+          kill "$pid"
+
+      - name: Zip
+        run: ditto -c -k --keepParent build/Ribalta.app Ribalta-macos-${{ matrix.suffix }}.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Ribalta-macos-${{ matrix.suffix }}
+          path: Ribalta-macos-${{ matrix.suffix }}.zip
+
+      - name: Attach to the release (tags v*)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: Ribalta-macos-${{ matrix.suffix }}.zip

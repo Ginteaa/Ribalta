@@ -3,17 +3,36 @@
 #   make release    build ottimizzata        make test  test unitari (senza display)
 #   make install    installa in ~/.local     make uninstall  (le statistiche restano)
 #   make debug      ASan + UBSan             make icons      rigenera le PNG dell'icona
+#   make app        macOS: build/Ribalta.app  (make install su macOS la copia in ~/Applications)
 
 CC      ?= cc
 PKGS    := sdl3 sdl3-ttf
-# fontconfig: solo header (caricata a richiesta con dlopen in fonts.c), non va linkata
-FCPKG   := fontconfig
 # PKGFLAGS=--static quando SDL3_ttf è una libreria statica (Flatpak): aggiunge le sue dipendenze
 PKGFLAGS ?=
 CFLAGS  ?= -std=c17 -Wall -Wextra -Wpedantic -O2
-override CFLAGS += $(shell pkg-config --cflags $(PKGS) $(FCPKG)) -D_POSIX_C_SOURCE=200809L -Isrc
-override LDLIBS += $(shell pkg-config $(PKGFLAGS) --libs $(PKGS)) -lm
-SRC     := $(shell find src -name '*.c' | sort)
+UNAME_S := $(shell uname -s)
+
+ifeq ($(UNAME_S),Darwin)
+  # macOS: elenco font con CoreText (fonts_mac.c); _DARWIN_C_SOURCE espone anche flock
+  FCPKG      :=
+  PLATDEF    := -D_DARWIN_C_SOURCE
+  PLATLIBS   := -framework CoreText -framework CoreFoundation
+  FONTS_SRC  := src/platform/fonts_mac.c
+  STRIP_LD   := -Wl,-dead_strip
+else
+  # fontconfig: solo header (caricata a richiesta con dlopen in fonts.c), non va linkata
+  FCPKG      := fontconfig
+  PLATDEF    := -D_POSIX_C_SOURCE=200809L
+  PLATLIBS   :=
+  FONTS_SRC  := src/platform/fonts.c
+  STRIP_LD   := -s
+endif
+
+override CFLAGS += $(shell pkg-config --cflags $(PKGS) $(FCPKG)) $(PLATDEF) -Isrc
+override LDLIBS += $(shell pkg-config $(PKGFLAGS) --libs $(PKGS)) -lm $(PLATLIBS)
+# fonts.c e fonts_mac.c sono alternativi: si compila solo quello della piattaforma
+SRC     := $(filter-out src/platform/fonts.c src/platform/fonts_mac.c,$(shell find src -name '*.c')) $(FONTS_SRC)
+SRC     := $(sort $(SRC))
 OBJ     := $(SRC:src/%.c=build/%.o)
 BIN     := ribalta
 PREFIX  ?= $(HOME)/.local
@@ -44,13 +63,29 @@ debug: clean
 	@$(MAKE) --no-print-directory CFLAGS="$(CFLAGS)" LDFLAGS="$(LDFLAGS)" $(BIN)
 
 release: CFLAGS += -flto -DNDEBUG
-release: LDFLAGS += -flto -s
+release: LDFLAGS += -flto $(STRIP_LD)
 release: clean
 	@$(MAKE) --no-print-directory CFLAGS="$(CFLAGS)" LDFLAGS="$(LDFLAGS)" $(BIN)
 
 # installazione con output leggibile (banner, barra di avanzamento): vedi tools/install.sh
+ifeq ($(UNAME_S),Darwin)
+# macOS: Ribalta.app (vedi tools/macos-app.sh) copiata in ~/Applications
+APPDIR  ?= $(HOME)/Applications
+app: release
+	@./tools/macos-app.sh
+
+install: app
+	@mkdir -p "$(APPDIR)"
+	@rm -rf "$(APPDIR)/Ribalta.app"
+	@cp -R build/Ribalta.app "$(APPDIR)/"
+	@echo "Ribalta.app installata in $(APPDIR)"
+else
+app:
+	@echo "make app: solo su macOS" >&2; exit 1
+
 install:
 	@./tools/install.sh "$(PREFIX)"
+endif
 
 # installazione semplice e silenziosa per chi impacchetta (Flatpak, distribuzioni):
 #   make install-files PREFIX=/app DESTDIR=... APPID=io.github.ginteaa.Ribalta
@@ -80,7 +115,8 @@ clean:
 
 # test unitari (senza display): ogni tests/test_*.c è un programma a sé, fallisce al primo errore
 TESTS       := $(patsubst tests/%.c,%,$(wildcard tests/test_*.c))
-TEST_COMMON := src/core/settings.c src/core/color.c src/core/timer.c src/platform/paths.c src/platform/fonts.c
+TEST_COMMON := src/core/settings.c src/core/color.c src/core/timer.c src/platform/paths.c \
+               src/platform/fonts_common.c $(FONTS_SRC)
 
 build/tests/%: tests/%.c $(TEST_COMMON)
 	$(call say,CC,tests/$*.c)
@@ -94,4 +130,4 @@ test: $(addprefix build/tests/,$(TESTS))
 icons:
 	./tools/icons.sh
 
-.PHONY: all debug release install install-files uninstall clean icons test
+.PHONY: all app debug release install install-files uninstall clean icons test

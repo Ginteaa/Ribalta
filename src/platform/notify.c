@@ -43,12 +43,38 @@ void notify_init(const char *wav_path, const char *icon_path) {
     }
 }
 
+#ifdef __APPLE__
+/* Copia s in out come stringa AppleScript (tra virgolette): escape di \ e ". */
+static void applescript_quote(char *out, size_t n, const char *s) {
+    size_t k = 0;
+    if (n < 3) { if (n) out[0] = '\0'; return; }
+    out[k++] = '"';
+    for (; s && *s && k + 3 < n; s++) {
+        if (*s == '"' || *s == '\\') out[k++] = '\\';
+        out[k++] = *s == '\n' ? ' ' : *s;
+    }
+    out[k++] = '"';
+    out[k] = '\0';
+}
+#endif
+
 void notify_desktop(const char *title, const char *body) {
     if (g_nchildren >= MAX_CHILDREN) return;
+#ifdef __APPLE__
+    /* macOS: notifica nativa tramite osascript (nessuna dipendenza, nessuna firma richiesta) */
+    char qt[256], qb[512], script[900];
+    applescript_quote(qt, sizeof qt, title ? title : "");
+    applescript_quote(qb, sizeof qb, body ? body : "");
+    snprintf(script, sizeof script, "display notification %s with title %s", qb, qt);
+    char *argv[] = { "osascript", "-e", script, NULL };
+    const char *prog = "osascript";
+#else
     char *argv[] = { "notify-send", "-a", "Ribalta", "-i", g_icon, "-u", "normal",
                      (char *)(title ? title : ""), (char *)(body ? body : ""), NULL };
+    const char *prog = "notify-send";
+#endif
     pid_t pid;
-    int rc = posix_spawnp(&pid, "notify-send", NULL, NULL, argv, environ);
+    int rc = posix_spawnp(&pid, prog, NULL, NULL, argv, environ);
     if (rc != 0) {
         SDL_Log("notify: posix_spawnp fallita (%d)", rc);
         return;

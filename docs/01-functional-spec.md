@@ -98,7 +98,8 @@ use the bundled font.
 The Pomodoro keys (`pomodoro_work`, `pomodoro_break`, `pomodoro_long_break`, `pomodoro_cycles`,
 `pomodoro_auto_continue`) are described in [04-roadmap.md](04-roadmap.md), section 3.1.
 
-File: `~/.config/ribalta/config.ini` (honours `$XDG_CONFIG_HOME`). `key=value` format,
+File: `~/.config/ribalta/config.ini` (honours `$XDG_CONFIG_HOME`; on macOS
+`~/Library/Application Support/Ribalta/config.ini`, where `sessions.csv` lives too). `key=value` format,
 lines starting with `#` are ignored, unknown keys are ignored, invalid values fall back to the default.
 If the file does not exist it is created on the first save.
 

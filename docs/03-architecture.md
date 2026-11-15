@@ -98,9 +98,12 @@ ribalta/
 │   ├── core/               pure logic, testable without a window
 │   │   ├── clock  timer  pomodoro  stats  settings  color   (.c/.h)
 │   ├── platform/           OS integration
-│   │   ├── notify.c/.h     notify-send + sound
-│   │   ├── paths.c/.h      XDG config/data directories, asset lookup
-│   │   ├── fonts.c/.h      installed font list (fontconfig), ring stepping; no state kept
+│   │   ├── notify.c/.h     notify-send (Linux) / osascript (macOS) + sound
+│   │   ├── paths.c/.h      config/data directories (XDG; macOS: Application Support), asset lookup
+│   │   ├── fonts.h         installed font list API; no state kept
+│   │   ├── fonts.c         Linux: fontconfig (dlopen'd while needed)
+│   │   ├── fonts_mac.c     macOS: CoreText
+│   │   ├── fonts_common.c  sorting, lookup and ring stepping shared by both
 │   │   └── gpu.c/.h        Flatpak only: load just the Vulkan drivers for the installed GPUs
 │   ├── render/
 │   │   └── render.c/.h     layout, digit/tile textures, flip animation, progress bar
@@ -116,10 +119,12 @@ ribalta/
 ├── tools/
 │   ├── install.sh          `make install`: build, install, progress UI
 │   ├── uninstall.sh        `make uninstall`: removes only installed files, keeps user data
-│   └── icons.sh            regenerates the PNG icons from the SVG
+│   ├── icons.sh            regenerates the PNG icons from the SVG
+│   └── macos-app.sh        `make app` on macOS: builds build/Ribalta.app (icon, bundled libs, ad-hoc signature)
 ├── packaging/flatpak/      Flatpak manifest and AppStream metainfo
+├── packaging/macos/        Info.plist template for Ribalta.app
 ├── docs/                   specifications and design notes
-└── .github/workflows/      CI (build, tests, install/uninstall smoke test, Flatpak bundle)
+└── .github/workflows/      CI (build, tests, install/uninstall smoke test, Flatpak bundle, macOS app)
 ```
 
 Folder roles:
@@ -174,6 +179,19 @@ Uint32 clock_ms_to_next_change(const Settings *s);
 ```
 
 ## Packaging
+
+- **macOS** (experimental): the Makefile detects Darwin (`uname -s`) and then uses
+  `-D_DARWIN_C_SOURCE`, builds `fonts_mac.c` instead of `fonts.c`, and links CoreText and
+  CoreFoundation. Platform branches in the code: no video-driver hint (SDL picks Cocoa), renderer
+  order `gpu,metal,opengl,software`, single-instance lock in `$TMPDIR`, notifications through
+  `osascript`, config and data in `~/Library/Application Support/Ribalta/` (XDG variables still win,
+  e.g. in tests). `make app` runs `tools/macos-app.sh`: `Contents/MacOS/ribalta`,
+  `Contents/Resources/assets/` (found through `SDL_GetBasePath()`), an `.icns` made with `iconutil`,
+  optional `BUNDLE_LIBS=1` (`dylibbundler` copies Homebrew's dylibs into `Contents/Frameworks`) and an
+  ad-hoc `codesign`. The `macos.yml` workflow builds on `macos-14` (arm64) and `macos-15-intel`, runs
+  the tests and an offscreen start, checks that no Homebrew path is left in the bundle, uploads the
+  zips and attaches them to `v*` releases. No notarisation (no paid developer account).
+  Resource figures on macOS have not been measured yet.
 
 - **Flatpak**: `packaging/flatpak/io.github.ginteaa.Ribalta.yml` builds with `make release` and
   `make install-files PREFIX=/app APPID=io.github.ginteaa.Ribalta`; the AppStream metainfo is

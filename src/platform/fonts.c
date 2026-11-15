@@ -10,15 +10,7 @@
 #endif
 #include <stdlib.h>
 #include <string.h>
-#include <strings.h>
 #include <unistd.h>
-
-static int cmp_entry(const void *a, const void *b)
-{
-    const FontEntry *x = a, *y = b;
-    int c = strcasecmp(x->family, y->family);
-    return c ? c : strcmp(x->family, y->family);
-}
 
 /* Punteggio della variante: più basso = migliore (Bold non corsivo, poi Regular, poi il resto). */
 static int variant_score(int weight, int slant)
@@ -149,7 +141,7 @@ bool fonts_list(FontList *out)
         strcpy(out->items[k].family, (const char *)fam);
         strcpy(out->items[k].file, (const char *)file);
     }
-    qsort(out->items, (size_t)out->count, sizeof *out->items, cmp_entry);
+    fonts_sort(out);
     ok = true;
 done:
     free(score);
@@ -173,25 +165,4 @@ void fonts_free(FontList *l)
      * sistema e la RAM a riposo resterebbe ~5 MB più alta dopo aver chiuso il menu */
     malloc_trim(0);
 #endif
-}
-
-int fonts_find(const FontList *l, const char *file)
-{
-    if (!l || !file || !file[0]) return -1;
-    for (int i = 0; i < l->count; i++)
-        if (strcmp(l->items[i].file, file) == 0) return i;
-    return -1;
-}
-
-bool fonts_step(const char *current_file, int dir, FontEntry *out)
-{
-    FontList l;
-    if (!fonts_list(&l)) { fonts_free(&l); return false; }
-    int n = l.count + 1;                       /* anello: 0 = font incluso, 1..count = lista */
-    int cur = fonts_find(&l, current_file) + 1; /* non trovato/vuoto -> 0 */
-    int next = ((cur + (dir < 0 ? -1 : 1)) % n + n) % n;
-    if (next == 0) { out->family[0] = '\0'; out->file[0] = '\0'; }
-    else *out = l.items[next - 1];
-    fonts_free(&l);
-    return true;
 }
