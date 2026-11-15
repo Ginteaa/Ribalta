@@ -93,10 +93,29 @@ accumulate error (±1 s over 1 h); settings survive a restart.
 ## Phase 6 — Flatpak package ✅
 
 - Manifest `packaging/flatpak/io.github.ginteaa.Ribalta.yml` on `org.freedesktop.Platform` 25.08
-  (SDL3, SDL3_ttf, fontconfig and `notify-send` come from the runtime).
+  (fontconfig and `notify-send` come from the runtime; SDL3 3.4, FreeType and SDL3_ttf are built
+  by the manifest — the runtime's SDL 3.2 crashed on resize with the `gpu` renderer).
 - AppStream metainfo, app-id `io.github.ginteaa.Ribalta` (also set as `SDL_APP_ID`).
 - `make install-files` target; `paths.c` also finds assets in `<exe dir>/../share/ribalta`.
 - GitHub Actions workflow `flatpak.yml` builds the `ribalta.flatpak` bundle.
+
+## Phase 7 — macOS port (planned)
+
+- Native build with Homebrew SDL3 (`make`, `make app`); notifications via `osascript`, font list
+  via CoreText, config and data in `~/Library/Application Support/Ribalta/`.
+- CI workflow `macos.yml` producing a zipped `Ribalta.app` with bundled libraries, ad-hoc signed
+  (no notarisation: "Open Anyway" on first launch).
+
+## Phase 8 — Study subjects (planned)
+
+- Optional subject per session (`M` key overlay); CSV gains a `materia` column, old rows stay
+  valid and count as "no subject".
+- Statistics filter: all study, each subject, no subject; weekly hours per subject.
+
+## Phase 9 — Daily goal (planned)
+
+- `daily_goal_min` setting; progress bar and "goal reached N days in a row" in the statistics;
+  one notification when the goal is reached.
 
 ## Future ideas
 - Publish the Flatpak on Flathub.
