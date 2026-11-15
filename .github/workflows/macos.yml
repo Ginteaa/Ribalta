@@ -47,7 +47,8 @@ jobs:
           pid=$!
           sleep 3
           if kill -0 "$pid"; then kill "$pid"; cat run.log
-          else wait "$pid" || echo "exit code $?"; cat run.log; exit 1; fi
+          else wait "$pid" || echo "exit code $?" >> run.log
+               cat run.log; echo "::error::$(tr '\n' '|' < run.log)"; exit 1; fi
 
       - name: Build Ribalta.app (libraries bundled)
         run: BUNDLE_LIBS=1 make app
@@ -71,7 +72,8 @@ jobs:
           pid=$!
           sleep 3
           if kill -0 "$pid"; then kill "$pid"; cat run.log
-          else wait "$pid" || echo "exit code $?"; cat run.log; exit 1; fi
+          else wait "$pid" || echo "exit code $?" >> run.log
+               cat run.log; echo "::error::$(tr '\n' '|' < run.log)"; exit 1; fi
 
       - name: Zip
         run: ditto -c -k --keepParent build/Ribalta.app Ribalta-macos-${{ matrix.suffix }}.zip
