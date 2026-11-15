@@ -16,7 +16,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - runner: macos-14
+          - runner: macos-15
             suffix: arm64
           - runner: macos-15-intel
             suffix: x86_64
@@ -43,11 +43,11 @@ jobs:
       - name: Offscreen run
         run: |
           export XDG_CONFIG_HOME="$(mktemp -d)" XDG_DATA_HOME="$(mktemp -d)"
-          ./ribalta &
+          RIBALTA_DEBUG=1 ./ribalta > run.log 2>&1 &
           pid=$!
           sleep 3
-          kill -0 "$pid"
-          kill "$pid"
+          if kill -0 "$pid"; then kill "$pid"; cat run.log
+          else wait "$pid" || echo "exit code $?"; cat run.log; exit 1; fi
 
       - name: Build Ribalta.app (libraries bundled)
         run: BUNDLE_LIBS=1 make app
@@ -67,11 +67,11 @@ jobs:
           app="$PWD/build/Ribalta.app"
           export XDG_CONFIG_HOME="$(mktemp -d)" XDG_DATA_HOME="$(mktemp -d)"
           cd "$(mktemp -d)"
-          "$app/Contents/MacOS/ribalta" &
+          RIBALTA_DEBUG=1 "$app/Contents/MacOS/ribalta" > run.log 2>&1 &
           pid=$!
           sleep 3
-          kill -0 "$pid"
-          kill "$pid"
+          if kill -0 "$pid"; then kill "$pid"; cat run.log
+          else wait "$pid" || echo "exit code $?"; cat run.log; exit 1; fi
 
       - name: Zip
         run: ditto -c -k --keepParent build/Ribalta.app Ribalta-macos-${{ matrix.suffix }}.zip
