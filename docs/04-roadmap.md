@@ -99,12 +99,15 @@ accumulate error (±1 s over 1 h); settings survive a restart.
 - `make install-files` target; `paths.c` also finds assets in `<exe dir>/../share/ribalta`.
 - GitHub Actions workflow `flatpak.yml` builds the `ribalta.flatpak` bundle.
 
-## Phase 7 — macOS port (planned)
+## Phase 7 — macOS port (experimental) ✅
 
-- Native build with Homebrew SDL3 (`make`, `make app`); notifications via `osascript`, font list
-  via CoreText, config and data in `~/Library/Application Support/Ribalta/`.
-- CI workflow `macos.yml` producing a zipped `Ribalta.app` with bundled libraries, ad-hoc signed
-  (no notarisation: "Open Anyway" on first launch).
+- Native build with Homebrew SDL3 (`make`, `make app`, `make install` → `~/Applications`);
+  notifications via `osascript`, font list via CoreText (`fonts_mac.c`, shared code in
+  `fonts_common.c`), config and data in `~/Library/Application Support/Ribalta/`.
+- CI workflow `macos.yml` on `macos-15` (arm64) and `macos-15-intel`: `-Werror` build, tests, a real
+  Cocoa start (renderer `gpu` on arm64, `metal` on Intel), zipped `Ribalta.app` with bundled
+  libraries, ad-hoc signed (no notarisation: "Open Anyway" on first launch), attached to `v*` releases.
+- Still to do: feedback from real Macs, resource measurements on macOS.
 
 ## Phase 8 — Study subjects (planned)
 
