@@ -61,6 +61,11 @@
   </supports>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.6.0" date="2026-11-15">
+      <description>
+        <p>Experimental macOS build. The Flatpak now bundles SDL 3.4, fixing a crash when the window is resized or maximised.</p>
+      </description>
+    </release>
     <release version="0.5.0" date="2026-11-14">
       <description>
         <p>First packaged release: flip clock, study timer, Pomodoro, statistics, digit colour and font picker.</p>
