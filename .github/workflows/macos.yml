@@ -46,7 +46,7 @@ jobs:
           RIBALTA_DEBUG=1 ./ribalta > run.log 2>&1 &
           pid=$!
           sleep 3
-          if kill -0 "$pid"; then kill "$pid"; cat run.log; echo "::notice::$(tr '\n' '|' < run.log)"
+          if kill -0 "$pid"; then kill "$pid"; wait "$pid" || true; cat run.log; echo "::notice::$(tr '\n' '|' < run.log)"
           else wait "$pid" || echo "exit code $?" >> run.log
                cat run.log; echo "::error::$(tr '\n' '|' < run.log)"; exit 1; fi
 
@@ -71,7 +71,7 @@ jobs:
           RIBALTA_DEBUG=1 "$app/Contents/MacOS/ribalta" > run.log 2>&1 &
           pid=$!
           sleep 3
-          if kill -0 "$pid"; then kill "$pid"; cat run.log; echo "::notice::$(tr '\n' '|' < run.log)"
+          if kill -0 "$pid"; then kill "$pid"; wait "$pid" || true; cat run.log; echo "::notice::$(tr '\n' '|' < run.log)"
           else wait "$pid" || echo "exit code $?" >> run.log
                cat run.log; echo "::error::$(tr '\n' '|' < run.log)"; exit 1; fi
 
