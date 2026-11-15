@@ -12,6 +12,7 @@ bool input_panel_open(const App *a);
 bool input_stats_open(const App *a);
 bool input_color_open(const App *a);
 bool input_font_open(const App *a);
+bool input_subject_open(const App *a);
 /* Scaduta la pausa FONT_PREVIEW_NS: applica a Render il font selezionato nel menu (anteprima). */
 void input_font_preview_apply(App *a);
 

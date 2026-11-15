@@ -105,7 +105,8 @@ with `animations=false` the change is instantaneous.
 │   ██████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░   │ ← progress bar
 └────────────────────────────────────────────────────────┘
 ```
-The `TIMER` label (or `PAUSA` when paused) is small, top-left, at 50% opacity.
+The `TIMER` label (or `PAUSA` when paused) is small, top-left, at 50% opacity. With an active subject
+it becomes `TIMER · Analisi` (Pomodoro study: `STUDIO 2/4 · Analisi`).
 
 ### Settings panel (overlay)
 ```
@@ -152,6 +153,28 @@ Same style as the colour picker: light overlay, panel on the right, tiles left v
 ```
 The first entry is always the bundled font ("Ribalta (IBM Plex Sans Condensed)"). Panel text uses the
 bundled font; only the "12:34" preview uses the selected one.
+
+### Subjects menu (overlay, `M`)
+
+Same style as the font menu: light overlay, panel on the right, tiles visible.
+```
+┌──────────────────────────────┐
+│ MATERIE                      │
+│   Nessuna materia            │
+│ ▸ ● Analisi                  │ ← selected row; ● = active subject
+│   Fisica                     │
+│   Diritto privato            │
+│   Nome della materia|        │ ← input row (after N), static caret
+│   Materia già presente       │ ← error in red
+│ Invio sceglie · N nuova ·    │
+│ Canc elimina · Esc chiude    │ ← hint
+└──────────────────────────────┘
+```
+
+### Statistics panel: subject filter
+
+Under the title, `‹ Tutte ›` / `‹ Analisi ›` / `‹ Senza materia ›` shows the filter (`←`/`→`). In the
+"Tutte" view a section "Per materia (7 giorni)" lists up to 4 subjects with their hours.
 
 ## 5. Font
 

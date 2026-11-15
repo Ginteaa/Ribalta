@@ -111,7 +111,8 @@ ribalta/
 │       ├── ui_settings.c/.h
 │       ├── ui_stats.c/.h
 │       ├── ui_color.c/.h
-│       └── ui_font.c/.h    digit-font menu (search field, list, preview)
+│       ├── ui_font.c/.h    digit-font menu (search field, list, preview)
+│       └── ui_subject.c/.h subjects menu (list, add with text input, remove)
 ├── assets/                 font, licence, chime, icon source
 │   ├── icons/              PNG icons (16 ... 512 px)
 │   └── ribalta.desktop     launcher entry

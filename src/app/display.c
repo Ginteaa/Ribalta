@@ -21,6 +21,21 @@ static bool face_equal(const ClockFace *x, const ClockFace *y)
     return true;
 }
 
+/* Materia da mostrare: quella fissata all'inizio della sessione in corso, altrimenti l'attiva. */
+static const char *shown_subject(const App *a, time_t start, const char *session_subject)
+{
+    return start ? session_subject : a->cfg.subject;
+}
+
+/* Aggiunge " · <materia>" all'etichetta (base = "TIMER", "STUDIO 1/4", …). */
+static void label_with_subject(char *out, size_t n, const char *base, const char *subject)
+{
+    if (subject && subject[0])
+        snprintf(out, n, "%.31s \u00b7 %.24s", base, subject); /* 31 + 4 + 24 < 64 */
+    else
+        snprintf(out, n, "%s", base);
+}
+
 static void build_timer_display(const App *a, Uint64 now, Display *d)
 {
     const Timer *t = &a->timer;
@@ -38,6 +53,9 @@ static void build_timer_display(const App *a, Uint64 now, Display *d)
         d->alpha[0] = a->timer_sel == 0 ? 1.0f : 0.4f;
         d->alpha[1] = a->timer_sel == 1 ? 1.0f : 0.4f;
     }
+    const char *subj = shown_subject(a, a->timer_start, a->timer_subject);
+    if (subj[0]) /* il testo libero ha la precedenza sull'etichetta TIMER/PAUSA */
+        label_with_subject(d->text, sizeof d->text, d->label == LABEL_PAUSA ? "PAUSA" : "TIMER", subj);
 }
 
 static void build_pomo_display(const App *a, Uint64 now, Display *d)
@@ -45,6 +63,11 @@ static void build_pomo_display(const App *a, Uint64 now, Display *d)
     const Pomodoro *p = &a->pomo;
     timer_face(&p->timer, &a->cfg, now, d->face.values, &d->face.count);
     pomo_label(p, &a->cfg, d->text, sizeof d->text);
+    if (p->phase == POMO_WORK) {
+        char base[32];
+        snprintf(base, sizeof base, "%.31s", d->text);
+        label_with_subject(d->text, sizeof d->text, base, shown_subject(a, a->pomo_start, a->pomo_subject));
+    }
     d->has_progress = p->timer.state != TIMER_SETUP;
     d->alpha[0] = d->alpha[1] = p->timer.state == TIMER_PAUSED ? 0.5f : 1.0f;
     uint32_t base = display_base_color(a);

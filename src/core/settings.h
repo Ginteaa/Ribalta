@@ -5,6 +5,9 @@
 #include <stdint.h>
 
 #define RECENT_COLORS_MAX 5
+/* Materie (docs/plans/materie.md): al massimo SUBJECTS_MAX nomi da 1..SUBJECT_LEN-1 byte UTF-8. */
+#define SUBJECTS_MAX 8
+#define SUBJECT_LEN  25
 
 /* Vedi docs/01-specifiche-funzionali.md §1.3 */
 typedef struct {
@@ -32,6 +35,12 @@ typedef struct {
      * troppo lungo viene ignorato). All'avvio si apre font_file senza fontconfig. */
     char     font_family[128];
     char     font_file[512];
+    /* Materie facoltative. Nel file: subjects=Analisi;Fisica (ordine conservato) e subject=Analisi
+     * (materia attiva, "" = nessuna; un nome non in elenco viene ignorato). Le chiavi si scrivono
+     * sempre. Nomi validi: vedi settings_subject_valid. */
+    char     subjects[SUBJECTS_MAX][SUBJECT_LEN];
+    int      subject_count;                      /* 0..SUBJECTS_MAX */
+    char     subject[SUBJECT_LEN];               /* default "" */
 } Settings;
 
 void settings_defaults(Settings *s);
@@ -46,5 +55,21 @@ bool settings_save(const Settings *s);
 
 /* Mette rgb in testa ai colori recenti (rimuove un eventuale duplicato, tronca a RECENT_COLORS_MAX). */
 void settings_push_recent(Settings *s, uint32_t rgb);
+
+/* Nome di materia valido: non vuoto, lungo < SUBJECT_LEN byte, senza spazi iniziali/finali e senza
+ * i caratteri , ; " né caratteri di controllo (< 0x20, 0x7f). UTF-8 ammesso (accenti). */
+bool settings_subject_valid(const char *name);
+
+/* Aggiunge una materia in fondo all'elenco. Toglie prima gli spazi iniziali/finali; rifiuta (false)
+ * nomi non validi, duplicati (confronto senza distinzione di maiuscole ASCII) ed elenco pieno.
+ * Non cambia la materia attiva. */
+bool settings_subject_add(Settings *s, const char *name);
+
+/* Toglie la materia di indice index (0..subject_count-1, altrimenti nulla) conservando l'ordine.
+ * Se era la materia attiva, la materia attiva diventa "" (nessuna). */
+void settings_subject_remove(Settings *s, int index);
+
+/* Indice della materia con quel nome (confronto esatto), -1 se assente o name vuoto/NULL. */
+int settings_subject_find(const Settings *s, const char *name);
 
 #endif

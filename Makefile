@@ -116,7 +116,7 @@ clean:
 # test unitari (senza display): ogni tests/test_*.c è un programma a sé, fallisce al primo errore
 TESTS       := $(patsubst tests/%.c,%,$(wildcard tests/test_*.c))
 TEST_COMMON := src/core/settings.c src/core/color.c src/core/timer.c src/platform/paths.c \
-               src/platform/fonts_common.c $(FONTS_SRC)
+               src/platform/fonts_common.c $(FONTS_SRC) src/core/stats.c
 
 build/tests/%: tests/%.c $(TEST_COMMON)
 	$(call say,CC,tests/$*.c)

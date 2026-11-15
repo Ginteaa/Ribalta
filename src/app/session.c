@@ -9,45 +9,51 @@
 
 /* --- Statistiche (roadmap §3.2): nulla in modalità screensaver --- */
 
-static void log_session(const App *a, time_t start, Uint64 elapsed_ns, const char *type, bool completed)
+static void log_session(const App *a, time_t start, Uint64 elapsed_ns, const char *type, bool completed,
+                        const char *subject)
 {
     if (a->screensaver)
         return;
     long secs = (long)(elapsed_ns / SDL_NS_PER_SECOND);
-    stats_append(start ? start : time(NULL) - secs, secs, type, completed);
+    stats_append(start ? start : time(NULL) - secs, secs, type, completed, subject);
 }
 
 /* Timer interrotto (R / uscita): da chiamare PRIMA di resettarlo. */
 void session_log_timer_partial(const App *a, Uint64 now)
 {
     if (a->timer.state != TIMER_SETUP)
-        log_session(a, a->timer_start, timer_elapsed_ns(&a->timer, now), "timer", false);
+        log_session(a, a->timer_start, timer_elapsed_ns(&a->timer, now), "timer", false, a->timer_subject);
 }
 
 /* STUDIO avviato e interrotto (N / R / uscita): da chiamare PRIMA di cambiare fase. */
 void session_log_pomo_partial(const App *a, Uint64 now)
 {
     if (a->pomo.phase == POMO_WORK && a->pomo.timer.state != TIMER_SETUP)
-        log_session(a, a->pomo_start, timer_elapsed_ns(&a->pomo.timer, now), "pomodoro", false);
+        log_session(a, a->pomo_start, timer_elapsed_ns(&a->pomo.timer, now), "pomodoro", false, a->pomo_subject);
 }
 
-/* Inizio sessione: istante di prima transizione SETUP -> RUNNING (rilevata a ogni giro). */
+/* Inizio sessione: istante di prima transizione SETUP -> RUNNING (rilevata a ogni giro).
+ * La materia attiva in quel momento resta quella della sessione anche se poi si cambia. */
 void session_track_starts(App *a)
 {
-    if (a->timer.state == TIMER_SETUP)
+    if (a->timer.state == TIMER_SETUP) {
         a->timer_start = 0;
-    else if (!a->timer_start)
+    } else if (!a->timer_start) {
         a->timer_start = time(NULL);
-    if (a->pomo.phase != POMO_WORK || a->pomo.timer.state == TIMER_SETUP)
+        snprintf(a->timer_subject, sizeof a->timer_subject, "%s", a->cfg.subject);
+    }
+    if (a->pomo.phase != POMO_WORK || a->pomo.timer.state == TIMER_SETUP) {
         a->pomo_start = 0;
-    else if (!a->pomo_start)
+    } else if (!a->pomo_start) {
         a->pomo_start = time(NULL);
+        snprintf(a->pomo_subject, sizeof a->pomo_subject, "%s", a->cfg.subject);
+    }
 }
 
 /* Fine timer: notifiche, vista Timer a 00:00 e lampeggio. */
 void session_on_timer_finished(App *a, Uint64 now)
 {
-    log_session(a, a->timer_start, (Uint64)a->timer.minutes * 60 * SDL_NS_PER_SECOND, "timer", true);
+    log_session(a, a->timer_start, (Uint64)a->timer.minutes * 60 * SDL_NS_PER_SECOND, "timer", true, a->timer_subject);
     if (a->cfg.timer_notify) {
         int m = a->timer.minutes;
         char body[96];
@@ -67,7 +73,7 @@ void session_on_pomo_finished(App *a, PomoPhase finished)
     const char *msg = "Riposo finito \u2014 si torna a studiare";
     char body[96];
     if (finished == POMO_WORK) {
-        log_session(a, a->pomo_start, (Uint64)a->cfg.pomodoro_work * 60 * SDL_NS_PER_SECOND, "pomodoro", true);
+        log_session(a, a->pomo_start, (Uint64)a->cfg.pomodoro_work * 60 * SDL_NS_PER_SECOND, "pomodoro", true, a->pomo_subject);
         if (a->pomo.phase == POMO_LONG_BREAK)
             snprintf(body, sizeof body, "Fine studio \u2014 riposo lungo di %d min", a->cfg.pomodoro_long_break);
         else

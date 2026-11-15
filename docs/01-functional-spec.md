@@ -72,6 +72,21 @@ Every change is applied immediately and saved when the panel is closed.
 | `recent_colors` | list | empty | Up to 5 recent colours, comma separated, most recent first |
 | `font_family` | string | empty | Digit font family shown in the panel; empty = bundled font ("Ribalta (IBM Plex Sans Condensed)") |
 | `font_file` | string | empty | Digit font file; empty = bundled font. Both values run to the end of the line (inner spaces kept, CR/trailing blanks trimmed); a value that is too long (family > 127, file > 511 bytes) is ignored. The keys are always written |
+| `subjects` | list | empty | Study subjects, `;` separated, in order (max 8; each 1–24 bytes UTF-8, no leading/trailing spaces, no `,` `;` `"` or control characters; invalid entries and case-insensitive duplicates are dropped) |
+| `subject` | string | empty | Active subject; empty = no subject. Ignored if it is not in `subjects`. Both keys are always written |
+
+**Subjects** (optional). `M` opens the subjects menu (overlay, same style as the font menu): first
+entry "Nessuna materia", then the subjects; the active one is marked. `↑`/`↓` move, `Enter` makes the
+selected entry active and closes, `N` starts typing a new name (text input: accents allowed; `Enter`
+adds it, `Esc` cancels; an invalid or duplicate name shows the reason in red), `Canc`/`Delete`
+removes the selected subject from the list (past sessions keep it in the CSV; if it was active, the
+active subject becomes none), `Esc`/`M` close. Mouse: wheel scrolls, click selects, double click
+chooses, click outside closes. The list and the active subject are saved when the menu closes.
+Studying without a subject is always possible.
+
+A session is recorded with the subject that was active when it **started**; changing subject during
+a session affects only the next one. In Timer and Pomodoro study views the label shows the subject:
+`TIMER · Analisi`, `PAUSA · Analisi`, `STUDIO 2/4 · Analisi`.
 
 The "Digit colour" row shows a swatch and the HEX value; ←/→ step through the palette and Enter
 opens a **colour picker** overlay (saturation/value square, hue bar, HEX field with read-only
@@ -113,11 +128,12 @@ If the file does not exist it is created on the first save.
 | `Space` / `Enter` | Timer or Pomodoro: start / pause / resume |
 | `R` | Timer: reset to the set duration. Pomodoro: reset everything (STUDIO 1/N, stopped) |
 | `N` | Pomodoro: skip to the next phase |
-| `I` | Open/close the study statistics panel |
+| `I` | Open/close the study statistics panel (`←`/`→` inside it: change the subject filter) |
+| `M` | Open/close the subjects menu |
 | `0`–`9` / keypad, `Backspace` | Timer in setup: type the duration (microwave style), delete a digit |
 | `↑ ↓ ← →` | Timer in setup: adjust duration. Panels: navigate |
 | `S` | Open/close the settings panel |
-| `Esc` | Cancel timer entry; close the font menu or the colour picker, or the panel (settings or statistics); otherwise leave fullscreen; otherwise nothing |
+| `Esc` | Cancel timer entry; close the font menu, the subjects menu or the colour picker, or the panel (settings or statistics); otherwise leave fullscreen; otherwise nothing |
 | `Q` / `Ctrl+Q` | Quit |
 
 The mouse cursor hides after 2 s of inactivity in fullscreen.

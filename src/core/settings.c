@@ -34,6 +34,10 @@ void settings_defaults(Settings *s)
         s->recent_colors[i] = 0;
     s->font_family[0] = '\0';
     s->font_file[0] = '\0';
+    s->subject_count = 0;
+    for (int i = 0; i < SUBJECTS_MAX; i++)
+        s->subjects[i][0] = '\0';
+    s->subject[0] = '\0';
 }
 
 /* ---- parsing ---- */
@@ -89,6 +93,14 @@ static void parse_str(const char *v, char *dst, size_t cap)
     memcpy(dst, v, strlen(v) + 1);
 }
 
+static void parse_subjects(Settings *s, char *v)
+{
+    s->subject_count = 0;
+    char *save = NULL;
+    for (char *tok = strtok_r(v, ";", &save); tok; tok = strtok_r(NULL, ";", &save))
+        settings_subject_add(s, tok);   /* scarta non validi, duplicati, eccedenti */
+}
+
 static void apply_kv(Settings *s, const char *k, char *v)
 {
     if (!strcmp(k, "show_seconds")) parse_bool(v, &s->show_seconds);
@@ -113,6 +125,8 @@ static void apply_kv(Settings *s, const char *k, char *v)
     else if (!strcmp(k, "recent_colors")) parse_recent(s, v);
     else if (!strcmp(k, "font_family")) parse_str(v, s->font_family, sizeof s->font_family);
     else if (!strcmp(k, "font_file")) parse_str(v, s->font_file, sizeof s->font_file);
+    else if (!strcmp(k, "subjects")) parse_subjects(s, v);
+    else if (!strcmp(k, "subject")) parse_str(v, s->subject, sizeof s->subject);
 }
 
 bool settings_load(Settings *s)
@@ -136,6 +150,9 @@ bool settings_load(Settings *s)
         apply_kv(s, trim(p), trim(eq + 1));
     }
     fclose(f);
+    /* la materia attiva vale solo se in elenco (la chiave può precedere subjects) */
+    if (settings_subject_find(s, s->subject) < 0)
+        s->subject[0] = '\0';
     return true;
 }
 
@@ -173,6 +190,10 @@ bool settings_save(const Settings *s)
     fprintf(f, "digit_color=%s\n", hex);
     fprintf(f, "font_family=%s\n", s->font_family);
     fprintf(f, "font_file=%s\n", s->font_file);
+    fprintf(f, "subjects=");
+    for (int i = 0; i < s->subject_count && i < SUBJECTS_MAX; i++)
+        fprintf(f, "%s%s", i ? ";" : "", s->subjects[i]);
+    fprintf(f, "\nsubject=%s\n", s->subject);
     if (s->recent_count > 0) {
         fprintf(f, "recent_colors=");
         for (int i = 0; i < s->recent_count && i < RECENT_COLORS_MAX; i++) {
@@ -195,4 +216,61 @@ void settings_push_recent(Settings *s, uint32_t rgb)
     for (int i = 0; i < n; i++)
         s->recent_colors[i] = out[i];
     s->recent_count = n;
+}
+
+/* ---- materie ---- */
+
+bool settings_subject_valid(const char *name)
+{
+    if (!name || !*name)
+        return false;
+    size_t n = strlen(name);
+    if (n >= SUBJECT_LEN)
+        return false;
+    if (isspace((unsigned char)name[0]) || isspace((unsigned char)name[n - 1]))
+        return false;
+    for (const unsigned char *c = (const unsigned char *)name; *c; c++)
+        if (*c < 0x20 || *c == 0x7f || *c == ',' || *c == ';' || *c == '"')
+            return false;
+    return true;
+}
+
+bool settings_subject_add(Settings *s, const char *name)
+{
+    if (!name || s->subject_count >= SUBJECTS_MAX)
+        return false;
+    char buf[SUBJECT_LEN + 64];
+    if (strlen(name) >= sizeof buf)
+        return false;
+    memcpy(buf, name, strlen(name) + 1);
+    const char *t = trim(buf);
+    if (!settings_subject_valid(t))
+        return false;
+    for (int i = 0; i < s->subject_count; i++)
+        if (!strcasecmp(s->subjects[i], t))
+            return false;
+    memcpy(s->subjects[s->subject_count++], t, strlen(t) + 1);
+    return true;
+}
+
+void settings_subject_remove(Settings *s, int index)
+{
+    if (index < 0 || index >= s->subject_count)
+        return;
+    if (!strcmp(s->subject, s->subjects[index]))
+        s->subject[0] = '\0';
+    for (int i = index; i < s->subject_count - 1; i++)
+        memcpy(s->subjects[i], s->subjects[i + 1], SUBJECT_LEN);
+    s->subject_count--;
+    s->subjects[s->subject_count][0] = '\0';
+}
+
+int settings_subject_find(const Settings *s, const char *name)
+{
+    if (!name || !*name)
+        return -1;
+    for (int i = 0; i < s->subject_count; i++)
+        if (!strcmp(s->subjects[i], name))
+            return i;
+    return -1;
 }

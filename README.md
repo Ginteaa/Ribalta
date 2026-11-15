@@ -43,6 +43,7 @@ original and the project is not affiliated with Fliqlo.
 - 🍅 **Pomodoro** with study, short break and long break phases (breaks turn the digits blue, or amber if you picked a blue colour)
 - 🔤 **Digit font**: keep the bundled font or pick any installed font from a searchable drop-down menu with live preview
 - 🎨 **Digit colour** with a built-in colour picker (palette, HEX field, recent colours, live preview); the accent applies to digits, progress bar and labels
+- 📚 **Optional study subjects** (`M`): statistics per subject, without subject, or all together
 - 📊 **Study statistics**: today, last 7 days, month, streak, completed sessions
 - ⚙️ **Settings overlay** (`S`), changes apply live and are saved to a plain `config.ini`
 - 🌙 **Screensaver mode** (`ribalta --screensaver`), easy to hook to `swayidle`
@@ -206,10 +207,11 @@ Use `make V=1` for the full compiler commands during a normal build. Use
 | `Backspace` | Timer entry: delete the last digit |
 | `R` | Timer: reset to the set duration. Pomodoro: reset everything |
 | `N` | Pomodoro: skip to the next phase |
-| `I` | Open / close the statistics panel |
+| `I` | Open / close the statistics panel (`←`/`→` inside it: filter by subject) |
+| `M` | Open / close the subjects menu (choose, add with `N`, remove with `Canc`) |
 | `← →` / `↑ ↓` | Timer in setup: select hours or minutes / adjust them (hours ±1, minutes ±1, `Shift` = ±10 min). Panels: navigate and change values |
 | `S` | Open / close the settings panel |
-| `Esc` | Cancel timer entry (keeps the previous duration); close the panel, the colour picker or the font menu; otherwise leave fullscreen |
+| `Esc` | Cancel timer entry (keeps the previous duration); close the panel, the colour picker, the font menu or the subjects menu; otherwise leave fullscreen |
 | `Q` / `Ctrl+Q` | Quit |
 
 `ribalta --help` lists the command-line options.
@@ -240,6 +242,8 @@ edit it by hand: the settings panel (`S`) changes everything live and saves on c
 | `recent_colors` | empty | Up to 5 recently used colours, comma separated (`#rrggbb,#rrggbb`) |
 | `font_family` | empty | Name of the digit font (e.g. `DejaVu Sans`); empty = bundled font |
 | `font_file` | empty | Path of the digit font file; empty = bundled font. The value runs to the end of the line (spaces allowed) |
+| `subjects` | empty | Study subjects, `;` separated (max 8, up to 24 bytes each) |
+| `subject` | empty | Active subject; empty = no subject |
 
 The **Digit colour** row of the settings panel shows a swatch and the HEX code: `←`/`→` step through
 the palette, `Enter` opens the colour picker (saturation/value square, hue bar, HEX field, palette
@@ -269,14 +273,23 @@ were studied) are appended to `~/.local/share/ribalta/sessions.csv` (honours `$X
 one row per session:
 
 ```csv
-inizio,durata_s,tipo,completata
-2026-11-14T09:30:00,1500,pomodoro,1
+inizio,durata_s,tipo,completata,materia
+2026-11-14T09:30:00,1500,pomodoro,1,Analisi
+2026-11-14T11:00:00,3600,timer,0,
 ```
 
 The columns are the local start time (ISO 8601), the studied seconds (pauses excluded), the type
-(`timer` or `pomodoro`) and whether the session ran to completion (`1`) or was stopped early (`0`).
+(`timer` or `pomodoro`), whether the session ran to completion (`1`) or was stopped early (`0`) and
+the subject (empty = none). Files written by older versions have no `materia` column: their rows are
+still read and count as "no subject", and the file is never rewritten.
 Press `I` to see today, the last 7 days, the month, your streak of consecutive days and the number
 of completed sessions. The file is read only when the panel opens.
+
+**Subjects** are optional. Press `M` to pick the subject you are studying (or "Nessuna materia"), add
+one with `N` or remove one with `Canc`. Each session is recorded with the subject active when it
+started, and the Timer/Pomodoro label shows it (`TIMER · Analisi`). In the statistics panel `←`/`→`
+switch between **Tutte** (all your study, with or without a subject), each subject and
+**Senza materia**; the "Tutte" view also lists the week's hours per subject.
 
 ## 🌙 Screensaver
 

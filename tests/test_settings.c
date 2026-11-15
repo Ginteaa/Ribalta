@@ -101,6 +101,75 @@ int main(void) {
         CHECK(!strcmp(l.font_family, "Ok") && l.font_file[0] == '\0');
     }
 
+    /* materie */
+    settings_defaults(&s);
+    CHECK(s.subject_count == 0 && s.subject[0] == '\0');
+    CHECK(settings_subject_add(&s, "  Analisi "));
+    CHECK(settings_subject_add(&s, "Fisica"));
+    CHECK(settings_subject_add(&s, "Chimica"));
+    CHECK(!settings_subject_add(&s, "analisi"));      /* duplicato senza maiuscole */
+    CHECK(!settings_subject_add(&s, ""));
+    CHECK(!settings_subject_add(&s, "   "));
+    CHECK(!settings_subject_add(&s, "A,B"));
+    CHECK(!settings_subject_add(&s, "A;B"));
+    CHECK(!settings_subject_add(&s, "A\"B"));
+    CHECK(!settings_subject_add(&s, "A\tB"));
+    CHECK(!settings_subject_add(&s, NULL));
+    CHECK(s.subject_count == 3 && !strcmp(s.subjects[0], "Analisi"));
+    CHECK(settings_subject_find(&s, "Fisica") == 1);
+    CHECK(settings_subject_find(&s, "fisica") == -1);
+    CHECK(settings_subject_find(&s, "") == -1 && settings_subject_find(&s, NULL) == -1);
+    snprintf(s.subject, sizeof s.subject, "Fisica");
+    CHECK(settings_save(&s));
+    CHECK(settings_load(&l));
+    CHECK(l.subject_count == 3 && !strcmp(l.subjects[0], "Analisi") && !strcmp(l.subjects[1], "Fisica") &&
+          !strcmp(l.subjects[2], "Chimica") && !strcmp(l.subject, "Fisica"));
+    /* rimozione: ordine conservato, attiva -> "" */
+    settings_subject_remove(&s, 5);
+    settings_subject_remove(&s, -1);
+    CHECK(s.subject_count == 3 && !strcmp(s.subject, "Fisica"));
+    settings_subject_remove(&s, 0);
+    CHECK(s.subject_count == 2 && !strcmp(s.subjects[0], "Fisica") && !strcmp(s.subjects[1], "Chimica"));
+    CHECK(!strcmp(s.subject, "Fisica"));
+    settings_subject_remove(&s, 0);
+    CHECK(s.subject_count == 1 && !strcmp(s.subjects[0], "Chimica") && s.subject[0] == '\0');
+    /* elenco pieno */
+    settings_defaults(&s);
+    for (int i = 0; i < SUBJECTS_MAX; i++) {
+        char nm[16];
+        snprintf(nm, sizeof nm, "M%d", i);
+        CHECK(settings_subject_add(&s, nm));
+    }
+    CHECK(!settings_subject_add(&s, "Extra") && s.subject_count == SUBJECTS_MAX);
+    /* lunghezza: 24 byte ok (anche con accenti), 25 no */
+    settings_defaults(&s);
+    CHECK(settings_subject_add(&s, "abcdefghijklmnopqrstuvwx"));            /* 24 */
+    CHECK(!settings_subject_add(&s, "abcdefghijklmnopqrstuvwxy"));          /* 25 */
+    CHECK(settings_subject_add(&s, "\xc3\xa0\xc3\xa0\xc3\xa0\xc3\xa0\xc3\xa0\xc3\xa0\xc3\xa0\xc3\xa0\xc3\xa0\xc3\xa0\xc3\xa0\xc3\xa0")); /* 24 byte */
+    CHECK(!settings_subject_add(&s, "\xc3\xa0\xc3\xa0\xc3\xa0\xc3\xa0\xc3\xa0\xc3\xa0\xc3\xa0\xc3\xa0\xc3\xa0\xc3\xa0\xc3\xa0\xc3\xa0x")); /* 25 */
+    CHECK(settings_subject_valid("Fisica 2") && !settings_subject_valid(" x") && !settings_subject_valid("x "));
+    /* file: voci non valide/duplicate ignorate, subject prima di subjects */
+    write_cfg(dir, "subject=Fisica\nsubjects=Analisi; Fisica ;A,B;;analisi;\"x\";Chimica\n");
+    CHECK(settings_load(&l));
+    CHECK(l.subject_count == 3 && !strcmp(l.subjects[0], "Analisi") && !strcmp(l.subjects[1], "Fisica") &&
+          !strcmp(l.subjects[2], "Chimica") && !strcmp(l.subject, "Fisica"));
+    write_cfg(dir, "subjects=Analisi;Fisica\nsubject=Storia\n");
+    CHECK(settings_load(&l));
+    CHECK(l.subject_count == 2 && l.subject[0] == '\0');
+    write_cfg(dir, "subject=Analisi\n");   /* senza elenco */
+    CHECK(settings_load(&l));
+    CHECK(l.subject_count == 0 && l.subject[0] == '\0');
+    write_cfg(dir, "subjects=A;B;C;D;E;F;G;H;I;J\n");
+    CHECK(settings_load(&l));
+    CHECK(l.subject_count == SUBJECTS_MAX);
+    /* le chiavi si scrivono sempre */
+    settings_defaults(&s);
+    CHECK(settings_save(&s));
+    f = fopen(p, "r");
+    memset(buf, 0, sizeof buf);
+    if (f) { size_t n = fread(buf, 1, sizeof buf - 1, f); buf[n] = 0; fclose(f); }
+    CHECK(strstr(buf, "subjects=\n") && strstr(buf, "subject=\n"));
+
     char cmd[600];
     snprintf(cmd, sizeof cmd, "rm -rf '%s'", dir);
     if (system(cmd) != 0) { /* ignora */ }

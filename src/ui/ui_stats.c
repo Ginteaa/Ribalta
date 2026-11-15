@@ -8,7 +8,7 @@
 #include <time.h>
 #include <SDL3_ttf/SDL_ttf.h>
 
-enum { SUM_ROWS = 4, DAYS = 7 };
+enum { SUM_ROWS = 4, DAYS = 7, SUBJ_ROWS = 4 };
 
 typedef struct {
     SDL_Texture *tex;
@@ -23,10 +23,16 @@ struct StatsUI {
     bool          dirty;
     int           win_w, win_h;
     StatsSummary  sum;
+    char          subjects[SUBJECTS_MAX][SUBJECT_LEN];
+    int           subject_count;
+    int           filter;      /* 0 = Tutte, 1..n = materie, n+1 = Senza materia */
+    StatsSubjectTotal totals[SUBJ_ROWS];
+    int           total_count; /* righe "Per materia" (solo vista Tutte) */
 
     float         pw, ph, px, py, pitch, pad;
     SDL_Texture  *panel_tex;
-    Label         title, section, footer;
+    Label         title, filter_lbl, section, subj_section, footer;
+    Label         subj_name[SUBJ_ROWS], subj_value[SUBJ_ROWS];
     Label         row_label[SUM_ROWS], row_value[SUM_ROWS];
     Label         day_label[DAYS], day_value[DAYS];
     float         label_w, value_w;
@@ -61,6 +67,9 @@ static void free_textures(StatsUI *ui)
     label_free(&ui->title);
     label_free(&ui->section);
     label_free(&ui->footer);
+    label_free(&ui->filter_lbl);
+    label_free(&ui->subj_section);
+    for (int i = 0; i < SUBJ_ROWS; i++) { label_free(&ui->subj_name[i]); label_free(&ui->subj_value[i]); }
     for (int i = 0; i < SUM_ROWS; i++) { label_free(&ui->row_label[i]); label_free(&ui->row_value[i]); }
     for (int i = 0; i < DAYS; i++) { label_free(&ui->day_label[i]); label_free(&ui->day_value[i]); }
 }
@@ -92,6 +101,34 @@ static SDL_Texture *make_panel(StatsUI *ui, int w, int h, float radius)
     return t;
 }
 
+/* nome del filtro corrente; NULL come valore di stats_summary per "Tutte" */
+static const char *filter_value(const StatsUI *ui)
+{
+    if (ui->filter == 0) return NULL;
+    if (ui->filter <= ui->subject_count) return ui->subjects[ui->filter - 1];
+    return "";
+}
+
+static const char *filter_name(const StatsUI *ui)
+{
+    if (ui->filter == 0) return "Tutte";
+    if (ui->filter <= ui->subject_count) return ui->subjects[ui->filter - 1];
+    return "Senza materia";
+}
+
+/* rilegge il CSV per il filtro corrente (solo apertura e cambio filtro) */
+static void refresh(StatsUI *ui)
+{
+    time_t now = time(NULL);
+    stats_summary(&ui->sum, now, filter_value(ui));
+    ui->total_count = 0;
+    if (ui->filter == 0) {
+        int n = stats_subject_totals(ui->totals, SUBJ_ROWS, now);
+        ui->total_count = n < 0 ? 0 : (n > SUBJ_ROWS ? SUBJ_ROWS : n);
+    }
+    ui->dirty = true;
+}
+
 static void rebuild(StatsUI *ui)
 {
     free_textures(ui);
@@ -105,8 +142,11 @@ static void rebuild(StatsUI *ui)
     /* righe: titolo(~1.6) + 4 righe + sezione(1.3) + 7 barre(0.95) + footer(1.4) + margini */
     float fs = fmaxf(12.0f, H / 28.0f);
     float ph;
+    const int nt = ui->total_count;
     for (;;) {
-        ph = fs * (1.5f * SUM_ROWS + 1.3f * 1.5f + 0.95f * 1.5f * DAYS + 5.8f);
+        /* + riga del filtro (0.9 passi) + sezione "Per materia" (1.0 + 0.95 per riga + 0.35 passi) */
+        float units = SUM_ROWS + 1.3f + 0.95f * DAYS + 0.9f + (nt > 0 ? 1.35f + 0.95f * (float)nt : 0.0f);
+        ph = fs * (1.5f * units + 5.8f);
         if (ph <= H * 0.94f || fs <= 8.0f) break;
         fs -= 1.0f;
     }
@@ -123,9 +163,24 @@ static void rebuild(StatsUI *ui)
     const SDL_Color dim = {0x80, 0x80, 0x80, 255};
     label_make(ui, &ui->title, "STATISTICHE", dim);
     label_make(ui, &ui->section, "Ultimi 7 giorni", dim);
-    label_make(ui, &ui->footer, "Esc chiudi", dim);
+    label_make(ui, &ui->subj_section, "Per materia (7 giorni)", dim);
 
-    char buf[64];
+    /* frecce e angolari solo se il font li ha, altrimenti ASCII */
+    bool ang = TTF_FontHasGlyph(ui->font, 0x2039) && TTF_FontHasGlyph(ui->font, 0x203A);
+    bool arr = TTF_FontHasGlyph(ui->font, 0x2190) && TTF_FontHasGlyph(ui->font, 0x2192);
+    char buf[64], fbuf[160];
+    snprintf(fbuf, sizeof fbuf, ang ? "\xe2\x80\xb9  %s  \xe2\x80\xba" : "<  %s  >", filter_name(ui));
+    label_make(ui, &ui->filter_lbl, fbuf, white);
+    label_make(ui, &ui->footer, arr ? "\xe2\x86\x90/\xe2\x86\x92 materia  \xc2\xb7  Esc chiudi"
+                                    : "Frecce materia  -  Esc chiudi", dim);
+
+    for (int i = 0; i < nt; i++) {
+        const char *nm = ui->totals[i].name[0] ? ui->totals[i].name : "Senza materia";
+        stats_format_duration(ui->totals[i].week_s, buf, sizeof buf);
+        label_make(ui, &ui->subj_name[i], nm, norm);
+        label_make(ui, &ui->subj_value[i], buf, norm);
+    }
+
     stats_format_duration(ui->sum.today_s, buf, sizeof buf);
     label_make(ui, &ui->row_label[0], k_rows[0], norm);
     label_make(ui, &ui->row_value[0], buf, white);
@@ -172,11 +227,18 @@ void ui_stats_destroy(StatsUI *ui)
     free(ui);
 }
 
-void ui_stats_open(StatsUI *ui, int pixel_w, int pixel_h)
+void ui_stats_open(StatsUI *ui, int pixel_w, int pixel_h,
+                   const char subjects[][SUBJECT_LEN], int subject_count)
 {
     if (!ui) return;
+    ui->subject_count = 0;
+    for (int i = 0; subjects && i < subject_count && i < SUBJECTS_MAX; i++) {
+        snprintf(ui->subjects[i], SUBJECT_LEN, "%s", subjects[i]);
+        ui->subject_count++;
+    }
+    ui->filter = 0;
     if (!ui->font && ui->font_path) ui->font = TTF_OpenFont(ui->font_path, 24.0f);
-    stats_summary(&ui->sum, time(NULL));
+    refresh(ui);
     ui->open = true;
     ui->win_w = pixel_w;
     ui->win_h = pixel_h;
@@ -237,7 +299,9 @@ void ui_stats_draw(StatsUI *ui)
     const float x0 = ui->px + ui->pad, x1 = ui->px + ui->pw - ui->pad;
     float y = ui->py + ui->pad * 0.8f;
     blit(ui, &ui->title, x0, y);
-    y += (float)ui->title.h + ui->pitch * 0.45f;
+    y += (float)ui->title.h + ui->pitch * 0.2f;
+    blit(ui, &ui->filter_lbl, x0 + (x1 - x0 - (float)ui->filter_lbl.w) * 0.5f, y);
+    y += (float)ui->filter_lbl.h + ui->pitch * 0.45f;
 
     for (int i = 0; i < SUM_ROWS; i++) {
         float ry = y + (float)i * ui->pitch;
@@ -276,8 +340,30 @@ void ui_stats_draw(StatsUI *ui)
         }
     }
     y += (float)DAYS * bpitch + ui->pitch * 0.35f;
+    if (ui->total_count > 0) {
+        blit(ui, &ui->subj_section, x0, y);
+        y += ui->pitch * 1.0f;
+        for (int i = 0; i < ui->total_count; i++) {
+            float ry = y + (float)i * bpitch;
+            const Label *lb = &ui->subj_name[i], *vl = &ui->subj_value[i];
+            blit(ui, lb, x0, ry + (bpitch - (float)lb->h) * 0.5f);
+            blit(ui, vl, x1 - (float)vl->w, ry + (bpitch - (float)vl->h) * 0.5f);
+        }
+        y += (float)ui->total_count * bpitch + ui->pitch * 0.35f;
+    }
     blit(ui, &ui->footer, x0, y);
 
     SDL_SetRenderDrawBlendMode(ui->ren, prev);
     SDL_SetRenderDrawColor(ui->ren, pr, pg, pb, pa);
+}
+
+bool ui_stats_key(StatsUI *ui, SDL_Keycode key)
+{
+    if (!ui || !ui->open) return false;
+    int n = ui->subject_count + 2;   /* Tutte + materie + Senza materia */
+    if (key == SDLK_LEFT) ui->filter = (ui->filter + n - 1) % n;
+    else if (key == SDLK_RIGHT) ui->filter = (ui->filter + 1) % n;
+    else return false;
+    refresh(ui);
+    return true;
 }

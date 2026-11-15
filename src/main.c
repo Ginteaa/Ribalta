@@ -39,6 +39,8 @@ static void apply_resize(App *a)
             ui_color_resize(a->cui, w, h);
         if (input_font_open(a))
             ui_font_resize(a->fui, w, h);
+        if (input_subject_open(a))
+            ui_subject_resize(a->subj, w, h);
     }
     a->resized = false;
 }
@@ -136,6 +138,8 @@ static void main_loop(App *a)
                 ui_color_draw(a->cui);
             else if (input_font_open(a))
                 ui_font_draw(a->fui);
+            else if (input_subject_open(a))
+                ui_subject_draw(a->subj);
             else if (input_panel_open(a))
                 ui_settings_draw(a->ui, &a->cfg);
             else if (input_stats_open(a))
@@ -216,6 +220,7 @@ static bool app_open(App *a)
         a->sui = ui_stats_create(a->ren, a->bundled_font);
         a->cui = ui_color_create(a->ren, a->bundled_font);
         a->fui = ui_font_create(a->ren, a->bundled_font, a->bundled_font);
+        a->subj = ui_subject_create(a->ren, a->bundled_font);
     }
     display_update(a, SDL_GetTicksNS());
     a->dirty = true;
@@ -240,6 +245,8 @@ static void app_close(App *a)
         ui_color_destroy(a->cui);
     if (a->fui)
         ui_font_destroy(a->fui);
+    if (a->subj)
+        ui_subject_destroy(a->subj);
     if (a->render)
         render_destroy(a->render);
     if (a->ren)

@@ -46,9 +46,10 @@ accumulate error (±1 s over 1 h); settings survive a restart.
 
 ### 3.2 Study statistics (`I` key)
 - File `$XDG_DATA_HOME/ribalta/sessions.csv` (fallback `~/.local/share/ribalta/`), one row
-  per session: `start_iso8601_local,duration_seconds,type,completed` with type `timer|pomodoro`.
-  A header row is written if the file is new (the header uses the Italian column names
-  `inizio,durata_s,tipo,completata`).
+  per session: `start_iso8601_local,duration_seconds,type,completed,subject` with type
+  `timer|pomodoro` and an empty subject when none (Phase 8). A header row is written if the file is
+  new (Italian column names `inizio,durata_s,tipo,completata,materia`). Rows written before Phase 8
+  have 4 columns: they stay valid and count as "no subject"; an existing file is never rewritten.
 - What is recorded (study time only, never breaks), if the studied duration is ≥ 60 s:
   - timer: when the timer ends (completed=1); on `R` or on quitting the app with a started timer (completed=0);
   - pomodoro: at the end of a STUDIO phase (1); on `N`/`R`/quit during a started STUDIO (0).
@@ -56,7 +57,9 @@ accumulate error (±1 s over 1 h); settings survive a restart.
 - `I` opens/closes an overlay panel (same style as the settings panel): **Today**, **Last 7 days**
   (horizontal bars per day, abbreviated Italian day label and `1h 25m`), **This month**,
   **Streak** (consecutive days up to today, or up to yesterday if today is still 0),
-  total **Completed sessions**. `Esc`/`I` closes it.
+  total **Completed sessions**. `Esc`/`I` closes it. `←`/`→` change the filter (Phase 8):
+  **Tutte** (all study) → each subject → **Senza materia**; in "Tutte" a section "Per materia"
+  lists the last 7 days' hours of up to 4 subjects.
 - The file is read only when the panel opens; font and textures exist only while it is open.
 
 ### 3.3 Screensaver mode
@@ -109,11 +112,14 @@ accumulate error (±1 s over 1 h); settings survive a restart.
   libraries, ad-hoc signed (no notarisation: "Open Anyway" on first launch), attached to `v*` releases.
 - Still to do: feedback from real Macs, resource measurements on macOS.
 
-## Phase 8 — Study subjects (planned)
+## Phase 8 — Study subjects ✅
 
 - Optional subject per session (`M` key overlay); CSV gains a `materia` column, old rows stay
   valid and count as "no subject".
 - Statistics filter: all study, each subject, no subject; weekly hours per subject.
+- Session subject fixed when the session starts; label `TIMER · Analisi` / `STUDIO 2/4 · Analisi`.
+- New modules `ui/ui_subject.c` (menu, SDL text input only while typing a name) and
+  `tests/test_stats.c`. Idle PSS unchanged (17.8 MB).
 
 ## Phase 9 — Daily goal (planned)
 

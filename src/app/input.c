@@ -214,6 +214,62 @@ static void font_mouse(App *a, const SDL_Event *ev)
     font_result(a, ui_font_mouse(a->fui, &copy));
 }
 
+/* --- Menu materie (tasto M) --- */
+
+bool input_subject_open(const App *a)
+{
+    return a->subj && ui_subject_is_open(a->subj);
+}
+
+/* L'inserimento testo di SDL resta attivo solo mentre si scrive il nome di una materia. */
+static void subject_sync_text_input(App *a)
+{
+    bool want = input_subject_open(a) && ui_subject_editing(a->subj);
+    if (want != SDL_TextInputActive(a->win)) {
+        if (want)
+            SDL_StartTextInput(a->win);
+        else
+            SDL_StopTextInput(a->win);
+    }
+}
+
+static void close_subject(App *a)
+{
+    if (!input_subject_open(a))
+        return;
+    ui_subject_close(a->subj);
+    subject_sync_text_input(a);
+    settings_save(&a->cfg); /* elenco e materia attiva */
+    a->dirty = true;
+}
+
+static void open_subject(App *a)
+{
+    int w, h;
+    if (!a->subj)
+        return;
+    pixel_size(a, &w, &h);
+    ui_subject_open(a->subj, w, h, &a->cfg);
+    a->dirty = true;
+}
+
+static void subject_result(App *a, UiSubjectResult r)
+{
+    if (r == UISUBJ_CLOSE)
+        close_subject(a);
+    else
+        subject_sync_text_input(a);
+    if (a->subj && ui_subject_dirty(a->subj))
+        a->dirty = true;
+}
+
+static void subject_mouse(App *a, const SDL_Event *ev)
+{
+    SDL_Event copy = *ev;
+    SDL_ConvertEventToRenderCoordinates(a->ren, &copy);
+    subject_result(a, ui_subject_mouse(a->subj, &copy));
+}
+
 bool input_stats_open(const App *a)
 {
     return a->sui && ui_stats_is_open(a->sui);
@@ -233,7 +289,7 @@ static void open_stats(App *a)
     if (input_panel_open(a))
         close_panel(a);
     pixel_size(a, &w, &h);
-    ui_stats_open(a->sui, w, h);
+    ui_stats_open(a->sui, w, h, (const char (*)[SUBJECT_LEN])a->cfg.subjects, a->cfg.subject_count);
     a->dirty = true;
 }
 
@@ -448,6 +504,8 @@ static void on_key(App *a, const SDL_KeyboardEvent *k)
             font_finish(a, false); /* ripristina il font */
         if (input_panel_open(a))
             settings_save(&a->cfg);
+        if (input_subject_open(a))
+            close_subject(a); /* salva elenco e materia attiva */
         a->running = false;
         return;
     }
@@ -459,7 +517,15 @@ static void on_key(App *a, const SDL_KeyboardEvent *k)
         font_result(a, ui_font_key(a->fui, k->key, k->mod));
         return;
     }
+    if (input_subject_open(a)) {
+        subject_result(a, ui_subject_key(a->subj, k->key, k->mod));
+        return;
+    }
     if (input_stats_open(a)) {
+        if (ui_stats_key(a->sui, k->key)) {
+            a->dirty = true;
+            return;
+        }
         if (k->repeat)
             return;
         if (k->key == SDLK_ESCAPE || k->key == SDLK_I)
@@ -498,6 +564,9 @@ static void on_key(App *a, const SDL_KeyboardEvent *k)
     case SDLK_I:
         open_stats(a);
         break;
+    case SDLK_M:
+        open_subject(a);
+        break;
     case SDLK_T:
         set_view(a, a->view == VIEW_TIMER ? VIEW_CLOCK : VIEW_TIMER);
         break;
@@ -520,10 +589,21 @@ void input_handle_event(App *a, const SDL_Event *ev)
             color_mouse(a, ev);
         else if (input_font_open(a))
             font_mouse(a, ev);
+        else if (input_subject_open(a))
+            subject_mouse(a, ev);
         break;
     case SDL_EVENT_MOUSE_WHEEL:
         if (input_font_open(a))
             font_mouse(a, ev);
+        else if (input_subject_open(a))
+            subject_mouse(a, ev);
+        break;
+    case SDL_EVENT_TEXT_INPUT:
+        if (input_subject_open(a)) {
+            ui_subject_text(a->subj, ev->text.text);
+            if (ui_subject_dirty(a->subj))
+                a->dirty = true;
+        }
         break;
     case SDL_EVENT_KEY_DOWN:
     case SDL_EVENT_MOUSE_BUTTON_DOWN:
@@ -536,6 +616,11 @@ void input_handle_event(App *a, const SDL_Event *ev)
         if (ev->type != SDL_EVENT_KEY_DOWN && input_font_open(a)) {
             input_cursor_activity(a);
             font_mouse(a, ev);
+            break;
+        }
+        if (ev->type != SDL_EVENT_KEY_DOWN && input_subject_open(a)) {
+            input_cursor_activity(a);
+            subject_mouse(a, ev);
             break;
         }
         if (a->screensaver) {
