@@ -50,7 +50,7 @@ void render_set_tile_alpha(Render *r, int tile, float alpha);
  * Ha la precedenza su render_set_label. La texture si ricrea solo se il testo cambia. */
 void render_set_label_text(Render *r, const char *text);
 
-/* Colore base delle cifre (prima della luminosità). Default 0xb7b7b7; pausa Pomodoro 0x6fa8dc.
+/* Colore base delle cifre (prima della luminosità). Default 0xb7b7b7; pausa Pomodoro 0x6fa8dc se pomodoro_break_blue.
  * ECONOMICO: i glifi sono bianchi e il colore si applica con SDL_SetTextureColorMod; un cambio
  * ricompone solo le facce delle tessere (nessuna riapertura del font, nessuna animazione).
  * Pensato per essere chiamato anche molte volte al secondo (anteprima del selettore colore). */

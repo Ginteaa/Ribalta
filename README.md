@@ -40,7 +40,7 @@ original and the project is not affiliated with Fliqlo.
 
 - 🕰️ **Flip clock** `HH:MM`, with optional seconds and 12h/24h format; only the tiles that change flip
 - ⏳ **Study timer** from 0h01 to 23h59, keeps running while you look at the clock; type the duration with the digit keys, microwave style (`1` `3` `0` → `01:30`)
-- 🍅 **Pomodoro** with study, short break and long break phases (breaks turn the digits blue, or amber if you picked a blue colour)
+- 🍅 **Pomodoro** with study, short break and long break phases (breaks keep your digit colour, or turn blue if you prefer)
 - 🔤 **Digit font**: keep the bundled font or pick any installed font from a searchable drop-down menu with live preview
 - 🎨 **Digit colour** with a built-in colour picker (palette, HEX field, recent colours, live preview); the accent applies to digits, progress bar and labels
 - 📚 **Optional study subjects** (`M`): statistics per subject, without subject, or all together
@@ -57,7 +57,7 @@ original and the project is not affiliated with Fliqlo.
 | | |
 |:---:|:---:|
 | <img src="docs/images/clock.png" alt="Fullscreen clock" width="420"><br>**Clock**: fullscreen `HH:MM` | <img src="docs/images/timer.png" alt="Study timer" width="420"><br>**Study timer**: running, with progress bar |
-| <img src="docs/images/pomodoro.png" alt="Pomodoro break" width="420"><br>**Pomodoro**: break phase in blue | <img src="docs/images/settings.png" alt="Settings panel" width="420"><br>**Settings** overlay (`S`) |
+| <img src="docs/images/pomodoro.png" alt="Pomodoro break" width="420"><br>**Pomodoro**: break phase (optional blue digits) | <img src="docs/images/settings.png" alt="Settings panel" width="420"><br>**Settings** overlay (`S`) |
 | <img src="docs/images/stats.png" alt="Statistics panel" width="420"><br>**Statistics** overlay (`I`, sample data) | <img src="docs/images/colors.png" alt="Colour picker" width="420"><br>**Colour picker**: live preview of the digit colour |
 
 ## 📦 Installation
@@ -238,6 +238,7 @@ edit it by hand: the settings panel (`S`) changes everything live and saves on c
 | `pomodoro_long_break` | `15` | Long break minutes (1–120) |
 | `pomodoro_cycles` | `4` | Study sessions before the long break (1–12) |
 | `pomodoro_auto_continue` | `true` | Start the next phase automatically |
+| `pomodoro_break_blue` | `false` | Blue digits during breaks (amber if your colour is already blue); `false` keeps your digit colour |
 | `digit_color` | `#b7b7b7` | Digit colour `#rrggbb`; also tints the progress bar and labels (accent) |
 | `recent_colors` | empty | Up to 5 recently used colours, comma separated (`#rrggbb,#rrggbb`) |
 | `font_family` | empty | Name of the digit font (e.g. `DejaVu Sans`); empty = bundled font |
@@ -248,8 +249,9 @@ edit it by hand: the settings panel (`S`) changes everything live and saves on c
 The **Digit colour** row of the settings panel shows a swatch and the HEX code: `←`/`→` step through
 the palette, `Enter` opens the colour picker (saturation/value square, hue bar, HEX field, palette
 grid, recent colours; mouse or keyboard: `Tab` changes zone, `Enter` applies, `Esc` cancels). The
-digits preview the colour live. During Pomodoro breaks the digits are blue (`#6fa8dc`), or amber
-(`#ffb347`) if the chosen colour is already blue; the accent stays your colour.
+digits preview the colour live. During Pomodoro breaks the digits keep your colour; turn on
+"Pomodoro: riposo in blu" (`pomodoro_break_blue=true`) to make them blue (`#6fa8dc`), or amber
+(`#ffb347`) if the chosen colour is already blue; the accent always stays your colour.
 
 The **Digit font** row (right after the colour) shows the font name: `←`/`→` switch to the previous or
 next installed font, `Enter` opens the font menu: type to filter, `↑`/`↓`/`PgUp`/`PgDn`/`Home`/`End`
@@ -262,7 +264,8 @@ prints a warning on stderr and uses the bundled font, leaving the setting untouc
 
 `P` opens the Pomodoro view: STUDIO (25 min) → RIPOSO (5 min) → … and, after 4 study sessions, a
 RIPOSO LUNGO (15 min), then the cycle restarts. `Space`/`Enter` starts or pauses, `N` skips to
-the next phase, `R` resets. During breaks the digits turn blue. At the end of each phase you get a
+the next phase, `R` resets. During breaks the digits keep your colour (or turn blue with
+`pomodoro_break_blue=true`). At the end of each phase you get a
 notification and a chime, and with `pomodoro_auto_continue=true` the next phase starts by itself.
 The timer and the Pomodoro are independent and can both run in the background.
 

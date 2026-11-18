@@ -71,7 +71,7 @@ static void build_pomo_display(const App *a, Uint64 now, Display *d)
     d->has_progress = p->timer.state != TIMER_SETUP;
     d->alpha[0] = d->alpha[1] = p->timer.state == TIMER_PAUSED ? 0.5f : 1.0f;
     uint32_t base = display_base_color(a);
-    if (p->phase == POMO_WORK)
+    if (p->phase == POMO_WORK || !a->cfg.pomodoro_break_blue)
         d->color = base;
     else
         d->color = color_is_bluish(base) ? COLOR_BREAK_ALT : COLOR_BREAK;

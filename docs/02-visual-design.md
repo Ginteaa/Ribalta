@@ -10,7 +10,7 @@
 | Cut line | `#000000` | separates the upper and lower halves of the tile |
 | Flip shadow | black with alpha 0–60% | darkens the rotating half |
 | AM/PM, labels | `#b7b7b7` at 70% | small text |
-| Pomodoro break (Phase 3) | digit `#6fa8dc` | soft blue to tell breaks apart |
+| Pomodoro break (Phase 3) | digit colour, or `#6fa8dc` with `pomodoro_break_blue` | optional soft blue to tell breaks apart |
 
 ## 2. Geometry
 
@@ -131,7 +131,7 @@ it becomes `TIMER · Analisi` (Pomodoro study: `STUDIO 2/4 · Analisi`).
 "Animations", "Esc to close".)
 
 Overlay background `#000000` at 75%, panel `#1a1a1a`, text `#b7b7b7`, selected entry in white.
-The panel has 16 rows; "Digit font" ("Font cifre") follows "Digit colour" and its value is ellipsised
+The panel has 17 rows (the last is "Pomodoro: riposo in blu"); "Digit font" ("Font cifre") follows "Digit colour" and its value is ellipsised
 with `...` when it does not fit the value column.
 
 ### Font menu (overlay)

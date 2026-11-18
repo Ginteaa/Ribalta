@@ -170,6 +170,25 @@ int main(void) {
     if (f) { size_t n = fread(buf, 1, sizeof buf - 1, f); buf[n] = 0; fclose(f); }
     CHECK(strstr(buf, "subjects=\n") && strstr(buf, "subject=\n"));
 
+    /* pomodoro_break_blue */
+    settings_defaults(&s);
+    CHECK(!s.pomodoro_break_blue);
+    CHECK(settings_save(&s));
+    f = fopen(p, "r");
+    memset(buf, 0, sizeof buf);
+    if (f) { size_t n = fread(buf, 1, sizeof buf - 1, f); buf[n] = 0; fclose(f); }
+    CHECK(strstr(buf, "pomodoro_break_blue=false"));
+    s.pomodoro_break_blue = true;
+    CHECK(settings_save(&s));
+    settings_defaults(&l);
+    CHECK(settings_load(&l) && l.pomodoro_break_blue);
+    write_cfg(dir, "pomodoro_break_blue=boh\n");
+    l.pomodoro_break_blue = true;
+    CHECK(settings_load(&l) && !l.pomodoro_break_blue);
+    write_cfg(dir, "digit_color=#ffffff\n");
+    settings_defaults(&l);
+    CHECK(settings_load(&l) && !l.pomodoro_break_blue);
+
     char cmd[600];
     snprintf(cmd, sizeof cmd, "rm -rf '%s'", dir);
     if (system(cmd) != 0) { /* ignora */ }

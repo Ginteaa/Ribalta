@@ -35,14 +35,15 @@ accumulate error (±1 s over 1 h); settings survive a restart.
 - Keys in the view: `Space`/`Enter` start/pause, `N` skip to the next phase, `R` reset everything
   (STUDIO phase 1/N, stopped).
 - Label: `STUDIO 2/4`, `RIPOSO`, `RIPOSO LUNGO`; when paused ` · IN PAUSA` is appended and the tiles
-  go to 50%. During RIPOSO/RIPOSO LUNGO the digits turn soft blue `#6fa8dc`.
+  go to 50%. During RIPOSO/RIPOSO LUNGO the digits keep the chosen colour, or turn soft blue
+  `#6fa8dc` with `pomodoro_break_blue=true`.
 - At the end of a phase: notification ("Fine studio — riposo di 5 min" / "Riposo finito — si torna a
   studiare", i.e. study over — 5 min break / break over — back to studying) + sound; if
   `pomodoro_auto_continue=true` (default) the next phase starts by itself, otherwise it stays
   stopped, ready to start. The view does not change (no blinking, it stays on Pomodoro).
 - New config keys (also in the settings panel): `pomodoro_work` (1..180),
   `pomodoro_break` (1..60), `pomodoro_long_break` (1..120), `pomodoro_cycles` (1..12),
-  `pomodoro_auto_continue` (bool).
+  `pomodoro_auto_continue` (bool), `pomodoro_break_blue` (bool, default false).
 
 ### 3.2 Study statistics (`I` key)
 - File `$XDG_DATA_HOME/ribalta/sessions.csv` (fallback `~/.local/share/ribalta/`), one row
@@ -81,7 +82,8 @@ accumulate error (±1 s over 1 h); settings survive a restart.
   cheap re-colouring (white glyphs + colour modulation, no font reopening).
 - Colour picker overlay (saturation/value square, hue bar, HEX, palette, recent colours via
   `recent_colors`), live preview, mouse and keyboard.
-- Pomodoro breaks keep blue digits (amber if the chosen colour is blue).
+- Pomodoro breaks keep the digit colour; optional blue breaks with `pomodoro_break_blue` (amber if
+  the chosen colour is blue).
 - Automated tests (`make test`).
 
 ## Phase 5 — Digit font picker ✅

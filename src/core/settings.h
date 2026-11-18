@@ -26,6 +26,8 @@ typedef struct {
     int  pomodoro_long_break;    /* default 15, range 1..120 */
     int  pomodoro_cycles;        /* default 4,  range 1..12  */
     bool pomodoro_auto_continue; /* default true */
+    bool pomodoro_break_blue;    /* default false: riposo nel colore delle cifre; true = blu #6fa8dc
+                                  * (ambra #ffb347 se il colore scelto è bluastro) */
     /* Colori: 0xRRGGBB. Nel file: digit_color=#rrggbb, recent_colors=#rrggbb,#rrggbb,... */
     uint32_t digit_color;                        /* default 0xb7b7b7 */
     uint32_t recent_colors[RECENT_COLORS_MAX];   /* il più recente per primo */

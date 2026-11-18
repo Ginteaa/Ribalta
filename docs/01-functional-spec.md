@@ -92,9 +92,11 @@ The "Digit colour" row shows a swatch and the HEX value; ←/→ step through th
 opens a **colour picker** overlay (saturation/value square, hue bar, HEX field with read-only
 RGB/HSV, palette grid, recent colours; mouse and keyboard). The digits preview the colour live;
 Enter applies, saves and adds it to the recents, Esc restores the previous colour. In Pomodoro
-breaks the digits are blue `#6fa8dc` (amber `#ffb347` if the chosen colour is bluish).
+breaks the digits keep the chosen colour; with `pomodoro_break_blue=true` (row "Pomodoro: riposo in
+blu", last of the panel) they turn blue `#6fa8dc` instead (amber `#ffb347` if the chosen colour is
+bluish).
 
-The "Digit font" row (right after "Digit colour", 16 rows in total) shows `font_family`, or the bundled
+The "Digit font" row (right after "Digit colour", 17 rows in total) shows `font_family`, or the bundled
 font name when empty (ellipsised if too wide). ←/→ move to the previous/next font of the ring
 [bundled font, installed fonts…] and apply it immediately. Enter opens the **font menu** (fontconfig
 is queried only while it is open): a search field filtering the list (case-insensitive substring),
@@ -111,7 +113,7 @@ bundled font is used and the setting is left untouched. Panels, labels and the f
 use the bundled font.
 
 The Pomodoro keys (`pomodoro_work`, `pomodoro_break`, `pomodoro_long_break`, `pomodoro_cycles`,
-`pomodoro_auto_continue`) are described in [04-roadmap.md](04-roadmap.md), section 3.1.
+`pomodoro_auto_continue`, `pomodoro_break_blue`) are described in [04-roadmap.md](04-roadmap.md), section 3.1.
 
 File: `~/.config/ribalta/config.ini` (honours `$XDG_CONFIG_HOME`; on macOS
 `~/Library/Application Support/Ribalta/config.ini`, where `sessions.csv` lives too). `key=value` format,

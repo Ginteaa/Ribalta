@@ -28,6 +28,7 @@ void settings_defaults(Settings *s)
     s->pomodoro_long_break = 15;
     s->pomodoro_cycles = 4;
     s->pomodoro_auto_continue = true;
+    s->pomodoro_break_blue = false;
     s->digit_color = 0xb7b7b7;
     s->recent_count = 0;
     for (int i = 0; i < RECENT_COLORS_MAX; i++)
@@ -117,6 +118,7 @@ static void apply_kv(Settings *s, const char *k, char *v)
     else if (!strcmp(k, "pomodoro_long_break")) parse_int(v, &s->pomodoro_long_break, 1, 120);
     else if (!strcmp(k, "pomodoro_cycles")) parse_int(v, &s->pomodoro_cycles, 1, 12);
     else if (!strcmp(k, "pomodoro_auto_continue")) parse_bool(v, &s->pomodoro_auto_continue);
+    else if (!strcmp(k, "pomodoro_break_blue")) parse_bool(v, &s->pomodoro_break_blue);
     else if (!strcmp(k, "digit_color")) {
         uint32_t c;
         if (color_parse_hex(v, &c))
@@ -184,6 +186,7 @@ bool settings_save(const Settings *s)
     fprintf(f, "pomodoro_long_break=%d\n", s->pomodoro_long_break);
     fprintf(f, "pomodoro_cycles=%d\n", s->pomodoro_cycles);
     fprintf(f, "pomodoro_auto_continue=%s\n", B(s->pomodoro_auto_continue));
+    fprintf(f, "pomodoro_break_blue=%s\n", B(s->pomodoro_break_blue));
 #undef B
     char hex[8];
     color_format_hex(s->digit_color, hex);
