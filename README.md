@@ -290,8 +290,10 @@ Press `I` to see today, the last 7 days, the month, your streak of consecutive d
 of completed sessions. The file is read only when the panel opens.
 
 **Subjects** are optional. Press `M` to pick the subject you are studying (or "Nessuna materia"), add
-one with `N` or remove one with `Canc`. Each session is recorded with the subject active when it
-started, and the Timer/Pomodoro label shows it (`TIMER · Analisi`). In the statistics panel `←`/`→`
+one with `N` or remove one with `Canc`. You can switch subject during a running timer or Pomodoro
+study phase: the time studied so far stays under the previous subject and the new one starts from
+there, while the session still counts as one completed session. The Timer/Pomodoro label shows the
+subject (`TIMER · Analisi`). In the statistics panel `←`/`→`
 switch between **Tutte** (all your study, with or without a subject), each subject and
 **Senza materia**; the "Tutte" view also lists the week's hours per subject.
 

@@ -56,6 +56,8 @@ accumulate error (±1 s over 1 h); settings survive a restart.
   - timer: when the timer ends (completed=1); on `R` or on quitting the app with a started timer (completed=0);
   - pomodoro: at the end of a STUDIO phase (1); on `N`/`R`/quit during a started STUDIO (0).
   - Duration = time actually elapsed, pauses excluded.
+  - A session may be split into several rows when the subject changes during it (Phase 10): each
+    earlier part is a row with `completed=0`, and only the last part is `completed=1`.
 - `I` opens/closes an overlay panel (same style as the settings panel): **Today**, **Last 7 days**
   (horizontal bars per day, abbreviated Italian day label and `1h 25m`), **This month**,
   **Streak** (consecutive days up to today, or up to yesterday if today is still 0),
@@ -120,7 +122,8 @@ accumulate error (±1 s over 1 h); settings survive a restart.
 - Optional subject per session (`M` key overlay); CSV gains a `materia` column, old rows stay
   valid and count as "no subject".
 - Statistics filter: all study, each subject, no subject; weekly hours per subject.
-- Session subject fixed when the session starts; label `TIMER · Analisi` / `STUDIO 2/4 · Analisi`.
+- Session subject fixed when the session starts; label `TIMER · Analisi` / `STUDIO 2/4 · Analisi`
+  (changeable during the session since Phase 10).
 - New modules `ui/ui_subject.c` (menu, SDL text input only while typing a name) and
   `tests/test_stats.c`. Idle PSS unchanged (17.8 MB).
 
@@ -134,10 +137,17 @@ accumulate error (±1 s over 1 h); settings survive a restart.
   colour; Enter opens the colour picker on the break colour, with live preview and Esc to restore.
 - The accent (progress bar and labels) always stays the digit colour.
 
-## Phase 10 — Change subject during a session (planned)
+## Phase 10 — Change subject during a session ✅
 
-- Choosing another subject with `M` during a running session splits it: the previous part is saved
-  as its own row, and only the last part counts as completed.
+- Choosing another subject with `M` while a timer or a started Pomodoro STUDIO phase (running or
+  paused) applies at once; the label changes (`TIMER · Fisica`, `STUDIO 2/4 · Fisica`).
+- The part studied so far is saved at once as its own CSV row with `completata=0` (pauses
+  excluded) and the new part starts now. At the end only the last part is saved with `completata=1`,
+  so the "Completed sessions" count does not grow and the total time stays correct.
+- A part shorter than 60 s is not saved: the subject is just replaced and that time goes to the new
+  one. Breaks have nothing to split; with a timer and a Pomodoro both started, the change applies to
+  both. Removing the active subject from the list means "no subject".
+- Known limit: a last part shorter than 60 s is not recorded (existing rule).
 
 ## Phase 11 — Daily and weekly goals (planned)
 

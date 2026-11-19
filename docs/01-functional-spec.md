@@ -84,8 +84,15 @@ active subject becomes none), `Esc`/`M` close. Mouse: wheel scrolls, click selec
 chooses, click outside closes. The list and the active subject are saved when the menu closes.
 Studying without a subject is always possible.
 
-A session is recorded with the subject that was active when it **started**; changing subject during
-a session affects only the next one. In Timer and Pomodoro study views the label shows the subject:
+Changing subject **during** a session applies at once (Phase 10). While a timer is started, or a
+Pomodoro STUDIO phase is started (running or paused), choosing another subject with `M` splits the
+session: the part studied so far is saved as its own row with `completata=0` (pauses excluded) and
+the new part starts now; when the session ends only the last part is saved as completed, so the
+"Completed sessions" count does not grow. A part shorter than 60 s is not saved and its time goes to
+the new subject. During Pomodoro breaks there is nothing to split: the next STUDIO phase takes the
+active subject. With both a timer and a Pomodoro started, the change applies to both. Removing the
+active subject from the list means switching to "no subject". In Timer and Pomodoro study views the
+label shows the subject:
 `TIMER · Analisi`, `PAUSA · Analisi`, `STUDIO 2/4 · Analisi`.
 
 The "Digit colour" row shows a swatch and the HEX value; ←/→ step through the palette and Enter

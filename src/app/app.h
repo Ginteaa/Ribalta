@@ -73,6 +73,12 @@ typedef struct {
     time_t        pomo_start;        /* inizio sessione STUDIO (0 = nessuna) */
     char          timer_subject[SUBJECT_LEN]; /* materia della sessione timer, fissata all'inizio */
     char          pomo_subject[SUBJECT_LEN];  /* materia della sessione STUDIO, fissata all'inizio */
+    /* Cambio materia a sessione avviata (docs/plans/cambio-materia.md): tempo di studio (pause
+     * escluse) già registrato in tratti precedenti della sessione in corso; si sottrae da ogni
+     * registrazione successiva. Azzerati insieme a timer_start / pomo_start. timer_start e
+     * pomo_start diventano l'inizio (ora locale) del tratto corrente. */
+    Uint64        timer_seg_ns;
+    Uint64        pomo_seg_ns;
     bool          inhibit;           /* SDL_DisableScreenSaver attivo */
     int           timer_sel;         /* 0 = ore, 1 = minuti (SETUP) */
     View          view;

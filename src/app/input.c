@@ -250,6 +250,7 @@ static void close_subject(App *a)
         return;
     ui_subject_close(a->subj);
     subject_sync_text_input(a);
+    session_subject_changed(a, SDL_GetTicksNS()); /* a sessione avviata spezza il tratto */
     settings_save(&a->cfg); /* elenco e materia attiva */
     a->dirty = true;
 }

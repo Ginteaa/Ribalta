@@ -123,6 +123,12 @@ build/tests/%: tests/%.c $(TEST_COMMON)
 	@mkdir -p build/tests
 	$(Q)$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $< $(TEST_COMMON) $(LDLIBS)
 
+# test_session: collega anche session.c, pomodoro.c e gli stub delle notifiche
+build/tests/test_session: tests/test_session.c tests/stub_notify.c src/app/session.c src/core/pomodoro.c $(TEST_COMMON)
+	$(call say,CC,tests/test_session.c)
+	@mkdir -p build/tests
+	$(Q)$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $< tests/stub_notify.c src/app/session.c src/core/pomodoro.c $(TEST_COMMON) $(LDLIBS)
+
 test: $(addprefix build/tests/,$(TESTS))
 	@for t in $(TESTS); do printf '  %-4s %s ' TEST $$t; ./build/tests/$$t || exit 1; done
 
