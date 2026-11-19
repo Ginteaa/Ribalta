@@ -196,6 +196,31 @@ Use `make V=1` for the full compiler commands during a normal build. Use
 `PREFIX`) removes only the installed files: **your settings and statistics are kept**. Make sure
 `~/.local/bin` is in your `PATH`.
 
+### Updating
+
+```sh
+ribalta update          # shows the release notes, asks, then builds and installs the new version
+ribalta update --check  # only reports whether a newer release exists (exit code 10 = yes)
+```
+
+`ribalta update` downloads the source of the latest GitHub release and installs it in the same
+prefix as the current installation. It needs the same tools as `make install`, plus `curl` or
+`wget` and `tar`. Your settings and statistics are not touched; restart Ribalta afterwards. Use
+`-y` to skip the question. Not available for the Flatpak (`flatpak update io.github.ginteaa.Ribalta`),
+for the macOS app (download the new `Ribalta.app` from the releases page) or for a binary run from
+the source tree (`git pull && make install`). Installs older than 0.7.0 have no `update` command:
+update them once with `git pull && make install`.
+
+### Uninstalling
+
+```sh
+ribalta uninstall   # asks for confirmation (-y skips it)
+make uninstall      # alternative, from the source tree, with the same PREFIX as the install
+```
+
+Both remove exactly the files installed by `make install`; **your settings and statistics are
+kept**. For the Flatpak use `flatpak uninstall io.github.ginteaa.Ribalta`.
+
 ## ⌨️ Keyboard shortcuts
 
 | Key | Action |
@@ -324,6 +349,17 @@ or from any compositor/session script:
 ```sh
 swayidle -w timeout 300 'ribalta --screensaver'
 ```
+
+## 🖥️ Command line
+
+| Command | What it does |
+|---|---|
+| `ribalta` | Starts the app |
+| `ribalta --screensaver` | Screensaver mode (see above) |
+| `ribalta --version` (or `-V`) | Prints the version, e.g. `ribalta 0.7.0` |
+| `ribalta update [--check] [-y]` | Updates to the latest release (see [Updating](#updating)) |
+| `ribalta uninstall [-y]` | Removes Ribalta, keeping settings and statistics (see [Uninstalling](#uninstalling)) |
+| `ribalta --help` | Lists the options |
 
 ## ⚡ Performance
 

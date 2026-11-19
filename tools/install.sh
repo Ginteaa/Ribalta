@@ -26,7 +26,10 @@ banner() {
     mid2+="${DIM}│   │${RST}"
     bot+="${DIM}└───┘${RST}"
   done
-  local ver; ver="$(git describe --always --dirty 2>/dev/null || true)"; ver="${ver:-dev}"
+  local ver=""
+  if [ -r VERSION ]; then ver="$(head -n 1 VERSION | tr -d '[:space:]')"; fi
+  [ -n "$ver" ] || ver="$(git describe --always --dirty 2>/dev/null || true)"
+  ver="${ver:-dev}"
   printf '\n'
   printf '  %s\n  %s\n  %s\n  %s\n  %s\n' "$top" "$mid1" "$cut" "$mid2" "$bot"
   printf '  %sA tiny flip clock & study timer%s\n' "$ORG" "$RST"
@@ -137,7 +140,12 @@ step_begin "Installing assets"
 n=0
 for f in font.ttf OFL.txt ding.wav ribalta.svg; do
   install -Dm644 "assets/$f" "$PREFIX/share/ribalta/$f"
-  n=$((n + 1)); step_progress "$n" 4
+  n=$((n + 1)); step_progress "$n" 6
+done
+# the `ribalta update` / `ribalta uninstall` scripts
+for f in update.sh uninstall.sh; do
+  install -Dm755 "tools/$f" "$PREFIX/share/ribalta/$f"
+  n=$((n + 1)); step_progress "$n" 6
 done
 step_end
 
@@ -170,7 +178,8 @@ printf '  Location   %s\n' "$PREFIX"
 printf '  Run it     %sribalta%s (or search "Ribalta" in your app launcher)\n' "$CYN" "$RST"
 printf '  Settings   %s\n' "$cfg"
 printf '  Statistics %s\n' "$dat"
-printf '  Uninstall  make uninstall (your settings and statistics are kept)\n'
+printf '  Update     ribalta update\n'
+printf '  Uninstall  ribalta uninstall (your settings and statistics are kept)\n'
 case ":$PATH:" in
   *":$PREFIX/bin:"*) ;;
   *)

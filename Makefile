@@ -28,7 +28,11 @@ else
   STRIP_LD   := -s
 endif
 
+# versione: unica fonte il file VERSION (funziona anche dal tarball di una release, senza .git)
+VERSION := $(shell cat VERSION 2>/dev/null || echo dev)
 override CFLAGS += $(shell pkg-config --cflags $(PKGS) $(FCPKG)) $(PLATDEF) -Isrc
+# fuori da CFLAGS: debug/release richiamano make passando CFLAGS (si duplicherebbe senza virgolette)
+VERSION_DEF := -DRIBALTA_VERSION='"$(VERSION)"'
 override LDLIBS += $(shell pkg-config $(PKGFLAGS) --libs $(PKGS)) -lm $(PLATLIBS)
 # fonts.c e fonts_mac.c sono alternativi: si compila solo quello della piattaforma
 SRC     := $(filter-out src/platform/fonts.c src/platform/fonts_mac.c,$(shell find src -name '*.c')) $(FONTS_SRC)
@@ -52,10 +56,13 @@ $(BIN): $(OBJ)
 	$(call say,LD,$@)
 	$(Q)$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS)
 
+# main.c contiene RIBALTA_VERSION: si ricompila quando cambia VERSION
+build/main.o: VERSION
+
 build/%.o: src/%.c
 	$(call say,CC,$*.c)
 	@mkdir -p $(dir $@)
-	$(Q)$(CC) $(CFLAGS) -MMD -MP -c -o $@ $<
+	$(Q)$(CC) $(CFLAGS) $(VERSION_DEF) -MMD -MP -c -o $@ $<
 
 debug: CFLAGS += -O0 -g -fsanitize=address,undefined
 debug: LDFLAGS += -fsanitize=address,undefined

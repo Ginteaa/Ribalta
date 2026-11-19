@@ -17,6 +17,11 @@ bool paths_data_dir(char *out, size_t out_size);
 /* mkdir -p: crea path e le cartelle intermedie (0755). */
 bool paths_mkdir_p(const char *path);
 
+/* Cartella dell'eseguibile in uso (assoluta, senza '/' finale), es. "/home/u/.local/bin".
+ * Non richiede SDL_Init: si può chiamare prima di inizializzare SDL (sottocomandi di main).
+ * Ritorna false se non determinabile o se out è troppo piccolo. */
+bool paths_exe_dir(char *out, size_t out_size);
+
 /* Cerca un file asset (es. "font.ttf") in ordine:
  * $RIBALTA_DATA, ./assets, <dir dell'eseguibile>/assets, <dir dell'eseguibile>/../share/ribalta,
  * $XDG_DATA_HOME/ribalta (fallback ~/.local/share/ribalta), /usr/share/ribalta.

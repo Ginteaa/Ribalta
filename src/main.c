@@ -278,6 +278,76 @@ static bool acquire_single_instance(void)
     return true; /* fd lasciato aperto di proposito */
 }
 
+#ifndef RIBALTA_VERSION
+#define RIBALTA_VERSION "dev"
+#endif
+
+#define MAX_EXTRA_ARGS 32
+
+/* Sottocomandi "update" / "uninstall": passano il controllo a share/ribalta/<nome>.sh
+ * dell'installazione (make install). Non ritornano: exit 1 o execvp. */
+static void run_subcommand(const char *name, int argc, char **argv)
+{
+    bool is_update = strcmp(name, "update") == 0;
+    const char *fp = getenv("FLATPAK_ID");
+    if (fp && *fp) {
+        fprintf(stderr, "ribalta: Ribalta è installato come Flatpak: %s  flatpak %s io.github.ginteaa.Ribalta\n",
+                is_update ? "aggiornalo con" : "disinstallalo con", is_update ? "update" : "uninstall");
+        exit(1);
+    }
+#ifdef __APPLE__
+    (void)argc;
+    (void)argv;
+    if (is_update)
+        fputs("ribalta: scarica l'ultimo Ribalta.app da https://github.com/Ginteaa/Ribalta/releases/latest "
+              "oppure, se l'hai compilato dai sorgenti, usa  git pull && make install  nel repository\n",
+              stderr);
+    else
+        fputs("ribalta: rimuovi Ribalta.app da Applicazioni "
+              "(impostazioni e statistiche restano in ~/Library/Application Support/Ribalta)\n",
+              stderr);
+    exit(1);
+#else
+    char exe[1024] = "", prefix[1024], script[1100];
+    size_t el = 0;
+    bool ok = paths_exe_dir(exe, sizeof exe);
+    if (ok) {
+        el = strlen(exe);
+        ok = el > 4 && strcmp(exe + el - 4, "/bin") == 0;
+    }
+    if (ok) {
+        memcpy(prefix, exe, el - 4);
+        prefix[el - 4] = '\0';
+        ok = snprintf(script, sizeof script, "%s/share/ribalta/%s.sh", prefix, name) < (int)sizeof script
+             && access(script, R_OK) == 0;
+    }
+    if (!ok) {
+        fprintf(stderr, "ribalta: Questa copia di Ribalta non risulta installata con make install (%s): "
+                        "nel repository usa  %s\n",
+                exe, is_update ? "git pull && make install" : "make uninstall");
+        exit(1);
+    }
+    if (argc - 2 > MAX_EXTRA_ARGS) {
+        fprintf(stderr, "ribalta: troppi argomenti per %s\n", name);
+        exit(1);
+    }
+    const char *args[MAX_EXTRA_ARGS + 7];
+    int n = 0;
+    args[n++] = "bash";
+    args[n++] = script;
+    args[n++] = "--prefix";
+    args[n++] = prefix;
+    args[n++] = "--current";
+    args[n++] = RIBALTA_VERSION;
+    for (int i = 2; i < argc; i++)
+        args[n++] = argv[i];
+    args[n] = NULL;
+    execvp("bash", (char *const *)args);
+    perror("ribalta: bash");
+    exit(1);
+#endif
+}
+
 static void usage(FILE *out)
 {
     fputs("Uso: ribalta [opzioni]\n"
@@ -286,7 +356,12 @@ static void usage(FILE *out)
           "\n"
           "Opzioni:\n"
           "  --screensaver   schermo intero, esce con tasto, clic o movimento del mouse\n"
+          "  -V, --version   mostra la versione\n"
           "  -h, --help      mostra questo aiuto\n"
+          "\n"
+          "Comandi:\n"
+          "  update [--check] [-y]   aggiorna all'ultima versione (--check: controlla soltanto)\n"
+          "  uninstall [-y]          disinstalla (impostazioni e statistiche restano)\n"
           "\n"
           "Tasti:\n"
           "  F/F11 schermo intero   T timer   P Pomodoro   S impostazioni   I statistiche\n"
@@ -299,9 +374,14 @@ static void usage(FILE *out)
 int main(int argc, char **argv)
 {
     bool screensaver = false;
+    if (argc > 1 && (strcmp(argv[1], "update") == 0 || strcmp(argv[1], "uninstall") == 0))
+        run_subcommand(argv[1], argc, argv);
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--screensaver") == 0) {
             screensaver = true;
+        } else if (strcmp(argv[i], "--version") == 0 || strcmp(argv[i], "-V") == 0) {
+            printf("ribalta %s\n", RIBALTA_VERSION);
+            return 0;
         } else if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
             usage(stdout);
             return 0;

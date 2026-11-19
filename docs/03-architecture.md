@@ -87,6 +87,7 @@ Checking resource use: `ps -o rss,pcpu -C ribalta`, `pidstat -p <pid> 1`, `/usr/
 ```
 ribalta/
 ├── Makefile
+├── VERSION                 release version (e.g. 0.7.0): the only source, read by the Makefile
 ├── README.md
 ├── src/
 │   ├── main.c              CLI parsing, SDL init/shutdown, main loop, wait-timeout selection
@@ -119,7 +120,8 @@ ribalta/
 ├── tests/                  unit tests run by `make test` and the CI
 ├── tools/
 │   ├── install.sh          `make install`: build, install, progress UI
-│   ├── uninstall.sh        `make uninstall`: removes only installed files, keeps user data
+│   ├── uninstall.sh        `make uninstall` / `ribalta uninstall`: removes only installed files, keeps user data
+│   ├── update.sh           `ribalta update [--check]`: latest GitHub release, build, install in the same prefix
 │   ├── icons.sh            regenerates the PNG icons from the SVG
 │   └── macos-app.sh        `make app` on macOS: builds build/Ribalta.app (icon, bundled libs, ad-hoc signature)
 ├── packaging/flatpak/      Flatpak manifest and AppStream metainfo
@@ -287,6 +289,11 @@ clean:
 
 (This is a condensed sketch: recipes are shown on one line for readability. The real `Makefile`
 in the repository is the reference.)
+
+The real `Makefile` reads the version from `VERSION` (`VERSION := $(shell cat VERSION ...)`) and
+passes it to the compiler as `RIBALTA_VERSION`, so `ribalta --version` and the release tag share one
+source. `ribalta update` and `ribalta uninstall` are not Makefile targets: the binary runs
+`tools/update.sh` or `tools/uninstall.sh` from `<prefix>/share/ribalta/` with `execvp`.
 
 ## 5. Development with agents
 

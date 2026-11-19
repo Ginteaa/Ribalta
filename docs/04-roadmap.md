@@ -160,11 +160,17 @@ accumulate error (±1 s over 1 h); settings survive a restart.
 - One notification and chime when a recorded session makes the total cross a goal; checked only on
   record, so it fires once even after a restart, and never on quit.
 
-## Phase 12 — Terminal commands (planned)
+## Phase 12 — Terminal commands ✅
 
-- `ribalta --version`.
-- `ribalta update [--check]`: update from the latest GitHub release (`--check` only reports).
-- `ribalta uninstall`.
+- `VERSION` file as the single source of the version: the Makefile passes it as `RIBALTA_VERSION`;
+  `ribalta --version` / `-V` prints it.
+- `ribalta update`: checks the latest GitHub release, shows its notes, asks, then builds and installs
+  the source tarball in the same prefix; `-y` skips the question; settings and statistics untouched.
+- `ribalta update --check`: reports current and latest version only (exit 0 up to date, 10 update
+  available, 1 error), for scripts or a status bar.
+- `ribalta uninstall`: removes exactly what `make install` installed, keeps settings and statistics.
+- Not for the Flatpak, macOS or source-tree builds, which get a pointer to the right update path;
+  installs older than 0.7.0 update once with `git pull && make install`.
 
 ## Future ideas
 - Publish the Flatpak on Flathub.

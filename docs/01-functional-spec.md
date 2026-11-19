@@ -193,3 +193,21 @@ The mouse cursor hides after 2 s of inactivity in fullscreen.
 | Runtime dependencies | SDL3 + SDL3_ttf + fontconfig (+ optional `notify-send`) |
 | Accuracy | the minute change happens within 50 ms of the real minute |
 | Platforms | Linux Wayland (primary), X11 |
+
+## 5. Command line
+
+| Invocation | Behaviour | Exit code |
+|---|---|---|
+| `ribalta` | Starts the app | — |
+| `ribalta --screensaver` | Screensaver mode, see the README | — |
+| `ribalta --version`, `-V` | Prints `ribalta X.Y.Z` (from `VERSION`) and exits | 0 |
+| `ribalta --help` | Lists the options | 0 |
+| `ribalta update` | Shows the latest release notes, asks `Update now? [Y/n]` (`-y` skips), builds and installs it in the same prefix; settings and statistics are untouched; says to restart a running instance | 0 done, already up to date or cancelled; 1 error |
+| `ribalta update --check` | Reports current and latest version and the release notes, changes nothing | 0 up to date, 10 update available, 1 error |
+| `ribalta uninstall` | Asks `[y/N]` (`-y` skips) and removes exactly what `make install` installed; settings and statistics are kept | 0 removed or cancelled; 1 error, or no terminal without `-y` (nothing done) |
+
+`update` and `uninstall` need an installation made with `make install`. In the Flatpak, on macOS and
+for a binary run from the source tree they print a message pointing to the right command and exit
+with 1: `flatpak update` / `flatpak uninstall`, a new `Ribalta.app` from the releases page, or
+`git pull && make install`. If the prefix is not writable, `update` explains it and stops; it never
+calls `sudo`.

@@ -85,6 +85,36 @@ static bool try_dir(const char *dir, const char *name, char *out, size_t n)
     return true;
 }
 
+bool paths_exe_dir(char *out, size_t out_size)
+{
+    char buf[PATH_MAX_LEN];
+    const char *base = SDL_GetBasePath(); /* di proprieta' di SDL, con '/' finale */
+    if (base && base[0]) {
+        if (snprintf(buf, sizeof buf, "%s", base) >= (int)sizeof buf)
+            return false;
+    } else {
+#ifdef __linux__
+        ssize_t n = readlink("/proc/self/exe", buf, sizeof buf - 1);
+        if (n <= 0)
+            return false;
+        buf[n] = '\0';
+        char *slash = strrchr(buf, '/');
+        if (!slash)
+            return false;
+        slash[1] = '\0';
+#else
+        return false;
+#endif
+    }
+    size_t len = strlen(buf);
+    while (len > 1 && buf[len - 1] == '/')
+        buf[--len] = '\0';
+    if (buf[0] != '/' || len >= out_size)
+        return false;
+    memcpy(out, buf, len + 1);
+    return true;
+}
+
 bool paths_find_asset(const char *name, char *out, size_t out_size)
 {
     char d[PATH_MAX_LEN];
