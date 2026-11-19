@@ -35,15 +35,16 @@ accumulate error (±1 s over 1 h); settings survive a restart.
 - Keys in the view: `Space`/`Enter` start/pause, `N` skip to the next phase, `R` reset everything
   (STUDIO phase 1/N, stopped).
 - Label: `STUDIO 2/4`, `RIPOSO`, `RIPOSO LUNGO`; when paused ` · IN PAUSA` is appended and the tiles
-  go to 50%. During RIPOSO/RIPOSO LUNGO the digits keep the chosen colour, or turn soft blue
-  `#6fa8dc` with `pomodoro_break_blue=true`.
+  go to 50%. During RIPOSO/RIPOSO LUNGO the digits keep the chosen colour (the break colour is
+  configurable since Phase 9).
 - At the end of a phase: notification ("Fine studio — riposo di 5 min" / "Riposo finito — si torna a
   studiare", i.e. study over — 5 min break / break over — back to studying) + sound; if
   `pomodoro_auto_continue=true` (default) the next phase starts by itself, otherwise it stays
   stopped, ready to start. The view does not change (no blinking, it stays on Pomodoro).
 - New config keys (also in the settings panel): `pomodoro_work` (1..180),
   `pomodoro_break` (1..60), `pomodoro_long_break` (1..120), `pomodoro_cycles` (1..12),
-  `pomodoro_auto_continue` (bool), `pomodoro_break_blue` (bool, default false).
+  `pomodoro_auto_continue` (bool), `pomodoro_break_blue` (bool, default false; replaced by
+  `pomodoro_break_color` in Phase 9).
 
 ### 3.2 Study statistics (`I` key)
 - File `$XDG_DATA_HOME/ribalta/sessions.csv` (fallback `~/.local/share/ribalta/`), one row
@@ -83,7 +84,7 @@ accumulate error (±1 s over 1 h); settings survive a restart.
 - Colour picker overlay (saturation/value square, hue bar, HEX, palette, recent colours via
   `recent_colors`), live preview, mouse and keyboard.
 - Pomodoro breaks keep the digit colour; optional blue breaks with `pomodoro_break_blue` (amber if
-  the chosen colour is blue).
+  the chosen colour is blue; replaced by `pomodoro_break_color` in Phase 9).
 - Automated tests (`make test`).
 
 ## Phase 5 — Digit font picker ✅
@@ -123,10 +124,33 @@ accumulate error (±1 s over 1 h); settings survive a restart.
 - New modules `ui/ui_subject.c` (menu, SDL text input only while typing a name) and
   `tests/test_stats.c`. Idle PSS unchanged (17.8 MB).
 
-## Phase 9 — Daily goal (planned)
+## Phase 9 — Pomodoro break colour ✅
 
-- `daily_goal_min` setting; progress bar and "goal reached N days in a row" in the statistics;
-  one notification when the goal is reached.
+- `pomodoro_break_color=digits|auto|#rrggbb` (default `digits`) replaces `pomodoro_break_blue`:
+  `auto` is soft blue `#6fa8dc` (amber `#ffb347` if the digit colour is already bluish), `#rrggbb`
+  any custom colour.
+- An old `pomodoro_break_blue=true` without the new key is read as `auto`; only the new key is written.
+- Settings row "Pomodoro: colore riposo": ←/→ cycle "come le cifre" → "blu automatico" → custom
+  colour; Enter opens the colour picker on the break colour, with live preview and Esc to restore.
+- The accent (progress bar and labels) always stays the digit colour.
+
+## Phase 10 — Change subject during a session (planned)
+
+- Choosing another subject with `M` during a running session splits it: the previous part is saved
+  as its own row, and only the last part counts as completed.
+
+## Phase 11 — Daily and weekly goals (planned)
+
+- `daily_goal_min` and `weekly_goal_h` settings; goal bars and "goal reached N days in a row" in the
+  statistics.
+- One notification when a goal is reached. Weeks start on Monday (calendar week).
+- Goals count all study time, regardless of the subject filter.
+
+## Phase 12 — Terminal commands (planned)
+
+- `ribalta --version`.
+- `ribalta update [--check]`: update from the latest GitHub release (`--check` only reports).
+- `ribalta uninstall`.
 
 ## Future ideas
 - Publish the Flatpak on Flathub.

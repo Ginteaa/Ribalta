@@ -23,10 +23,21 @@ void ui_settings_resize(SettingsUI *ui, int pixel_w, int pixel_h);
  * Esc e S NON sono gestiti qui (li gestisce main per chiudere). */
 bool ui_settings_key(SettingsUI *ui, SDL_Keycode key, SDL_Keymod mod, Settings *s);
 
-/* Riga "Colore cifre": Invio chiede di aprire il selettore colore. Ritorna true UNA volta
- * dopo che l'utente l'ha chiesto (main allora apre ui_color). ←/→ sulla riga scorrono la
- * palette (color_palette_step) modificando s->digit_color e ui_settings_key ritorna true. */
-bool ui_settings_take_color_request(SettingsUI *ui);
+/* Richiesta di aprire il selettore colore (ui_color), e per quale impostazione. */
+typedef enum {
+    SETTINGS_COLOR_NONE,     /* nessuna richiesta */
+    SETTINGS_COLOR_DIGITS,   /* riga "Colore cifre" -> Settings.digit_color */
+    SETTINGS_COLOR_BREAK     /* riga "Pomodoro: colore riposo" -> Settings.pomodoro_break_color */
+} SettingsColorRequest;
+
+/* Riga "Colore cifre": Invio chiede di aprire il selettore colore. ←/→ sulla riga scorrono la
+ * palette (color_palette_step) modificando s->digit_color e ui_settings_key ritorna true.
+ * Riga "Pomodoro: colore riposo": ←/→ ciclano s->pomodoro_break_mode
+ * (DIGITS -> AUTO -> CUSTOM -> DIGITS, ← al contrario) e ui_settings_key ritorna true; Invio/Spazio
+ * chiedono il selettore per il colore del riposo. Il valore mostrato è "come le cifre",
+ * "blu automatico" oppure il campione di s->pomodoro_break_color + "#rrggbb".
+ * Ritorna la richiesta UNA volta (poi SETTINGS_COLOR_NONE); main allora apre ui_color. */
+SettingsColorRequest ui_settings_take_color_request(SettingsUI *ui);
 
 /* Riga "Font cifre" (subito dopo "Colore cifre"): mostra s->font_family o FONT_BUNDLED_NAME se
  * vuoto. Invio chiede di aprire il menu dei font: ritorna true UNA volta (main apre ui_font).

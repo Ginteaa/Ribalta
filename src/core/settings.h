@@ -9,6 +9,16 @@
 #define SUBJECTS_MAX 8
 #define SUBJECT_LEN  25
 
+/* Colore delle cifre nei riposi Pomodoro (docs/plans/colore-riposo.md).
+ * Nel file: pomodoro_break_color=digits|auto|#rrggbb (default digits). Compatibilità: un file vecchio
+ * con pomodoro_break_blue=true e senza pomodoro_break_color vale auto (qualsiasi ordine delle righe);
+ * al salvataggio si scrive solo pomodoro_break_color. */
+enum {
+    BREAK_COLOR_DIGITS = 0,   /* come le cifre (default) */
+    BREAK_COLOR_AUTO   = 1,   /* blu COLOR_BREAK, ambra COLOR_BREAK_ALT se le cifre sono bluastre */
+    BREAK_COLOR_CUSTOM = 2    /* pomodoro_break_color */
+};
+
 /* Vedi docs/01-specifiche-funzionali.md §1.3 */
 typedef struct {
     bool show_seconds;          /* default false */
@@ -26,8 +36,9 @@ typedef struct {
     int  pomodoro_long_break;    /* default 15, range 1..120 */
     int  pomodoro_cycles;        /* default 4,  range 1..12  */
     bool pomodoro_auto_continue; /* default true */
-    bool pomodoro_break_blue;    /* default false: riposo nel colore delle cifre; true = blu #6fa8dc
-                                  * (ambra #ffb347 se il colore scelto è bluastro) */
+    int      pomodoro_break_mode;   /* BREAK_COLOR_*, default BREAK_COLOR_DIGITS */
+    uint32_t pomodoro_break_color;  /* colore scelto (usato con BREAK_COLOR_CUSTOM), default 0x6fa8dc;
+                                     * conservato anche quando la modalità è un'altra */
     /* Colori: 0xRRGGBB. Nel file: digit_color=#rrggbb, recent_colors=#rrggbb,#rrggbb,... */
     uint32_t digit_color;                        /* default 0xb7b7b7 */
     uint32_t recent_colors[RECENT_COLORS_MAX];   /* il più recente per primo */

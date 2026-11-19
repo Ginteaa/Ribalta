@@ -1,4 +1,5 @@
 #include "core/color.h"
+#include "core/settings.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -47,6 +48,14 @@ int main(void) {
     CHECK(!color_is_bluish(0xffb347));
     CHECK(!color_is_bluish(0xb7b7b7));   /* grigio: saturazione bassa */
     CHECK(!color_is_bluish(0xff0000));
+
+    /* color_break */
+    CHECK(color_break(BREAK_COLOR_DIGITS, 0x112233, 0xb7b7b7) == 0xb7b7b7);
+    CHECK(color_break(BREAK_COLOR_AUTO, 0x112233, 0xb7b7b7) == COLOR_BREAK);
+    CHECK(color_break(BREAK_COLOR_AUTO, 0x112233, 0x0000ff) == COLOR_BREAK_ALT);
+    CHECK(color_break(BREAK_COLOR_CUSTOM, 0x112233, 0xb7b7b7) == 0x112233);
+    CHECK(color_break(99, 0x112233, 0xb7b7b7) == 0xb7b7b7);
+    CHECK(color_break(-1, 0x112233, 0x0000ff) == 0x0000ff);
 
     if (fails) return 1;
     puts("ok");

@@ -67,19 +67,24 @@ bool input_color_open(const App *a)
     return a->cui && ui_color_is_open(a->cui);
 }
 
-static void open_color(App *a)
+static void open_color(App *a, SettingsColorRequest target)
 {
     int w, h;
-    if (!a->cui)
+    if (!a->cui || target == SETTINGS_COLOR_NONE)
         return;
     pixel_size(a, &w, &h);
-    ui_color_open(a->cui, w, h, a->cfg.digit_color, a->cfg.recent_colors, a->cfg.recent_count);
+    a->color_target = target;
+    uint32_t init = target == SETTINGS_COLOR_BREAK
+                        ? color_break(a->cfg.pomodoro_break_mode, a->cfg.pomodoro_break_color, a->cfg.digit_color)
+                        : a->cfg.digit_color;
+    ui_color_open(a->cui, w, h, init, a->cfg.recent_colors, a->cfg.recent_count);
     a->dirty = true;
 }
 
 static void color_finish(App *a)
 {
     a->preview_active = false;
+    a->color_target = SETTINGS_COLOR_NONE;
     if (input_color_open(a))
         ui_color_close(a->cui);
     a->dirty = true;
@@ -94,8 +99,14 @@ static void color_result(App *a, UiColorResult r)
         a->dirty = true;
         break;
     case UICOLOR_APPLY:
-        a->cfg.digit_color = ui_color_value(a->cui);
-        settings_push_recent(&a->cfg, a->cfg.digit_color);
+        if (a->color_target == SETTINGS_COLOR_BREAK) {
+            a->cfg.pomodoro_break_color = ui_color_value(a->cui);
+            a->cfg.pomodoro_break_mode = BREAK_COLOR_CUSTOM;
+            settings_push_recent(&a->cfg, a->cfg.pomodoro_break_color);
+        } else {
+            a->cfg.digit_color = ui_color_value(a->cui);
+            settings_push_recent(&a->cfg, a->cfg.digit_color);
+        }
         settings_save(&a->cfg);
         color_finish(a);
         break;
@@ -340,8 +351,9 @@ static void on_key_panel(App *a, const SDL_KeyboardEvent *k)
         }
         settings_changed(a, old);
     }
-    if (a->cui && ui_settings_take_color_request(a->ui))
-        open_color(a);
+    SettingsColorRequest creq = ui_settings_take_color_request(a->ui);
+    if (a->cui && creq != SETTINGS_COLOR_NONE)
+        open_color(a, creq);
     if (a->fui && ui_settings_take_font_request(a->ui))
         open_font(a);
     a->dirty = true;

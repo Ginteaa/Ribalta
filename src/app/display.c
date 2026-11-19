@@ -71,10 +71,10 @@ static void build_pomo_display(const App *a, Uint64 now, Display *d)
     d->has_progress = p->timer.state != TIMER_SETUP;
     d->alpha[0] = d->alpha[1] = p->timer.state == TIMER_PAUSED ? 0.5f : 1.0f;
     uint32_t base = display_base_color(a);
-    if (p->phase == POMO_WORK || !a->cfg.pomodoro_break_blue)
-        d->color = base;
+    if (a->preview_active || p->phase == POMO_WORK)
+        d->color = base; /* l'anteprima del selettore vale in ogni fase */
     else
-        d->color = color_is_bluish(base) ? COLOR_BREAK_ALT : COLOR_BREAK;
+        d->color = color_break(a->cfg.pomodoro_break_mode, a->cfg.pomodoro_break_color, base);
 }
 
 static void build_blink_display(const App *a, Uint64 now, Display *d)
@@ -94,7 +94,9 @@ static void build_display(const App *a, Uint64 now, Display *d)
     d->alpha[0] = d->alpha[1] = 1.0f;
     d->label = LABEL_NONE;
     d->color = display_base_color(a);
-    d->accent = display_base_color(a);
+    /* accento (barra, etichette): anteprima solo se il selettore modifica le cifre */
+    d->accent = (a->preview_active && a->color_target != SETTINGS_COLOR_BREAK) ? a->preview_color
+                                                                                : a->cfg.digit_color;
     if (a->view == VIEW_CLOCK) {
         clock_get(&a->cfg, &d->face);
     } else if (a->view == VIEW_POMODORO) {

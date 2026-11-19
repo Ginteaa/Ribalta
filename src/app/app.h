@@ -22,8 +22,6 @@
 #define BLINK_PHASES   6
 #define SAVER_GRACE_NS (1000ULL * SDL_NS_PER_MS)
 #define SAVER_MOVE_PX  8.0f   /* movimento reale minimo per uscire dallo screensaver */
-#define COLOR_BREAK    0x6fa8dcu
-#define COLOR_BREAK_ALT 0xffb347u /* riposo se il colore scelto e gia blu */
 
 
 /* Animazione flip a 30 fps invece di 60: dimezza la CPU durante i flip
@@ -57,7 +55,9 @@ typedef struct {
     Pomodoro      pomo;
     StatsUI      *sui;
     ColorUI      *cui;               /* selettore colore (NULL in screensaver) */
-    bool          preview_active;    /* anteprima dal vivo del selettore (non salvata) */
+    SettingsColorRequest color_target; /* cosa modifica il selettore aperto: cifre o riposo */
+    bool          preview_active;    /* anteprima dal vivo del selettore (non salvata): le tessere
+                                      * mostrano preview_color in ogni vista, qualunque sia color_target */
     uint32_t      preview_color;
     FontUI       *fui;               /* menu dei font (NULL in screensaver) */
     SubjectUI    *subj;              /* menu delle materie (NULL in screensaver) */

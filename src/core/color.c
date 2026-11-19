@@ -1,5 +1,7 @@
 #include "core/color.h"
 
+#include "core/settings.h"
+
 #include <ctype.h>
 #include <math.h>
 #include <stdio.h>
@@ -132,4 +134,13 @@ bool color_is_bluish(uint32_t rgb)
 {
     ColorHSV c = color_to_hsv(rgb);
     return c.s >= 0.25f && c.h >= 180.0f && c.h <= 260.0f;
+}
+
+uint32_t color_break(int mode, uint32_t custom, uint32_t digit)
+{
+    switch (mode) {
+    case BREAK_COLOR_AUTO:   return color_is_bluish(digit) ? COLOR_BREAK_ALT : COLOR_BREAK;
+    case BREAK_COLOR_CUSTOM: return custom;
+    default:                 return digit;
+    }
 }

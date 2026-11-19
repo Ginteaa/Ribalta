@@ -8,7 +8,7 @@
 #include <string.h>
 #include <SDL3_ttf/SDL_ttf.h>
 
-enum { ROW_COUNT = 17, ROW_COLOR = 7, ROW_FONT = 8 };
+enum { ROW_COUNT = 17, ROW_COLOR = 7, ROW_FONT = 8, ROW_BREAK = 16 };
 
 typedef struct {
     SDL_Texture *tex;
@@ -26,7 +26,7 @@ struct SettingsUI {
     Settings      shown;       /* valori con cui sono state costruite le texture */
     bool          have_shown;
     bool          arrows;      /* il font ha le frecce */
-    bool          color_req;   /* Invio sulla riga colore */
+    SettingsColorRequest color_req; /* Invio sulla riga colore cifre o colore riposo */
     bool          font_req;    /* Invio sulla riga font */
 
     float         pw, ph, px, py, pitch, pad;
@@ -42,7 +42,7 @@ static const char *const k_labels[ROW_COUNT] = {
     "Mostra secondi", "Formato 24 ore", "Timer predefinito", "Suono fine timer",
     "Notifica fine timer", "Dimensione", "Luminosità", "Colore cifre", "Font cifre", "Schermo intero all'avvio", "Animazioni",
     "Pomodoro: studio", "Pomodoro: riposo", "Pomodoro: riposo lungo", "Pomodoro: cicli",
-    "Pomodoro: avvio automatico", "Pomodoro: riposo in blu"
+    "Pomodoro: avvio automatico", "Pomodoro: colore riposo"
 };
 
 static int clampi(int v, int lo, int hi) { return v < lo ? lo : (v > hi ? hi : v); }
@@ -105,7 +105,11 @@ static void fmt_value(int row, const Settings *s, char *buf, size_t n)
     case 13: snprintf(buf, n, "%d min", s->pomodoro_long_break); break;
     case 14: snprintf(buf, n, "%d", s->pomodoro_cycles); break;
     case 15: snprintf(buf, n, "%s", s->pomodoro_auto_continue ? "sì" : "no"); break;
-    case 16: snprintf(buf, n, "%s", s->pomodoro_break_blue ? "sì" : "no"); break;
+    case ROW_BREAK:
+        if (s->pomodoro_break_mode == BREAK_COLOR_DIGITS) snprintf(buf, n, "come le cifre");
+        else if (s->pomodoro_break_mode == BREAK_COLOR_AUTO) snprintf(buf, n, "blu automatico");
+        else { char hx[8]; color_format_hex(s->pomodoro_break_color, hx); snprintf(buf, n, "%s", hx); }
+        break;
     default: buf[0] = 0; break;
     }
 }
@@ -294,7 +298,8 @@ bool ui_settings_key(SettingsUI *ui, SDL_Keycode key, SDL_Keymod mod, Settings *
     case SDLK_RETURN:
     case SDLK_KP_ENTER:
     case SDLK_SPACE:
-        if (ui->sel == ROW_COLOR) { ui->color_req = true; return false; }
+        if (ui->sel == ROW_COLOR) { ui->color_req = SETTINGS_COLOR_DIGITS; return false; }
+        if (ui->sel == ROW_BREAK) { ui->color_req = SETTINGS_COLOR_BREAK; return false; }
         if (ui->sel == ROW_FONT) { ui->font_req = true; return false; }
         dir = 1;
         break;
@@ -317,7 +322,9 @@ bool ui_settings_key(SettingsUI *ui, SDL_Keycode key, SDL_Keymod mod, Settings *
     case 13: s->pomodoro_long_break = clampi(s->pomodoro_long_break + dir * (shift ? 5 : 1), 1, 120); break;
     case 14: s->pomodoro_cycles = clampi(s->pomodoro_cycles + dir, 1, 12); break;
     case 15: s->pomodoro_auto_continue = !s->pomodoro_auto_continue; break;
-    case 16: s->pomodoro_break_blue = !s->pomodoro_break_blue; break;
+    case ROW_BREAK:
+        s->pomodoro_break_mode = (s->pomodoro_break_mode + 3 + dir) % 3;
+        break;
     case ROW_COLOR: s->digit_color = color_palette_step(s->digit_color, dir); break;
     case ROW_FONT: {
         FontEntry e;
@@ -334,11 +341,12 @@ bool ui_settings_key(SettingsUI *ui, SDL_Keycode key, SDL_Keymod mod, Settings *
     return changed;
 }
 
-bool ui_settings_take_color_request(SettingsUI *ui)
+SettingsColorRequest ui_settings_take_color_request(SettingsUI *ui)
 {
-    if (!ui || !ui->color_req) return false;
-    ui->color_req = false;
-    return true;
+    if (!ui) return SETTINGS_COLOR_NONE;
+    SettingsColorRequest r = ui->color_req;
+    ui->color_req = SETTINGS_COLOR_NONE;
+    return r;
 }
 
 bool ui_settings_take_font_request(SettingsUI *ui)
@@ -393,17 +401,16 @@ void ui_settings_draw(SettingsUI *ui, const Settings *s)
         const Label *lb = &ui->label[i][is_sel], *vl = &ui->value[i][is_sel];
         blit(ui, lb, x0, ry + (ui->pitch - (float)lb->h) * 0.5f);
         float vx = x1 - (float)vl->w;
-        if (i == ROW_COLOR) {
+        if (i == ROW_COLOR || (i == ROW_BREAK && s->pomodoro_break_mode == BREAK_COLOR_CUSTOM)) {
+            uint32_t c = i == ROW_COLOR ? s->digit_color : s->pomodoro_break_color;
             float sw = ui->swatch, gap = ui->pad * 0.5f;
             vx -= sw + gap;
             SDL_FRect sr = {x1 - sw, ry + (ui->pitch - sw) * 0.5f, sw, sw};
             if (ui->swatch_tex) {
-                SDL_SetTextureColorMod(ui->swatch_tex, (Uint8)(s->digit_color >> 16),
-                                       (Uint8)(s->digit_color >> 8), (Uint8)s->digit_color);
+                SDL_SetTextureColorMod(ui->swatch_tex, (Uint8)(c >> 16), (Uint8)(c >> 8), (Uint8)c);
                 SDL_RenderTexture(ui->ren, ui->swatch_tex, NULL, &sr);
             } else {
-                SDL_SetRenderDrawColor(ui->ren, (Uint8)(s->digit_color >> 16),
-                                       (Uint8)(s->digit_color >> 8), (Uint8)s->digit_color, 255);
+                SDL_SetRenderDrawColor(ui->ren, (Uint8)(c >> 16), (Uint8)(c >> 8), (Uint8)c, 255);
                 SDL_RenderFillRect(ui->ren, &sr);
             }
         }

@@ -28,7 +28,8 @@ void settings_defaults(Settings *s)
     s->pomodoro_long_break = 15;
     s->pomodoro_cycles = 4;
     s->pomodoro_auto_continue = true;
-    s->pomodoro_break_blue = false;
+    s->pomodoro_break_mode = BREAK_COLOR_DIGITS;
+    s->pomodoro_break_color = COLOR_BREAK;
     s->digit_color = 0xb7b7b7;
     s->recent_count = 0;
     for (int i = 0; i < RECENT_COLORS_MAX; i++)
@@ -102,6 +103,20 @@ static void parse_subjects(Settings *s, char *v)
         settings_subject_add(s, tok);   /* scarta non validi, duplicati, eccedenti */
 }
 
+/* digits|auto|#rrggbb (parole senza distinzione di maiuscole); valore non valido: false, nulla cambia */
+static bool parse_break_color(Settings *s, const char *v)
+{
+    uint32_t c;
+    if (!strcasecmp(v, "digits")) s->pomodoro_break_mode = BREAK_COLOR_DIGITS;
+    else if (!strcasecmp(v, "auto")) s->pomodoro_break_mode = BREAK_COLOR_AUTO;
+    else if (color_parse_hex(v, &c)) {
+        s->pomodoro_break_mode = BREAK_COLOR_CUSTOM;
+        s->pomodoro_break_color = c;
+    } else
+        return false;
+    return true;
+}
+
 static void apply_kv(Settings *s, const char *k, char *v)
 {
     if (!strcmp(k, "show_seconds")) parse_bool(v, &s->show_seconds);
@@ -118,7 +133,6 @@ static void apply_kv(Settings *s, const char *k, char *v)
     else if (!strcmp(k, "pomodoro_long_break")) parse_int(v, &s->pomodoro_long_break, 1, 120);
     else if (!strcmp(k, "pomodoro_cycles")) parse_int(v, &s->pomodoro_cycles, 1, 12);
     else if (!strcmp(k, "pomodoro_auto_continue")) parse_bool(v, &s->pomodoro_auto_continue);
-    else if (!strcmp(k, "pomodoro_break_blue")) parse_bool(v, &s->pomodoro_break_blue);
     else if (!strcmp(k, "digit_color")) {
         uint32_t c;
         if (color_parse_hex(v, &c))
@@ -141,6 +155,7 @@ bool settings_load(Settings *s)
     if (!f)
         return false;
     char line[1024];
+    bool seen_break_color = false, legacy_blue = false;
     while (fgets(line, sizeof line, f)) {
         char *p = trim(line);
         if (*p == '#' || *p == '\0')
@@ -149,9 +164,22 @@ bool settings_load(Settings *s)
         if (!eq)
             continue;
         *eq = '\0';
-        apply_kv(s, trim(p), trim(eq + 1));
+        char *k = trim(p), *v = trim(eq + 1);
+        if (!strcmp(k, "pomodoro_break_color")) {
+            if (parse_break_color(s, v))
+                seen_break_color = true;
+        } else if (!strcmp(k, "pomodoro_break_blue")) {
+            bool b = false;   /* chiave vecchia: vale solo "true" */
+            parse_bool(v, &b);
+            if (b)
+                legacy_blue = true;
+        } else
+            apply_kv(s, k, v);
     }
     fclose(f);
+    /* compatibilità: pomodoro_break_blue=true senza pomodoro_break_color valido vale auto */
+    if (legacy_blue && !seen_break_color)
+        s->pomodoro_break_mode = BREAK_COLOR_AUTO;
     /* la materia attiva vale solo se in elenco (la chiave può precedere subjects) */
     if (settings_subject_find(s, s->subject) < 0)
         s->subject[0] = '\0';
@@ -186,9 +214,13 @@ bool settings_save(const Settings *s)
     fprintf(f, "pomodoro_long_break=%d\n", s->pomodoro_long_break);
     fprintf(f, "pomodoro_cycles=%d\n", s->pomodoro_cycles);
     fprintf(f, "pomodoro_auto_continue=%s\n", B(s->pomodoro_auto_continue));
-    fprintf(f, "pomodoro_break_blue=%s\n", B(s->pomodoro_break_blue));
 #undef B
     char hex[8];
+    if (s->pomodoro_break_mode == BREAK_COLOR_CUSTOM) {
+        color_format_hex(s->pomodoro_break_color, hex);
+        fprintf(f, "pomodoro_break_color=%s\n", hex);
+    } else
+        fprintf(f, "pomodoro_break_color=%s\n", s->pomodoro_break_mode == BREAK_COLOR_AUTO ? "auto" : "digits");
     color_format_hex(s->digit_color, hex);
     fprintf(f, "digit_color=%s\n", hex);
     fprintf(f, "font_family=%s\n", s->font_family);

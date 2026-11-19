@@ -170,24 +170,43 @@ int main(void) {
     if (f) { size_t n = fread(buf, 1, sizeof buf - 1, f); buf[n] = 0; fclose(f); }
     CHECK(strstr(buf, "subjects=\n") && strstr(buf, "subject=\n"));
 
-    /* pomodoro_break_blue */
+    /* colore del riposo Pomodoro */
     settings_defaults(&s);
-    CHECK(!s.pomodoro_break_blue);
-    CHECK(settings_save(&s));
-    f = fopen(p, "r");
-    memset(buf, 0, sizeof buf);
-    if (f) { size_t n = fread(buf, 1, sizeof buf - 1, f); buf[n] = 0; fclose(f); }
-    CHECK(strstr(buf, "pomodoro_break_blue=false"));
-    s.pomodoro_break_blue = true;
-    CHECK(settings_save(&s));
-    settings_defaults(&l);
-    CHECK(settings_load(&l) && l.pomodoro_break_blue);
+    CHECK(s.pomodoro_break_mode == BREAK_COLOR_DIGITS && s.pomodoro_break_color == 0x6fa8dc);
+    for (int m = 0; m < 3; m++) {
+        settings_defaults(&s);
+        s.pomodoro_break_mode = m;
+        s.pomodoro_break_color = 0x123456;
+        CHECK(settings_save(&s));
+        settings_defaults(&l);
+        CHECK(settings_load(&l) && l.pomodoro_break_mode == m);
+        if (m == BREAK_COLOR_CUSTOM) CHECK(l.pomodoro_break_color == 0x123456);
+        f = fopen(p, "r");
+        memset(buf, 0, sizeof buf);
+        if (f) { size_t n = fread(buf, 1, sizeof buf - 1, f); buf[n] = 0; fclose(f); }
+        CHECK(!strstr(buf, "pomodoro_break_blue"));
+        CHECK(strstr(buf, "pomodoro_break_color="));
+    }
+    write_cfg(dir, "pomodoro_break_color=AUTO\n");
+    CHECK(settings_load(&l) && l.pomodoro_break_mode == BREAK_COLOR_AUTO);
+    write_cfg(dir, "pomodoro_break_color=#FF8800\n");
+    CHECK(settings_load(&l) && l.pomodoro_break_mode == BREAK_COLOR_CUSTOM && l.pomodoro_break_color == 0xff8800);
+    /* legacy */
+    write_cfg(dir, "pomodoro_break_blue=true\n");
+    CHECK(settings_load(&l) && l.pomodoro_break_mode == BREAK_COLOR_AUTO);
+    write_cfg(dir, "pomodoro_break_blue=true\npomodoro_break_color=digits\n");
+    CHECK(settings_load(&l) && l.pomodoro_break_mode == BREAK_COLOR_DIGITS);
+    write_cfg(dir, "pomodoro_break_color=#102030\npomodoro_break_blue=true\n");
+    CHECK(settings_load(&l) && l.pomodoro_break_mode == BREAK_COLOR_CUSTOM && l.pomodoro_break_color == 0x102030);
+    write_cfg(dir, "pomodoro_break_blue=false\n");
+    CHECK(settings_load(&l) && l.pomodoro_break_mode == BREAK_COLOR_DIGITS);
     write_cfg(dir, "pomodoro_break_blue=boh\n");
-    l.pomodoro_break_blue = true;
-    CHECK(settings_load(&l) && !l.pomodoro_break_blue);
-    write_cfg(dir, "digit_color=#ffffff\n");
-    settings_defaults(&l);
-    CHECK(settings_load(&l) && !l.pomodoro_break_blue);
+    CHECK(settings_load(&l) && l.pomodoro_break_mode == BREAK_COLOR_DIGITS);
+    /* valori non validi ignorati; un nuovo valore non valido non annulla il legacy */
+    write_cfg(dir, "pomodoro_break_color=boh\n");
+    CHECK(settings_load(&l) && l.pomodoro_break_mode == BREAK_COLOR_DIGITS && l.pomodoro_break_color == 0x6fa8dc);
+    write_cfg(dir, "pomodoro_break_color=#12\npomodoro_break_blue=true\n");
+    CHECK(settings_load(&l) && l.pomodoro_break_mode == BREAK_COLOR_AUTO);
 
     char cmd[600];
     snprintf(cmd, sizeof cmd, "rm -rf '%s'", dir);

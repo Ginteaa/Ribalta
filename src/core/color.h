@@ -34,6 +34,15 @@ int color_palette_index(uint32_t rgb);
  * parte dal preset più vicino. Usato da ←/→ sulla riga "Colore cifre". */
 uint32_t color_palette_step(uint32_t rgb, int dir);
 
+/* Colori del riposo Pomodoro in modalità BREAK_COLOR_AUTO (core/settings.h). */
+#define COLOR_BREAK     0x6fa8dcu
+#define COLOR_BREAK_ALT 0xffb347u /* riposo se il colore delle cifre è già blu */
+
+/* Colore delle cifre durante un riposo Pomodoro: mode = BREAK_COLOR_* (core/settings.h).
+ * DIGITS -> digit; AUTO -> COLOR_BREAK, o COLOR_BREAK_ALT se color_is_bluish(digit);
+ * CUSTOM -> custom. Una modalità sconosciuta vale DIGITS. */
+uint32_t color_break(int mode, uint32_t custom, uint32_t digit);
+
 /* true se il colore è "blu" (tonalità 180..260 con saturazione >= 0.25): in quel caso la pausa
  * del Pomodoro usa l'ambra invece del blu. */
 bool color_is_bluish(uint32_t rgb);

@@ -92,9 +92,14 @@ The "Digit colour" row shows a swatch and the HEX value; ←/→ step through th
 opens a **colour picker** overlay (saturation/value square, hue bar, HEX field with read-only
 RGB/HSV, palette grid, recent colours; mouse and keyboard). The digits preview the colour live;
 Enter applies, saves and adds it to the recents, Esc restores the previous colour. In Pomodoro
-breaks the digits keep the chosen colour; with `pomodoro_break_blue=true` (row "Pomodoro: riposo in
-blu", last of the panel) they turn blue `#6fa8dc` instead (amber `#ffb347` if the chosen colour is
-bluish).
+breaks the digits keep the chosen colour (`pomodoro_break_color=digits`, the default). The last row of
+the panel, "Pomodoro: colore riposo", sets the break colour: ←/→ cycle "come le cifre" → "blu
+automatico" → the custom colour (swatch and HEX). `auto` is soft blue `#6fa8dc`, or amber `#ffb347`
+if the digit colour is already bluish; a custom colour is any `#rrggbb` chosen explicitly. Enter opens
+the colour picker on the break colour: the tiles preview the candidate colour live, Enter confirms
+(custom mode, added to the recents), Esc restores. The accent (progress bar and labels) always stays
+the digit colour. A config with the old `pomodoro_break_blue=true` and no `pomodoro_break_color` is
+read as `auto`; on save only the new key is written.
 
 The "Digit font" row (right after "Digit colour", 17 rows in total) shows `font_family`, or the bundled
 font name when empty (ellipsised if too wide). ←/→ move to the previous/next font of the ring
@@ -113,7 +118,7 @@ bundled font is used and the setting is left untouched. Panels, labels and the f
 use the bundled font.
 
 The Pomodoro keys (`pomodoro_work`, `pomodoro_break`, `pomodoro_long_break`, `pomodoro_cycles`,
-`pomodoro_auto_continue`, `pomodoro_break_blue`) are described in [04-roadmap.md](04-roadmap.md), section 3.1.
+`pomodoro_auto_continue`, `pomodoro_break_color`) are described in [04-roadmap.md](04-roadmap.md), section 3.1.
 
 File: `~/.config/ribalta/config.ini` (honours `$XDG_CONFIG_HOME`; on macOS
 `~/Library/Application Support/Ribalta/config.ini`, where `sessions.csv` lives too). `key=value` format,
