@@ -208,6 +208,25 @@ int main(void) {
     write_cfg(dir, "pomodoro_break_color=#12\npomodoro_break_blue=true\n");
     CHECK(settings_load(&l) && l.pomodoro_break_mode == BREAK_COLOR_AUTO);
 
+    /* obiettivi */
+    settings_defaults(&l);
+    CHECK(l.daily_goal_min == 0 && l.weekly_goal_h == 0);
+    l.daily_goal_min = 180; l.weekly_goal_h = 15;
+    CHECK(settings_save(&l));
+    {
+        Settings g;
+        CHECK(settings_load(&g) && g.daily_goal_min == 180 && g.weekly_goal_h == 15);
+    }
+    write_cfg(dir, "daily_goal_min=721\nweekly_goal_h=101\n");
+    settings_defaults(&l);   /* fuori intervallo: clamp, come le altre chiavi int (parse_int) */
+    CHECK(settings_load(&l) && l.daily_goal_min == 720 && l.weekly_goal_h == 100);
+    write_cfg(dir, "daily_goal_min=-5\nweekly_goal_h=boh\n");
+    settings_defaults(&l);
+    CHECK(settings_load(&l) && l.daily_goal_min == 0 && l.weekly_goal_h == 0);
+    write_cfg(dir, "daily_goal_min=720\nweekly_goal_h=100\n");
+    settings_defaults(&l);
+    CHECK(settings_load(&l) && l.daily_goal_min == 720 && l.weekly_goal_h == 100);
+
     char cmd[600];
     snprintf(cmd, sizeof cmd, "rm -rf '%s'", dir);
     if (system(cmd) != 0) { /* ignora */ }

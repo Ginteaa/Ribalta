@@ -4,6 +4,14 @@
 #include <SDL3/SDL.h>
 #include "app/app.h"
 
+/* Obiettivi (docs/plans/obiettivi.md): dopo ogni riga registrata con successo (fine sessione, log
+ * parziale, tratto chiuso da un cambio materia) si controllano gli obiettivi del Settings con
+ * stats_goals, senza stato: se il totale di oggi (o della settimana) ha appena superato l'obiettivo
+ * (totale >= obiettivo && totale - durata_riga < obiettivo) arriva una notifica ("Obiettivo di oggi
+ * raggiunto (3h)" / "Obiettivo della settimana raggiunto (15h)") e il suono, secondo timer_notify e
+ * timer_sound. Nessun controllo se gli obiettivi sono 0, in screensaver o all'uscita dall'app
+ * (a->running == false: main chiama i log parziali dopo la fine del loop). */
+
 /* Timer interrotto (R / uscita): da chiamare PRIMA di resettarlo. */
 void session_log_timer_partial(const App *a, Uint64 now);
 /* STUDIO avviato e interrotto (N / R / uscita): da chiamare PRIMA di cambiare fase. */

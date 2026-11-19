@@ -149,12 +149,16 @@ accumulate error (±1 s over 1 h); settings survive a restart.
   both. Removing the active subject from the list means "no subject".
 - Known limit: a last part shorter than 60 s is not recorded (existing rule).
 
-## Phase 11 — Daily and weekly goals (planned)
+## Phase 11 — Daily and weekly goals ✅
 
-- `daily_goal_min` and `weekly_goal_h` settings; goal bars and "goal reached N days in a row" in the
-  statistics.
-- One notification when a goal is reached. Weeks start on Monday (calendar week).
-- Goals count all study time, regardless of the subject filter.
+- `daily_goal_min` (0 = off, up to 720 min) and `weekly_goal_h` (0 = off, up to 100 h) settings, with
+  two new rows at the end of the settings panel (19 rows in total).
+- Statistics panel: an "Obiettivi" block (shown only if a goal is set) with a today bar, a week bar
+  and "goal reached N days in a row". Weeks start on Monday (calendar week).
+- Goals always count total study time, regardless of the subject filter; each session counts for the
+  day it started.
+- One notification and chime when a recorded session makes the total cross a goal; checked only on
+  record, so it fires once even after a restart, and never on quit.
 
 ## Phase 12 — Terminal commands (planned)
 

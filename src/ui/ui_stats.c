@@ -28,6 +28,8 @@ struct StatsUI {
     int           filter;      /* 0 = Tutte, 1..n = materie, n+1 = Senza materia */
     StatsSubjectTotal totals[SUBJ_ROWS];
     int           total_count; /* righe "Per materia" (solo vista Tutte) */
+    int           daily_goal_min, weekly_goal_h;
+    StatsGoals    goals;       /* calcolati all'apertura, indipendenti dal filtro */
 
     float         pw, ph, px, py, pitch, pad;
     SDL_Texture  *panel_tex;
@@ -35,6 +37,8 @@ struct StatsUI {
     Label         subj_name[SUBJ_ROWS], subj_value[SUBJ_ROWS];
     Label         row_label[SUM_ROWS], row_value[SUM_ROWS];
     Label         day_label[DAYS], day_value[DAYS];
+    Label         goal_section, goal_label[2], goal_value[2], goal_streak;
+    float         goal_label_w, goal_value_w;
     float         label_w, value_w;
 };
 
@@ -69,6 +73,9 @@ static void free_textures(StatsUI *ui)
     label_free(&ui->footer);
     label_free(&ui->filter_lbl);
     label_free(&ui->subj_section);
+    label_free(&ui->goal_section);
+    label_free(&ui->goal_streak);
+    for (int i = 0; i < 2; i++) { label_free(&ui->goal_label[i]); label_free(&ui->goal_value[i]); }
     for (int i = 0; i < SUBJ_ROWS; i++) { label_free(&ui->subj_name[i]); label_free(&ui->subj_value[i]); }
     for (int i = 0; i < SUM_ROWS; i++) { label_free(&ui->row_label[i]); label_free(&ui->row_value[i]); }
     for (int i = 0; i < DAYS; i++) { label_free(&ui->day_label[i]); label_free(&ui->day_value[i]); }
@@ -129,6 +136,21 @@ static void refresh(StatsUI *ui)
     ui->dirty = true;
 }
 
+static bool goals_on(const StatsUI *ui) { return ui->daily_goal_min > 0 || ui->weekly_goal_h > 0; }
+
+/* barre obiettivo da mostrare: 0 = oggi, 1 = settimana */
+static bool goal_active(const StatsUI *ui, int i)
+{
+    return i == 0 ? ui->daily_goal_min > 0 : ui->weekly_goal_h > 0;
+}
+
+static long goal_target_s(const StatsUI *ui, int i)
+{
+    return i == 0 ? (long)ui->daily_goal_min * 60L : (long)ui->weekly_goal_h * 3600L;
+}
+
+static long goal_done_s(const StatsUI *ui, int i) { return i == 0 ? ui->goals.today_s : ui->goals.week_s; }
+
 static void rebuild(StatsUI *ui)
 {
     free_textures(ui);
@@ -146,6 +168,10 @@ static void rebuild(StatsUI *ui)
     for (;;) {
         /* + riga del filtro (0.9 passi) + sezione "Per materia" (1.0 + 0.95 per riga + 0.35 passi) */
         float units = SUM_ROWS + 1.3f + 0.95f * DAYS + 0.9f + (nt > 0 ? 1.35f + 0.95f * (float)nt : 0.0f);
+        if (goals_on(ui)) {
+            int nb = (ui->daily_goal_min > 0) + (ui->weekly_goal_h > 0);
+            units += 1.35f + 0.95f * (float)(nb + (ui->daily_goal_min > 0 ? 1 : 0));
+        }
         ph = fs * (1.5f * units + 5.8f);
         if (ph <= H * 0.94f || fs <= 8.0f) break;
         fs -= 1.0f;
@@ -179,6 +205,29 @@ static void rebuild(StatsUI *ui)
         stats_format_duration(ui->totals[i].week_s, buf, sizeof buf);
         label_make(ui, &ui->subj_name[i], nm, norm);
         label_make(ui, &ui->subj_value[i], buf, norm);
+    }
+
+    ui->goal_label_w = ui->goal_value_w = 0.0f;
+    if (goals_on(ui)) {
+        label_make(ui, &ui->goal_section, "Obiettivi", dim);
+        static const char *const names[2] = {"Oggi", "Settimana"};
+        for (int i = 0; i < 2; i++) {
+            if (!goal_active(ui, i)) continue;
+            char a[32], b[32], vb[80];
+            long done = goal_done_s(ui, i), tgt = goal_target_s(ui, i);
+            stats_format_duration(done, a, sizeof a);
+            stats_format_duration(tgt, b, sizeof b);
+            snprintf(vb, sizeof vb, "%s / %s", a, b);
+            label_make(ui, &ui->goal_label[i], names[i], norm);
+            label_make(ui, &ui->goal_value[i], vb, done >= tgt ? white : norm);
+            if ((float)ui->goal_label[i].w > ui->goal_label_w) ui->goal_label_w = (float)ui->goal_label[i].w;
+            if ((float)ui->goal_value[i].w > ui->goal_value_w) ui->goal_value_w = (float)ui->goal_value[i].w;
+        }
+        if (ui->daily_goal_min > 0) {
+            int n = ui->goals.goal_streak_days;
+            snprintf(buf, sizeof buf, "Obiettivo raggiunto %d %s di fila", n, n == 1 ? "giorno" : "giorni");
+            label_make(ui, &ui->goal_streak, buf, norm);
+        }
     }
 
     stats_format_duration(ui->sum.today_s, buf, sizeof buf);
@@ -228,9 +277,15 @@ void ui_stats_destroy(StatsUI *ui)
 }
 
 void ui_stats_open(StatsUI *ui, int pixel_w, int pixel_h,
-                   const char subjects[][SUBJECT_LEN], int subject_count)
+                   const char subjects[][SUBJECT_LEN], int subject_count,
+                   int daily_goal_min, int weekly_goal_h)
 {
     if (!ui) return;
+    ui->daily_goal_min = daily_goal_min > 0 ? daily_goal_min : 0;
+    ui->weekly_goal_h = weekly_goal_h > 0 ? weekly_goal_h : 0;
+    memset(&ui->goals, 0, sizeof ui->goals);
+    if (goals_on(ui))
+        stats_goals(&ui->goals, time(NULL), (long)ui->daily_goal_min * 60L);
     ui->subject_count = 0;
     for (int i = 0; subjects && i < subject_count && i < SUBJECTS_MAX; i++) {
         snprintf(ui->subjects[i], SUBJECT_LEN, "%s", subjects[i]);
@@ -350,6 +405,40 @@ void ui_stats_draw(StatsUI *ui)
             blit(ui, vl, x1 - (float)vl->w, ry + (bpitch - (float)vl->h) * 0.5f);
         }
         y += (float)ui->total_count * bpitch + ui->pitch * 0.35f;
+    }
+    if (goals_on(ui)) {
+        blit(ui, &ui->goal_section, x0, y);
+        y += ui->pitch * 1.0f;
+        const float gx0 = x0 + ui->goal_label_w + gap;
+        const float gx1 = x1 - ui->goal_value_w - gap;
+        const float gw = gx1 > gx0 ? gx1 - gx0 : 0.0f;
+        int k = 0;
+        for (int i = 0; i < 2; i++) {
+            if (!goal_active(ui, i)) continue;
+            float ry = y + (float)k++ * bpitch;
+            const Label *lb = &ui->goal_label[i], *vl = &ui->goal_value[i];
+            blit(ui, lb, x0, ry + (bpitch - (float)lb->h) * 0.5f);
+            blit(ui, vl, x1 - (float)vl->w, ry + (bpitch - (float)vl->h) * 0.5f);
+            float by = floorf(ry + (bpitch - bh) * 0.5f);
+            SDL_SetRenderDrawColor(ui->ren, 0xb7, 0xb7, 0xb7, 38);
+            SDL_FRect track = {gx0, by, gw, bh};
+            SDL_RenderFillRect(ui->ren, &track);
+            long done = goal_done_s(ui, i), tgt = goal_target_s(ui, i);
+            if (done > 0) {
+                bool full = done >= tgt;
+                float len = full ? gw : floorf(gw * (float)done / (float)tgt);
+                if (len < 2.0f) len = 2.0f;
+                SDL_SetRenderDrawColor(ui->ren, 0xb7, 0xb7, 0xb7, full ? 255 : 153);
+                SDL_FRect bar = {gx0, by, len, bh};
+                SDL_RenderFillRect(ui->ren, &bar);
+            }
+        }
+        y += (float)k * bpitch;
+        if (ui->daily_goal_min > 0) {
+            blit(ui, &ui->goal_streak, x0, y + (bpitch - (float)ui->goal_streak.h) * 0.5f);
+            y += bpitch;
+        }
+        y += ui->pitch * 0.35f;
     }
     blit(ui, &ui->footer, x0, y);
 

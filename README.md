@@ -45,6 +45,7 @@ original and the project is not affiliated with Fliqlo.
 - 🎨 **Digit colour** with a built-in colour picker (palette, HEX field, recent colours, live preview); the accent applies to digits, progress bar and labels
 - 📚 **Optional study subjects** (`M`): statistics per subject, without subject, or all together
 - 📊 **Study statistics**: today, last 7 days, month, streak, completed sessions
+- 🎯 **Daily and weekly goals** (optional): progress bars, days in a row, a notification when reached
 - ⚙️ **Settings overlay** (`S`), changes apply live and are saved to a plain `config.ini`
 - 🌙 **Screensaver mode** (`ribalta --screensaver`), easy to hook to `swayidle`
 - 💡 **Keeps the screen awake** while a timer or Pomodoro is running (idle-inhibit)
@@ -245,6 +246,8 @@ edit it by hand: the settings panel (`S`) changes everything live and saves on c
 | `font_file` | empty | Path of the digit font file; empty = bundled font. The value runs to the end of the line (spaces allowed) |
 | `subjects` | empty | Study subjects, `;` separated (max 8, up to 24 bytes each) |
 | `subject` | empty | Active subject; empty = no subject |
+| `daily_goal_min` | `0` | Daily study goal in minutes (0 = off, up to 720) |
+| `weekly_goal_h` | `0` | Weekly study goal in hours (0 = off, up to 100) |
 
 The **Digit colour** row of the settings panel shows a swatch and the HEX code: `←`/`→` step through
 the palette, `Enter` opens the colour picker (saturation/value square, hue bar, HEX field, palette
@@ -288,6 +291,10 @@ the subject (empty = none). Files written by older versions have no `materia` co
 still read and count as "no subject", and the file is never rewritten.
 Press `I` to see today, the last 7 days, the month, your streak of consecutive days and the number
 of completed sessions. The file is read only when the panel opens.
+
+Optional **goals** (`daily_goal_min`, `weekly_goal_h`) add a block with a bar for today and for the
+week (weeks start on Monday) and the days in a row with the daily goal reached. Goals count all study
+time, whatever the subject filter. A notification and chime fire once when a session makes you reach a goal.
 
 **Subjects** are optional. Press `M` to pick the subject you are studying (or "Nessuna materia"), add
 one with `N` or remove one with `Canc`. You can switch subject during a running timer or Pomodoro

@@ -197,6 +197,44 @@ bool stats_summary(StatsSummary *out, time_t now, const char *filter)
     return true;
 }
 
+bool stats_goals(StatsGoals *out, time_t now, long daily_goal_s)
+{
+    if (!out) return false;
+    memset(out, 0, sizeof *out);
+
+    struct tm tn;
+    if (!localtime_r(&now, &tn)) return false;
+    const long today = day_number(tn.tm_year + 1900, tn.tm_mon + 1, tn.tm_mday);
+    const long since_monday = (tn.tm_wday + 6) % 7;   /* 0 = lunedì */
+
+    char path[1100];
+    if (!csv_path(path, sizeof path)) return true;
+    FILE *f = fopen(path, "r");
+    if (!f) return true;
+
+    /* Totali per giorno: [k] = k giorni fa. La serie di obiettivi è limitata agli ultimi GOAL_DAYS
+     * giorni (oltre, la serie si ferma lì): nessuna allocazione. */
+    enum { GOAL_DAYS = 400 };
+    long per_day[GOAL_DAYS];
+    memset(per_day, 0, sizeof per_day);
+
+    Row r;
+    while (read_row(f, &r)) {
+        long ago = today - day_number(r.year, r.mon, r.mday);
+        if (ago < 0) continue;
+        if (ago == 0) out->today_s += r.dur;
+        if (ago <= since_monday) out->week_s += r.dur;
+        if (ago < GOAL_DAYS) per_day[ago] += r.dur;
+    }
+    fclose(f);
+
+    if (daily_goal_s > 0) {
+        int k = per_day[0] >= daily_goal_s ? 0 : 1;
+        while (k < GOAL_DAYS && per_day[k] >= daily_goal_s) { out->goal_streak_days++; k++; }
+    }
+    return true;
+}
+
 void stats_format_duration(long seconds, char *out, size_t out_size)
 {
     if (!out || out_size == 0) return;

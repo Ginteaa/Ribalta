@@ -43,6 +43,20 @@ typedef struct {
  * (al massimo max); 0 se il file manca. */
 int stats_subject_totals(StatsSubjectTotal *out, int max, time_t now);
 
+/* Obiettivi (docs/plans/obiettivi.md). Contano TUTTE le righe (con e senza materia, nessun filtro);
+ * ogni riga vale per il giorno della sua data di inizio (ora locale), come in stats_summary. */
+typedef struct {
+    long today_s;          /* studio di oggi */
+    long week_s;           /* studio della settimana di calendario corrente: da lunedì a oggi compreso */
+    int  goal_streak_days; /* giorni consecutivi con studio >= daily_goal_s, fino a oggi compreso se oggi
+                            * è già raggiunto, altrimenti fino a ieri; 0 se daily_goal_s <= 0 */
+} StatsGoals;
+
+/* Legge il CSV e calcola gli obiettivi rispetto a now. Si chiama solo all'apertura del pannello
+ * statistiche e dopo una registrazione (mai a ogni fotogramma). File assente -> tutto a zero e true;
+ * false solo su errore di lettura. */
+bool stats_goals(StatsGoals *out, time_t now, long daily_goal_s);
+
 /* Formatta una durata come "1h 25m", "2h", "45m", "0m". */
 void stats_format_duration(long seconds, char *out, size_t out_size);
 

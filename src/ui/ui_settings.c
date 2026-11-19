@@ -1,5 +1,6 @@
 #include "ui/ui_settings.h"
 #include "core/color.h"
+#include "core/stats.h"
 #include "platform/fonts.h"
 
 #include <math.h>
@@ -8,7 +9,7 @@
 #include <string.h>
 #include <SDL3_ttf/SDL_ttf.h>
 
-enum { ROW_COUNT = 17, ROW_COLOR = 7, ROW_FONT = 8, ROW_BREAK = 16 };
+enum { ROW_COUNT = 19, ROW_COLOR = 7, ROW_FONT = 8, ROW_BREAK = 16, ROW_DAILY = 17, ROW_WEEKLY = 18 };
 
 typedef struct {
     SDL_Texture *tex;
@@ -42,7 +43,7 @@ static const char *const k_labels[ROW_COUNT] = {
     "Mostra secondi", "Formato 24 ore", "Timer predefinito", "Suono fine timer",
     "Notifica fine timer", "Dimensione", "Luminosità", "Colore cifre", "Font cifre", "Schermo intero all'avvio", "Animazioni",
     "Pomodoro: studio", "Pomodoro: riposo", "Pomodoro: riposo lungo", "Pomodoro: cicli",
-    "Pomodoro: avvio automatico", "Pomodoro: colore riposo"
+    "Pomodoro: avvio automatico", "Pomodoro: colore riposo", "Obiettivo giornaliero", "Obiettivo settimanale"
 };
 
 static int clampi(int v, int lo, int hi) { return v < lo ? lo : (v > hi ? hi : v); }
@@ -109,6 +110,14 @@ static void fmt_value(int row, const Settings *s, char *buf, size_t n)
         if (s->pomodoro_break_mode == BREAK_COLOR_DIGITS) snprintf(buf, n, "come le cifre");
         else if (s->pomodoro_break_mode == BREAK_COLOR_AUTO) snprintf(buf, n, "blu automatico");
         else { char hx[8]; color_format_hex(s->pomodoro_break_color, hx); snprintf(buf, n, "%s", hx); }
+        break;
+    case ROW_DAILY:
+        if (s->daily_goal_min <= 0) snprintf(buf, n, "no");
+        else stats_format_duration((long)s->daily_goal_min * 60L, buf, n);
+        break;
+    case ROW_WEEKLY:
+        if (s->weekly_goal_h <= 0) snprintf(buf, n, "no");
+        else snprintf(buf, n, "%dh", s->weekly_goal_h);
         break;
     default: buf[0] = 0; break;
     }
@@ -322,6 +331,8 @@ bool ui_settings_key(SettingsUI *ui, SDL_Keycode key, SDL_Keymod mod, Settings *
     case 13: s->pomodoro_long_break = clampi(s->pomodoro_long_break + dir * (shift ? 5 : 1), 1, 120); break;
     case 14: s->pomodoro_cycles = clampi(s->pomodoro_cycles + dir, 1, 12); break;
     case 15: s->pomodoro_auto_continue = !s->pomodoro_auto_continue; break;
+    case ROW_DAILY: s->daily_goal_min = clampi(s->daily_goal_min + dir * (shift ? 60 : 15), 0, 720); break;
+    case ROW_WEEKLY: s->weekly_goal_h = clampi(s->weekly_goal_h + dir * (shift ? 5 : 1), 0, 100); break;
     case ROW_BREAK:
         s->pomodoro_break_mode = (s->pomodoro_break_mode + 3 + dir) % 3;
         break;

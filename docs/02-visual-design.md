@@ -131,8 +131,9 @@ it becomes `TIMER · Analisi` (Pomodoro study: `STUDIO 2/4 · Analisi`).
 "Animations", "Esc to close".)
 
 Overlay background `#000000` at 75%, panel `#1a1a1a`, text `#b7b7b7`, selected entry in white.
-The panel has 17 rows (the last is "Pomodoro: colore riposo"); "Digit font" ("Font cifre") follows "Digit colour" and its value is ellipsised
-with `...` when it does not fit the value column.
+The panel has 19 rows: "Digit font" ("Font cifre") follows "Digit colour" and its value is ellipsised
+with `...` when it does not fit the value column; the last two rows are the goals ("Obiettivo giornaliero",
+"Obiettivo settimanale"), after "Pomodoro: colore riposo".
 
 ### Font menu (overlay)
 
@@ -175,6 +176,17 @@ Same style as the font menu: light overlay, panel on the right, tiles visible.
 
 Under the title, `‹ Tutte ›` / `‹ Analisi ›` / `‹ Senza materia ›` shows the filter (`←`/`→`). In the
 "Tutte" view a section "Per materia (7 giorni)" lists up to 4 subjects with their hours.
+
+### Statistics panel: goals block
+
+Shown only if a goal is set, below the summary. Bars grow with the progress and are full and
+highlighted once reached.
+```
+Obiettivi
+Oggi       [███████████░░░░░]  1h 40m / 3h
+Settimana  [████████░░░░░░░░]  8h / 15h
+Obiettivo raggiunto 2 giorni di fila
+```
 
 ## 5. Font
 

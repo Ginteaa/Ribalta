@@ -301,7 +301,8 @@ static void open_stats(App *a)
     if (input_panel_open(a))
         close_panel(a);
     pixel_size(a, &w, &h);
-    ui_stats_open(a->sui, w, h, (const char (*)[SUBJECT_LEN])a->cfg.subjects, a->cfg.subject_count);
+    ui_stats_open(a->sui, w, h, (const char (*)[SUBJECT_LEN])a->cfg.subjects, a->cfg.subject_count,
+                  a->cfg.daily_goal_min, a->cfg.weekly_goal_h);
     a->dirty = true;
 }
 

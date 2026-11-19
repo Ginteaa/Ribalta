@@ -138,6 +138,66 @@ int main(void) {
     CHECK(stats_subject_totals(tot, 8, now) == 2);
     CHECK(strcmp(tot[0].name, "Alfa") == 0 && strcmp(tot[1].name, "Zeta") == 0);
 
+    /* obiettivi */
+    {
+        StatsGoals g;
+        unlink(csv);
+        CHECK(stats_goals(&g, now, 3600) && g.today_s == 0 && g.week_s == 0 && g.goal_streak_days == 0);
+
+        /* mercoledì 2026-11-18 12:00 locale */
+        struct tm tw = {0};
+        tw.tm_year = 126; tw.tm_mon = 10; tw.tm_mday = 18; tw.tm_hour = 12; tw.tm_isdst = -1;
+        time_t wed = mktime(&tw);
+        char b[1500], ts[5][32];
+        int off[5] = {0, 1, 2, 3, 4};   /* oggi, mar, lun, dom prima, sab prima */
+        for (int i = 0; i < 5; i++) stamp(wed - (time_t)off[i] * 86400, ts[i], sizeof ts[i]);
+        snprintf(b, sizeof b,
+                 "inizio,durata_s,tipo,completata,materia\n"
+                 "%s,600,timer,1,Analisi\n%s,300,timer,1,\n%s,60,timer,1\n"   /* oggi: 3 righe */
+                 "%s,1000,timer,1,Fisica\n%s,2000,timer,1\n"                   /* mar, lun */
+                 "%s,5000,timer,1,X\n%s,7000,timer,1,\n", ts[0], ts[0], ts[0], ts[1], ts[2], ts[3], ts[4]);
+        write_file(b);
+        CHECK(stats_goals(&g, wed, 0) && g.today_s == 960 && g.week_s == 960 + 1000 + 2000);
+        CHECK(g.goal_streak_days == 0);
+
+        /* lunedì: week == today; domenica: tutta la settimana */
+        time_t mon = wed - 2 * 86400;
+        CHECK(stats_goals(&g, mon, 0) && g.today_s == 2000 && g.week_s == 2000);
+        time_t sun = wed + 4 * 86400;
+        CHECK(stats_goals(&g, sun, 0) && g.today_s == 0 && g.week_s == 960 + 1000 + 2000);
+
+        /* serie: oggi, ieri, l'altro ieri raggiunti (obiettivo 900 s) */
+        snprintf(b, sizeof b, "%s,900,timer,1,A\n%s,500,timer,1,B\n%s,400,timer,1\n%s,900,timer,1,\n%s,1000,timer,1\n",
+                 ts[0], ts[1], ts[1], ts[2], ts[3]);
+        write_file(b);
+        CHECK(stats_goals(&g, wed, 900) && g.goal_streak_days == 4);
+        /* oggi non raggiunto: conta fino a ieri */
+        snprintf(b, sizeof b, "%s,100,timer,1,A\n%s,900,timer,1\n%s,900,timer,1,\n", ts[0], ts[1], ts[2]);
+        write_file(b);
+        CHECK(stats_goals(&g, wed, 900) && g.goal_streak_days == 2);
+        /* oggi a zero */
+        snprintf(b, sizeof b, "%s,900,timer,1\n%s,900,timer,1,\n", ts[1], ts[2]);
+        write_file(b);
+        CHECK(stats_goals(&g, wed, 900) && g.goal_streak_days == 2);
+        /* un buco interrompe */
+        snprintf(b, sizeof b, "%s,900,timer,1\n%s,900,timer,1,\n%s,900,timer,1\n", ts[0], ts[1], ts[3]);
+        write_file(b);
+        CHECK(stats_goals(&g, wed, 900) && g.goal_streak_days == 2);
+
+        /* settimana a cavallo del mese: mercoledì 2026-12-02, lunedì 30 novembre */
+        struct tm td = {0};
+        td.tm_year = 126; td.tm_mon = 11; td.tm_mday = 2; td.tm_hour = 12; td.tm_isdst = -1;
+        time_t dec = mktime(&td);
+        char a[3][32];
+        for (int i = 0; i < 3; i++) stamp(dec - (time_t)i * 86400, a[i], sizeof a[i]);   /* 2, 1, 30 */
+        char o[32];
+        stamp(dec - 3 * 86400, o, sizeof o);   /* domenica 29 nov: fuori */
+        snprintf(b, sizeof b, "%s,100,timer,1\n%s,200,timer,1\n%s,400,timer,1\n%s,800,timer,1\n",
+                 a[0], a[1], a[2], o);
+        write_file(b);
+        CHECK(stats_goals(&g, dec, 0) && g.today_s == 100 && g.week_s == 700);
+    }
+
     if (fails) { fprintf(stderr, "%d failure(s)\n", fails); return 1; }
     puts("ok");
     return 0;

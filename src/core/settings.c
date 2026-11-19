@@ -28,6 +28,8 @@ void settings_defaults(Settings *s)
     s->pomodoro_long_break = 15;
     s->pomodoro_cycles = 4;
     s->pomodoro_auto_continue = true;
+    s->daily_goal_min = 0;
+    s->weekly_goal_h = 0;
     s->pomodoro_break_mode = BREAK_COLOR_DIGITS;
     s->pomodoro_break_color = COLOR_BREAK;
     s->digit_color = 0xb7b7b7;
@@ -131,6 +133,8 @@ static void apply_kv(Settings *s, const char *k, char *v)
     else if (!strcmp(k, "pomodoro_work")) parse_int(v, &s->pomodoro_work, 1, 180);
     else if (!strcmp(k, "pomodoro_break")) parse_int(v, &s->pomodoro_break, 1, 60);
     else if (!strcmp(k, "pomodoro_long_break")) parse_int(v, &s->pomodoro_long_break, 1, 120);
+    else if (!strcmp(k, "daily_goal_min")) parse_int(v, &s->daily_goal_min, 0, 720);
+    else if (!strcmp(k, "weekly_goal_h")) parse_int(v, &s->weekly_goal_h, 0, 100);
     else if (!strcmp(k, "pomodoro_cycles")) parse_int(v, &s->pomodoro_cycles, 1, 12);
     else if (!strcmp(k, "pomodoro_auto_continue")) parse_bool(v, &s->pomodoro_auto_continue);
     else if (!strcmp(k, "digit_color")) {
@@ -213,6 +217,8 @@ bool settings_save(const Settings *s)
     fprintf(f, "pomodoro_break=%d\n", s->pomodoro_break);
     fprintf(f, "pomodoro_long_break=%d\n", s->pomodoro_long_break);
     fprintf(f, "pomodoro_cycles=%d\n", s->pomodoro_cycles);
+    fprintf(f, "daily_goal_min=%d\n", s->daily_goal_min);
+    fprintf(f, "weekly_goal_h=%d\n", s->weekly_goal_h);
     fprintf(f, "pomodoro_auto_continue=%s\n", B(s->pomodoro_auto_continue));
 #undef B
     char hex[8];

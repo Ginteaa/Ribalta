@@ -7,6 +7,57 @@
 #include "core/stats.h"
 #include "platform/notify.h"
 
+/* Stessa data locale (giorno) di due istanti. */
+static bool same_day(time_t x, time_t y)
+{
+    struct tm a, b;
+    localtime_r(&x, &a);
+    localtime_r(&y, &b);
+    return a.tm_year == b.tm_year && a.tm_yday == b.tm_yday;
+}
+
+/* Lunedì (mezzanotte locale) della settimana di t, come time_t. */
+static time_t week_start(time_t t)
+{
+    struct tm tm;
+    localtime_r(&t, &tm);
+    tm.tm_mday -= (tm.tm_wday + 6) % 7;
+    tm.tm_hour = tm.tm_min = tm.tm_sec = 0;
+    tm.tm_isdst = -1;
+    return mktime(&tm);
+}
+
+/* Obiettivi: controllo senza stato dopo una riga registrata (durata secs, inizio st). Il suono solo
+ * per le righe non completate: a fine sessione suona già la notifica di fine timer/studio. */
+static void check_goals(const App *a, time_t st, long secs, bool completed)
+{
+    long dgoal = (long)a->cfg.daily_goal_min * 60L, wgoal = (long)a->cfg.weekly_goal_h * 3600L;
+    if (dgoal <= 0 && wgoal <= 0)
+        return;
+    time_t now = time(NULL);
+    StatsGoals g;
+    if (!stats_goals(&g, now, dgoal))
+        return;
+    long d_row = same_day(st, now) ? secs : 0;
+    long w_row = (st >= week_start(now) && st <= now + 86400) ? secs : 0;
+    bool fired = false;
+    char dur[32], body[96];
+    if (dgoal > 0 && g.today_s >= dgoal && g.today_s - d_row < dgoal) {
+        stats_format_duration(dgoal, dur, sizeof dur);
+        snprintf(body, sizeof body, "Obiettivo di oggi raggiunto (%s)", dur);
+        if (a->cfg.timer_notify) notify_desktop("Ribalta", body);
+        fired = true;
+    }
+    if (wgoal > 0 && g.week_s >= wgoal && g.week_s - w_row < wgoal) {
+        stats_format_duration(wgoal, dur, sizeof dur);
+        snprintf(body, sizeof body, "Obiettivo della settimana raggiunto (%s)", dur);
+        if (a->cfg.timer_notify) notify_desktop("Ribalta", body);
+        fired = true;
+    }
+    if (fired && !completed && a->cfg.timer_sound)
+        notify_sound();
+}
+
 /* --- Statistiche (roadmap §3.2): nulla in modalità screensaver --- */
 
 static void log_session(const App *a, time_t start, Uint64 elapsed_ns, const char *type, bool completed,
@@ -15,7 +66,9 @@ static void log_session(const App *a, time_t start, Uint64 elapsed_ns, const cha
     if (a->screensaver)
         return;
     long secs = (long)(elapsed_ns / SDL_NS_PER_SECOND);
-    stats_append(start ? start : time(NULL) - secs, secs, type, completed, subject);
+    time_t st = start ? start : time(NULL) - secs;
+    if (stats_append(st, secs, type, completed, subject) && secs >= 60 && a->running)
+        check_goals(a, st, secs, completed);
 }
 
 /* Tempo del tratto corrente: totale meno quanto già registrato (senza underflow). */

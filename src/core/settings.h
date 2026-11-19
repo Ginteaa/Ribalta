@@ -54,6 +54,10 @@ typedef struct {
     char     subjects[SUBJECTS_MAX][SUBJECT_LEN];
     int      subject_count;                      /* 0..SUBJECTS_MAX */
     char     subject[SUBJECT_LEN];               /* default "" */
+    /* Obiettivi (docs/plans/obiettivi.md): 0 = disattivo. Valgono sul totale dello studio (con e
+     * senza materia). Nel file: daily_goal_min=180, weekly_goal_h=15; fuori intervallo = limitato. */
+    int      daily_goal_min;   /* default 0, range 0..720 (nel pannello passi da 15 min) */
+    int      weekly_goal_h;    /* default 0, range 0..100 (settimana di calendario, da lunedì) */
 } Settings;
 
 void settings_defaults(Settings *s);

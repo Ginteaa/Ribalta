@@ -16,8 +16,14 @@ void     ui_stats_destroy(StatsUI *ui);
  * -> "Senza materia" (""). Si apre su "Tutte". Nella vista "Tutte" il pannello mostra anche le ore
  * della settimana per materia (stats_subject_totals, al massimo 4 righe; "" -> "Senza materia").
  * subjects/count vengono copiati all'apertura. */
+/* Obiettivi (docs/plans/obiettivi.md): se daily_goal_min > 0 o weekly_goal_h > 0 il pannello mostra
+ * anche il blocco "Obiettivi" (stats_goals, sempre sul totale qualunque sia il filtro): barra
+ * "Oggi 1h 40m / 3h" (se daily_goal_min > 0), barra "Settimana 8h / 15h" (se weekly_goal_h > 0),
+ * "Obiettivo raggiunto N giorni di fila" (se daily_goal_min > 0). Con entrambi a 0 nessun blocco.
+ * Il blocco si calcola all'apertura, non cambia con il filtro. */
 void ui_stats_open(StatsUI *ui, int pixel_w, int pixel_h,
-                   const char subjects[][SUBJECT_LEN], int subject_count);
+                   const char subjects[][SUBJECT_LEN], int subject_count,
+                   int daily_goal_min, int weekly_goal_h);
 void ui_stats_close(StatsUI *ui);
 bool ui_stats_is_open(const StatsUI *ui);
 void ui_stats_resize(StatsUI *ui, int pixel_w, int pixel_h);

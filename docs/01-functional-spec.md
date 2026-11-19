@@ -74,6 +74,8 @@ Every change is applied immediately and saved when the panel is closed.
 | `font_file` | string | empty | Digit font file; empty = bundled font. Both values run to the end of the line (inner spaces kept, CR/trailing blanks trimmed); a value that is too long (family > 127, file > 511 bytes) is ignored. The keys are always written |
 | `subjects` | list | empty | Study subjects, `;` separated, in order (max 8; each 1–24 bytes UTF-8, no leading/trailing spaces, no `,` `;` `"` or control characters; invalid entries and case-insensitive duplicates are dropped) |
 | `subject` | string | empty | Active subject; empty = no subject. Ignored if it is not in `subjects`. Both keys are always written |
+| `daily_goal_min` | int (0–720) | `0` | Daily study goal in minutes; `0` = off. Steps of 15 min in the panel (Shift: 60 min) |
+| `weekly_goal_h` | int (0–100) | `0` | Weekly study goal in hours; `0` = off. Steps of 1 h in the panel (Shift: 5 h) |
 
 **Subjects** (optional). `M` opens the subjects menu (overlay, same style as the font menu): first
 entry "Nessuna materia", then the subjects; the active one is marked. `↑`/`↓` move, `Enter` makes the
@@ -108,7 +110,7 @@ the colour picker on the break colour: the tiles preview the candidate colour li
 the digit colour. A config with the old `pomodoro_break_blue=true` and no `pomodoro_break_color` is
 read as `auto`; on save only the new key is written.
 
-The "Digit font" row (right after "Digit colour", 17 rows in total) shows `font_family`, or the bundled
+The "Digit font" row (right after "Digit colour", 19 rows in total) shows `font_family`, or the bundled
 font name when empty (ellipsised if too wide). ←/→ move to the previous/next font of the ring
 [bundled font, installed fonts…] and apply it immediately. Enter opens the **font menu** (fontconfig
 is queried only while it is open): a search field filtering the list (case-insensitive substring),
@@ -118,6 +120,10 @@ Home/End first/last, letters, digits, space and `-` edit the filter, Backspace d
 scrolls, click selects, double click or Enter applies and saves, Esc clears the filter, then
 cancels and restores the font the menu was opened with. The tiles preview the selected font once the
 selection rests for ~150 ms (no polling: the pause is a wait-timeout deadline).
+
+**Goals** (optional). The last two rows, "Obiettivo giornaliero" and "Obiettivo settimanale", show
+`no` when the goal is off, otherwise a value such as `2h 30m` or `15h`; ←/→ change it. Goals always
+count the total study time, with or without subject, whatever filter the statistics panel uses.
 
 Startup: if `font_file` is non-empty and readable (`access(R_OK)`, no fontconfig) it is used for the
 digits; otherwise a warning `ribalta: font non trovato: <path>, uso il font incluso` goes to stderr, the
@@ -131,6 +137,24 @@ File: `~/.config/ribalta/config.ini` (honours `$XDG_CONFIG_HOME`; on macOS
 `~/Library/Application Support/Ribalta/config.ini`, where `sessions.csv` lives too). `key=value` format,
 lines starting with `#` are ignored, unknown keys are ignored, invalid values fall back to the default.
 If the file does not exist it is created on the first save.
+
+### 1.4 Statistics panel and goals
+
+`I` opens the statistics panel (`←`/`→` change the subject filter). Its **Obiettivi** block is shown
+only if at least one goal is set:
+
+- bars "Oggi 1h 40m / 3h" and "Settimana 8h / 15h"; a bar is full and highlighted when its goal is
+  reached. The week is the calendar week, starting on Monday;
+- "Obiettivo raggiunto N giorni di fila": consecutive days with the daily goal reached, up to today if
+  it is already reached, otherwise up to yesterday.
+
+The block is computed when the panel opens and ignores the subject filter. Each session counts for the
+day it started.
+
+**Goal notification**: when a recorded session makes the total cross a goal, a desktop notification
+and chime fire (respecting `timer_notify` and `timer_sound`): "Obiettivo di oggi raggiunto (3h)" or
+"Obiettivo della settimana raggiunto (15h)". The check runs only when a session is recorded, so it
+fires once, even after a restart; it never fires when the app quits and there are no periodic wake-ups.
 
 ## 2. Controls
 
