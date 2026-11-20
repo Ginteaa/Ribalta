@@ -61,6 +61,11 @@
   </supports>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.7.1" date="2026-11-20">
+      <description>
+        <p>In-app legend (H or F1) with every key and where settings and statistics are stored, and a one-line explanation of the selected entry in the settings panel.</p>
+      </description>
+    </release>
     <release version="0.7.0" date="2026-11-20">
       <description>
         <p>Pomodoro break colour of your choice, subject change during a session, daily and weekly study goals with notifications, and (native build) the ribalta --version, update and uninstall commands.</p>
