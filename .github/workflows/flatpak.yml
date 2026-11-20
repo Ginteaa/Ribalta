@@ -20,6 +20,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Su alcuni runner l'overlayfs del container non permette di rinominare le cartelle che
+      # vengono dall'immagine ("Invalid cross-device link"): l'aggiornamento dell'SDK fallisce e
+      # flatpak-builder va in crash. Copiando le installazioni Flatpak tutto finisce nello strato
+      # scrivibile del container e l'aggiornamento funziona.
+      - name: Make the Flatpak installations writable (overlayfs workaround)
+        run: |
+          grep ' / ' /proc/mounts || true
+          done_dirs=""
+          for d in /var/lib/flatpak "$HOME/.local/share/flatpak" /root/.local/share/flatpak; do
+            [ -d "$d" ] && [ ! -L "$d" ] || continue
+            case " $done_dirs " in *" $d "*) continue ;; esac
+            done_dirs="$done_dirs $d"
+            echo "copy-up: $d ($(du -sh "$d" | cut -f1))"
+            cp -a "$d" "$d.copy-up" && rm -rf "$d" && mv "$d.copy-up" "$d"
+          done
+          flatpak --installations
+          flatpak list --runtime --columns=application,branch,installation
+
       - uses: flatpak/flatpak-github-actions/flatpak-builder@v6
         with:
           bundle: ribalta.flatpak
