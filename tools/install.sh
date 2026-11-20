@@ -110,15 +110,20 @@ total_c=$(find src -name '*.c' | wc -l)
 step_begin "Building"
 make release >"$LOG" 2>&1 &
 pid=$!
+# if this script stops early, stop the background build too (no orphaned make)
+trap 'pkill -P "$pid" 2>/dev/null || true; kill "$pid" 2>/dev/null || true; rm -f "$LOG"' EXIT
 while kill -0 "$pid" 2>/dev/null; do
   if [ "$FANCY" = 1 ]; then
-    objs=$(find build -name '*.o' 2>/dev/null | wc -l)
+    # build/ is missing for a moment (make release runs clean, then recreates it): with pipefail a
+    # failing find would kill the whole script, so the count must never fail
+    objs=$( (find build -name '*.o' 2>/dev/null || true) | wc -l)
     ((objs > total_c)) && objs=$total_c
     step_progress "$objs" $((total_c + 1))   # last slot is the link step
   fi
   sleep 0.1
 done
 rc=0; wait "$pid" || rc=$?
+trap 'rm -f "$LOG"' EXIT
 mkdir -p build
 cp "$LOG" build/install.log
 if [ "$rc" -ne 0 ]; then

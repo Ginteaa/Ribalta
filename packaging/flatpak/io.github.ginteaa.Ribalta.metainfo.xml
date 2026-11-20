@@ -61,6 +61,11 @@
   </supports>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.7.2" date="2026-11-20">
+      <description>
+        <p>Fixes the native installer stopping at 0% when run from a terminal, which also broke ribalta update.</p>
+      </description>
+    </release>
     <release version="0.7.1" date="2026-11-20">
       <description>
         <p>In-app legend (H or F1) with every key and where settings and statistics are stored, and a one-line explanation of the selected entry in the settings panel.</p>
