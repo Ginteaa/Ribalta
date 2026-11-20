@@ -15,7 +15,7 @@
 
 | Option | RAM | CPU at rest | Notes |
 |---|---|---|---|
-| **C + SDL3 (chosen)** | ~8–15 MB | ~0% | good trade-off between lightness and simplicity |
+| **C + SDL3 (chosen)** | ~17–18 MB PSS (measured, see below) | ~0% | good trade-off between lightness and simplicity |
 | C + Wayland + Cairo directly | ~3–6 MB | ~0% | much more code (xdg-shell protocols, shm buffers, input) |
 | C + GTK4 | ~40–70 MB | low | GTK4 loads GL, CSS, GLib/GObject |
 | Tauri / webview | ~80–150 MB | medium | a full web engine |
@@ -67,8 +67,12 @@
 1. **Event-driven loop, not fixed frames.**
    When nothing is animating the main thread calls
    `SDL_WaitEventTimeout(&ev, ms_to_next_change)`: the process sleeps until the next
-   minute (or second, if visible), the legend-hint deadline (3 s after startup or a mouse movement),
-   the cursor-hide and font-preview deadlines, or an input event. No polling at 60 fps.
+   minute (or second, if visible) +5 ms, or the earliest of the other deadlines (`wait_timeout_ms` in
+   `main.c`): ticks of a running timer/Pomodoro, the end-of-session blink phases (300 ms), the
+   notification poll (100 ms, only while a `notify-send` child or the chime is alive; see
+   `platform/notify.c`), the cursor hide (2 s, fullscreen), the legend hint (3 s after startup or a
+   mouse movement) and the font-menu preview (150 ms). Otherwise it waits for an input event.
+   No polling at 60 fps.
 2. **Render only when needed.** Redraw only if: an animation starts/continues, the window
    is resized/exposed, a panel opens. During a flip the animation is capped at
    **30 fps** (the loop sleeps in `SDL_WaitEventTimeout` between frames, vsync on):
@@ -76,7 +80,8 @@
 3. **Pre-rendered textures.** At startup (and on every resize) the textures for the digits
    `0–9` are generated at the exact size with SDL3_ttf, plus the empty tile texture. During a flip
    only rectangles already on the GPU are composited: zero rasterisation per frame.
-   Textures are regenerated only on resize (debounced by 150 ms).
+   Textures are rebuilt only when the window size changes (the resize is flagged by the event and
+   applied once on the next loop pass: `main.c`, `input.c`) and when the digit font changes.
 4. **Drift-free timekeeping.**
    - Clock: `clock_gettime(CLOCK_REALTIME)` + `localtime_r`; the wait timeout is computed
      up to the next minute/second boundary, +5 ms margin.
@@ -166,43 +171,36 @@ Conventions: headers live next to their `.c`; includes are written from `src/`
 (e.g. `#include "core/timer.h"`). `make` prints short lines (`  CC   core/timer.c`);
 use `make V=1` to see the full compiler commands.
 
-Asset files are searched in this order: `$RIBALTA_DATA`, `./assets`, `<executable dir>/assets`,
-`~/.local/share/ribalta` (`$XDG_DATA_HOME/ribalta`), `/usr/share/ribalta`.
+Asset files are searched in the order listed under *Asset lookup order* in section 3 (Packaging):
+`$RIBALTA_DATA` first, `/usr/share/ribalta` last.
 
-### Main interfaces (draft)
+### Main entry points
 
-```c
-/* app.h */
-typedef enum { MODE_CLOCK, MODE_TIMER } Mode;
+The headers are the reference; this is the map.
 
-typedef struct {
-    int  value;          /* 0..99 shown on the tile, -1 = blank */
-    int  prev_value;
-    Uint64 anim_start_ns;/* 0 = no animation */
-} Tile;
-
-typedef struct {
-    SDL_Window   *win;
-    SDL_Renderer *ren;
-    Settings      cfg;
-    Mode          mode;
-    Timer         timer;
-    Tile          tiles[3];
-    int           tile_count;     /* 2 or 3 */
-    bool          settings_open;
-    bool          dirty;          /* a redraw is needed */
-} App;
-
-/* render.h */
-bool render_init(App *a);                /* creates textures */
-void render_resize(App *a);              /* regenerates textures at the new size */
-bool render_frame(App *a, Uint64 now);   /* true if an animation is still running */
-void tile_set(Tile *t, int v, Uint64 now, bool animate);
-
-/* clock.h */
-void   clock_values(const Settings *s, int out[3], bool *pm);
-Uint32 clock_ms_to_next_change(const Settings *s);
-```
+- **`app/app.h`**: `View` (`VIEW_CLOCK`, `VIEW_TIMER`, `VIEW_POMODORO`), `Display` (what the tiles
+  show: view, `ClockFace`, label, progress, tile alphas, digit and accent colours, free text) and
+  `App`, the single state struct. Its fields fall in groups: SDL handles (`win`, `ren`, `render`);
+  settings and logic (`cfg`, `timer`, `pomo`, `entry`); overlays (`ui`, `sui`, `cui`, `fui`, `subj`,
+  `hui`, all `NULL` in screensaver mode); deadlines (`cursor_deadline`, `hint_deadline`,
+  `font_preview_at`, `blink_start`; 0 = none); session bookkeeping (`timer_start`, `pomo_start`,
+  subjects, segments); and loop flags (`dirty`, `resized`, `running`, `shown`/`has_shown`).
+- **`render/render.h`**: `render_create` / `render_destroy`, `render_resize` (rebuilds the textures),
+  `render_set_*` (`tiles`, `ampm`, `label`, `label_text`, `progress`, `tile_alpha`, `digit_color`,
+  `accent`, `style`, `hint`, `font`), `render_is_animating`, `render_draw`.
+- **`ui/ui_*.h`** (settings, stats, color, font, subject, help): every overlay follows the same
+  pattern: `ui_x_create(renderer, font_path)` / `ui_x_destroy`, `ui_x_open` / `ui_x_close` (fonts and
+  textures exist only while open), `ui_x_is_open`, `ui_x_resize`, `ui_x_draw` (no present), and, for
+  interactive ones, `ui_x_key` / `ui_x_mouse` returning a result enum that `input.c` acts on.
+- **`app/input.h`**: `input_handle_event` (keyboard, mouse, window events, routing to the overlays),
+  `input_*_open` queries, `input_cursor_tick`, `input_hint_tick`, `input_font_preview_apply`.
+- **`app/display.h`**: `display_update(app, now)` computes the desired `Display` and applies only
+  the differences to `Render`; `display_invalidate` forces a re-apply.
+- **`app/session.h`**: `session_on_timer_finished`, `session_on_pomo_finished`, `session_blink_tick`,
+  `session_track_starts`, `session_subject_changed`, `session_log_*_partial` (statistics) and
+  `session_set_inhibit` (screensaver inhibition while a timer runs).
+- **`core/`**: `clock_*`, `timer_*` (monotonic end instant, `timer_ms_to_next_change`), `pomo_*`,
+  `stats_*`, `settings_*`, `color_*`: no SDL window needed, covered by `make test`.
 
 ## Packaging
 
@@ -214,9 +212,12 @@ Uint32 clock_ms_to_next_change(const Settings *s);
   e.g. in tests). `make app` runs `tools/macos-app.sh`: `Contents/MacOS/ribalta`,
   `Contents/Resources/assets/` (found through `SDL_GetBasePath()`), an `.icns` made with `iconutil`,
   optional `BUNDLE_LIBS=1` (`dylibbundler` copies Homebrew's dylibs into `Contents/Frameworks`) and an
-  ad-hoc `codesign`. The `macos.yml` workflow builds on `macos-14` (arm64) and `macos-15-intel`, runs
-  the tests and an offscreen start, checks that no Homebrew path is left in the bundle, uploads the
-  zips and attaches them to `v*` releases. No notarisation (no paid developer account).
+  ad-hoc `codesign`. The `macos.yml` workflow builds on `macos-15` (arm64) and `macos-15-intel`, runs
+  the tests and a real Cocoa start for 3 s (no offscreen driver: the runners have a graphical
+  session), builds the bundle with `BUNDLE_LIBS=1`, checks that no Homebrew path is left in it and
+  `codesign --verify`, starts the bundled app for 3 s from outside the repository (so the assets must
+  come from `Contents/Resources`), uploads the zips and attaches them to `v*` releases. No
+  notarisation (no paid developer account).
   Resource figures on macOS have not been measured yet.
 
 - **macOS install**: users download `Ribalta-macos-arm64.zip` (Apple Silicon) or
@@ -233,7 +234,11 @@ Uint32 clock_ms_to_next_change(const Settings *s);
 - **Flatpak**: `packaging/flatpak/io.github.ginteaa.Ribalta.yml` builds with `make release` and
   `make install-files PREFIX=/app APPID=io.github.ginteaa.Ribalta`; the AppStream metainfo is
   installed next to it. The CI workflow `flatpak.yml` produces the `ribalta.flatpak` bundle on every
-  run, and on `v*` tags attaches it to the GitHub release (`softprops/action-gh-release`).
+  run, and on `v*` tags attaches it to the GitHub release (`softprops/action-gh-release`;
+  `permissions: contents: write`). Before building, it copies the container's Flatpak installations
+  (`/var/lib/flatpak`, `~/.local/share/flatpak`, `/root/.local/share/flatpak`) into the writable
+  layer: on some runners the overlayfs refuses to rename directories that come from the image
+  ("Invalid cross-device link") and `flatpak-builder` crashes while updating the SDK.
 - **Flatpak install** (users): Ribalta is not on Flathub yet. On Ubuntu install Flatpak first
   (`sudo apt install flatpak`; Mint already has it), then
   `flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo`.
@@ -291,7 +296,7 @@ Uint32 clock_ms_to_next_change(const Settings *s);
 > | `VK_LOADER_DRIVERS_SELECT=*intel*` (automatic) | ~27.5 MB | ~27.5 MB |
 > | + static minimal FreeType/SDL3_ttf, fontconfig via `dlopen` | **~24.9 MB** | ~24.9 MB |
 > | + bundled SDL 3.4.20 (same-session measurement: 21.9 → 22.1 MB) | ~+0.2 MB | — |
-> | Native build, for comparison | ~18.8 MB | ~28.4 MB |
+> | Native build, for comparison (different session) | ~18.8 MB | ~28.4 MB |
 >
 > RSS is lower than native; PSS is higher only because the runtime's libraries (Mesa Vulkan driver,
 > libc, libstdc++, SDL3 …) are not shared with host processes. The remaining gap is mostly
@@ -301,49 +306,34 @@ Uint32 clock_ms_to_next_change(const Settings *s);
 
 ## 4. Makefile
 
-```make
-CC      ?= cc
-PKGS    := sdl3 sdl3-ttf fontconfig
-CFLAGS  ?= -std=c17 -Wall -Wextra -Wpedantic -O2
-CFLAGS  += $(shell pkg-config --cflags $(PKGS))
-LDLIBS  += $(shell pkg-config --libs $(PKGS)) -lm
-SRC     := $(wildcard src/*.c)
-OBJ     := $(SRC:src/%.c=build/%.o)
-BIN     := ribalta
-PREFIX  ?= $(HOME)/.local
+The `Makefile` in the repository is the reference; in short:
 
-all: $(BIN)
-$(BIN): $(OBJ)            ; $(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS)
-build/%.o: src/%.c | build ; $(CC) $(CFLAGS) -MMD -c -o $@ $<
-build:                    ; mkdir -p build
+- **Libraries**: `PKGS := sdl3 sdl3-ttf` (linked); `FCPKG := fontconfig` only on Linux, for its headers
+  (the library is `dlopen`ed, never linked). `PKGFLAGS=--static` is used by the Flatpak manifest.
+- **Platform switch** (`uname -s`): on Linux `-D_POSIX_C_SOURCE=200809L`, `fonts.c`, `-s` for
+  stripping; on macOS `-D_DARWIN_C_SOURCE`, `fonts_mac.c`, `-framework CoreText -framework
+  CoreFoundation`, `-Wl,-dead_strip`, plus `make app` (`tools/macos-app.sh`) and a `make install` that
+  copies `Ribalta.app` to `~/Applications`. On Linux `make app` just says it is macOS only.
+- **Sources**: `SRC` is every `*.c` found by `find src -name '*.c'` minus the other platform's fonts
+  file; objects go to `build/`, with `-Isrc` and dependency files (`-MMD -MP`).
+- **Version**: read from the `VERSION` file (works from a release tarball without `.git`) and passed as
+  `-DRIBALTA_VERSION="..."` through `VERSION_DEF`, kept outside `CFLAGS` because `debug`/`release`
+  re-invoke make with `CFLAGS` on the command line. `build/main.o` depends on `VERSION`.
+- **Output**: short lines (`  CC   core/timer.c`); `make V=1` prints the full commands.
+- **`debug` / `release`**: add their flags (ASan + UBSan, or `-flto -DNDEBUG` + strip), run `clean`,
+  then re-invoke make with the extended `CFLAGS`/`LDFLAGS`.
+- **`install`** (Linux) runs `tools/install.sh "$(PREFIX)"` (default `~/.local`); **`uninstall`** runs
+  `tools/uninstall.sh "$(PREFIX)"`, which removes only Ribalta's own files and keeps the user's data.
+- **`install-files`**: no compile; installs binary, assets, icons and desktop file honouring `PREFIX`,
+  `DESTDIR` and `APPID` (see Packaging).
+- **`icons`**: `tools/icons.sh` (needs `rsvg-convert`; the PNGs are in the repository).
+- **Tests**: every `tests/test_*.c` is a standalone program built into `build/tests/` and linked with
+  `TEST_COMMON` (settings, color, timer, paths, fonts, stats sources); `test_session` additionally
+  links `app/session.c`, `core/pomodoro.c` and `tests/stub_notify.c`. `make test` runs them in turn and
+  stops at the first failure.
 
-debug:   CFLAGS += -O0 -g -fsanitize=address,undefined
-debug:   LDFLAGS += -fsanitize=address,undefined
-debug:   clean $(BIN)
-release: CFLAGS += -flto -DNDEBUG
-release: LDFLAGS += -flto -s
-release: clean $(BIN)
-
-install: release
-	install -Dm755 $(BIN) $(PREFIX)/bin/$(BIN)
-	install -Dm644 -t $(PREFIX)/share/ribalta assets/*
-	install -Dm644 ribalta.desktop $(PREFIX)/share/applications/ribalta.desktop
-uninstall:
-	rm -rf $(PREFIX)/bin/$(BIN) $(PREFIX)/share/ribalta $(PREFIX)/share/applications/ribalta.desktop
-clean:
-	rm -rf build $(BIN)
-
--include $(OBJ:.o=.d)
-.PHONY: all debug release install uninstall clean
-```
-
-(This is a condensed sketch: recipes are shown on one line for readability. The real `Makefile`
-in the repository is the reference.)
-
-The real `Makefile` reads the version from `VERSION` (`VERSION := $(shell cat VERSION ...)`) and
-passes it to the compiler as `RIBALTA_VERSION`, so `ribalta --version` and the release tag share one
-source. `ribalta update` and `ribalta uninstall` are not Makefile targets: the binary runs
-`tools/update.sh` or `tools/uninstall.sh` from `<prefix>/share/ribalta/` with `execvp`.
+`ribalta update` and `ribalta uninstall` are not Makefile targets: the binary runs
+`update.sh` or `uninstall.sh` from `<prefix>/share/ribalta/` with `execvp` (see 4.2).
 
 ### 4.1 Dependencies and install
 
@@ -370,16 +360,85 @@ find `sdl3`, `sdl3-ttf` and `fontconfig`).
   - the icons in `~/.local/share/icons/hicolor`;
   - the assets (font, licence, chime) in `~/.local/share/ribalta`.
   Make sure `~/.local/bin` is in your `PATH`.
-- Installer output (`tools/install.sh`): in a terminal a banner and a progress bar; in logs or pipes
-  plain lines. The requirement checks come first (`✓ C compiler (cc)`, `make`, `pkg-config`, `SDL3`,
-  `SDL3_ttf`, `fontconfig`), then five steps, each ending with `✓`: `[1/5] Building...`,
-  `[2/5] Installing binary...`, `[3/5] Installing assets...`, `[4/5] Installing icons...`,
-  `[5/5] Desktop entry and icon cache...`.
+- Installer (`tools/install.sh [PREFIX]`):
+  - The banner is always printed (uncoloured without a terminal). *Fancy* mode (colours and a progress
+    bar such as `[███░░░] 35%`) needs stdout to be a terminal, `NO_COLOR` unset and `TERM` not `dumb`;
+    otherwise plain `[n/5] ...` lines.
+  - The requirement checks come first (`✓ C compiler (cc)`, `make`, `pkg-config`, `SDL3`, `SDL3_ttf`,
+    `fontconfig`). If something is missing it prints hints for Arch, Debian/Ubuntu and Fedora and
+    exits 1.
+  - Five steps, weighted 60/5/10/15/10 in the global bar: building, binary, assets, icons, desktop
+    entry and icon cache. The assets installed into `<prefix>/share/ribalta/` are `font.ttf`,
+    `OFL.txt`, `ding.wav`, `ribalta.svg`, `update.sh` and `uninstall.sh`.
+  - The build runs as `make release` in the background; its log goes to a temporary file (because
+    `make release` runs `clean`, which deletes `build/`) copied to `build/install.log` at the end.
+    The progress count (objects in `build/`) must never fail: `build/` is missing for a moment, and
+    with `pipefail` a failing `find` killed the script (the 0.7.2 fix). If the script stops early, the
+    background build is stopped too.
+  - On a build failure it prints the last 15 log lines and the log path, and exits 1. On success a
+    summary with the paths, the `update`/`uninstall` hints and a warning if `<prefix>/bin` is not in
+    `PATH`.
+  - `ribalta update` calls the same script.
 - System-wide: `PREFIX=/usr make install`, as root.
 - `make uninstall` (with the same `PREFIX`) removes only the installed files; settings and statistics
   are kept. `ribalta uninstall` does the same from the installed binary.
 - `make install-files PREFIX=... APPID=...` installs without building (used by the Flatpak manifest and
   by packagers; see Packaging above).
+
+### 4.2 Update and uninstall
+
+**`ribalta update [--check] [-y]`**: `main.c` finds the prefix from the executable's directory
+(`<prefix>/bin`) and does `execvp("bash")` of `<prefix>/share/ribalta/update.sh --prefix P --current V`
+plus the user's arguments. The script:
+
+1. fetches `https://api.github.com/repos/Ginteaa/Ribalta/releases/latest` with `curl` or `wget`, reads
+   `tag_name` and `body` with `jq` (or a `sed` fallback), requires a tag shaped `vX.Y.Z` and compares
+   it with the current version using `sort -V`;
+2. `--check` prints the notes and exits 0 (up to date) or 10 (update available), 1 on error;
+3. otherwise it checks that `<prefix>/bin` is writable (no `sudo`), shows the notes and asks
+   `Update now? [Y/n]` (it needs a terminal; `-y` skips the question; with no terminal and no `-y` it
+   exits 1);
+4. downloads `https://github.com/Ginteaa/Ribalta/archive/refs/tags/{tag}.tar.gz` into a `mktemp`
+   directory (removed by a trap), checks that the archive has a single top-level folder, and runs
+   **that release's** `tools/install.sh <prefix>`, so an installer fixed in the new release applies to
+   the update itself;
+5. prints "Restart Ribalta" if it is running.
+
+Test hooks: `RIBALTA_UPDATE_API` (URL of the release JSON) and `RIBALTA_UPDATE_TARBALL` (template with
+`{tag}`); `file://` URLs are accepted (used by the CI). The whole script body is a function and the
+last line is `main "$@"; exit $?`, because `install.sh` overwrites `update.sh` while it runs and bash
+must have parsed it all first. `uninstall.sh` does the same since it deletes itself.
+
+**`ribalta uninstall [-y]`**: runs `uninstall.sh --prefix P --current V [-y]`. It asks `[y/N]` (no
+terminal and no `-y` → exit 1; answering no → "Cancelled", exit 0), then removes the binary, the
+desktop file, the icons and its own files in `share/ribalta` (`font.ttf`, `OFL.txt`, `ding.wav`,
+`ribalta.svg`, `update.sh`, `uninstall.sh`), removing the folder only if it is then empty. Settings and
+`sessions.csv` are kept (and the script prints how to delete them). `make uninstall` runs the same
+script without the prompt.
+
+Both subcommands exit 1 with a pointer message inside the Flatpak (`FLATPAK_ID` set), on macOS, or
+when the script is not installed next to the binary (e.g. a build run from the repository).
+
+### 4.3 CI
+
+- **`build.yml`** (push to `main`, `v*` tags, pull requests to `main`), in an `archlinux:latest`
+  container:
+  1. install the packages (`base-devel`, SDL3, SDL3_ttf, fontconfig, a font, pkgconf, git, curl,
+     util-linux for `script`);
+  2. on `v*` tags, check that the tag equals `v$(cat VERSION)`;
+  3. build with `-Werror` (zero warnings), then `make test`;
+  4. `make release` and a `--help` smoke test;
+  5. `make install` into a temporary prefix, checking the binary, desktop file, font, chime, icons,
+     `update.sh`/`uninstall.sh` and `ribalta --version`;
+  6. update from a local release: a `git archive` tarball of `HEAD` as `v9.9.9` and `file://` JSON
+     files through `RIBALTA_UPDATE_API` / `RIBALTA_UPDATE_TARBALL`; `update --check` must exit 10 for
+     the newer release and 0 for the same version; `ribalta update -y` runs inside a pseudo-terminal
+     (`script -qec`, `TERM=xterm`) and the log must contain the progress bar (`%`): the regression
+     test for the 0.7.0/0.7.1 bug fixed in 0.7.2, where the fancy output path broke the update;
+  7. `make uninstall` must keep `sessions.csv` and remove the binary and `update.sh`;
+  8. reinstall and `ribalta uninstall -y`: same checks, plus `uninstall.sh` gone.
+- **`flatpak.yml`**: builds the `ribalta.flatpak` bundle and attaches it to releases (see Packaging).
+- **`macos.yml`**: builds, tests and zips `Ribalta.app` for arm64 and Intel (see Packaging).
 
 ## 5. Development with agents
 

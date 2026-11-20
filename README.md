@@ -111,6 +111,9 @@ Download `Ribalta-macos-arm64.zip` (Apple Silicon) or `Ribalta-macos-x86_64.zip`
 *System Settings → Privacy & Security* and click **Open Anyway** (or run
 `xattr -dr com.apple.quarantine /Applications/Ribalta.app`). Feedback is welcome.
 
+From source on macOS: `brew install sdl3 sdl3_ttf pkg-config`, clone, `make install` (builds
+`Ribalta.app` into `~/Applications`).
+
 ### From source
 
 Dependencies: `sdl3` and `sdl3_ttf` (≥ 3.2), `fontconfig`, a C compiler, `make` and `pkg-config`;
@@ -136,12 +139,18 @@ On other distributions install the equivalent SDL3 and SDL3_ttf development pack
   `flatpak install --user ribalta.flatpak` again. Settings and statistics are kept.
 - **macOS:** download the new zip from the latest release.
 
+`ribalta update` does not apply to the Flatpak and the macOS app: it prints the right way to update
+them.
+
 ### Uninstalling
 
 ```sh
 ribalta uninstall                              # native; asks for confirmation (-y skips it)
 flatpak uninstall io.github.ginteaa.Ribalta    # Flatpak
 ```
+
+`ribalta uninstall` does not apply to the Flatpak and the macOS app: it prints the right command to
+use.
 
 Installs older than 0.7.0 have no `uninstall` command: run `make uninstall` in the source folder.
 Your settings and statistics are always kept.
@@ -165,7 +174,7 @@ swayidle -w timeout 300 'ribalta --screensaver'
 |---|---|
 | `ribalta` | Starts the app |
 | `ribalta --screensaver` | Screensaver mode (see above) |
-| `ribalta --version` (or `-V`) | Prints the version, e.g. `ribalta 0.7.0` |
+| `ribalta --version` (or `-V`) | Prints the version, e.g. `ribalta X.Y.Z` |
 | `ribalta update [--check] [-y]` | Updates to the latest release (see [Updating](#updating)) |
 | `ribalta uninstall [-y]` | Removes Ribalta, keeping settings and statistics (see [Uninstalling](#uninstalling)) |
 | `ribalta --help` | Lists the options |

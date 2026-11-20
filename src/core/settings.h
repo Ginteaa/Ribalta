@@ -5,11 +5,11 @@
 #include <stdint.h>
 
 #define RECENT_COLORS_MAX 5
-/* Materie (docs/plans/materie.md): al massimo SUBJECTS_MAX nomi da 1..SUBJECT_LEN-1 byte UTF-8. */
+/* Materie (docs/01-functional-spec.md, materie): al massimo SUBJECTS_MAX nomi da 1..SUBJECT_LEN-1 byte UTF-8. */
 #define SUBJECTS_MAX 8
 #define SUBJECT_LEN  25
 
-/* Colore delle cifre nei riposi Pomodoro (docs/plans/colore-riposo.md).
+/* Colore delle cifre nei riposi Pomodoro (docs/01-functional-spec.md §1.3).
  * Nel file: pomodoro_break_color=digits|auto|#rrggbb (default digits). Compatibilità: un file vecchio
  * con pomodoro_break_blue=true e senza pomodoro_break_color vale auto (qualsiasi ordine delle righe);
  * al salvataggio si scrive solo pomodoro_break_color. */
@@ -54,7 +54,7 @@ typedef struct {
     char     subjects[SUBJECTS_MAX][SUBJECT_LEN];
     int      subject_count;                      /* 0..SUBJECTS_MAX */
     char     subject[SUBJECT_LEN];               /* default "" */
-    /* Obiettivi (docs/plans/obiettivi.md): 0 = disattivo. Valgono sul totale dello studio (con e
+    /* Obiettivi (docs/01-functional-spec.md §1.4): 0 = disattivo. Valgono sul totale dello studio (con e
      * senza materia). Nel file: daily_goal_min=180, weekly_goal_h=15; fuori intervallo = limitato. */
     int      daily_goal_min;   /* default 0, range 0..720 (nel pannello passi da 15 min) */
     int      weekly_goal_h;    /* default 0, range 0..100 (settimana di calendario, da lunedì) */

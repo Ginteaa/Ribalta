@@ -65,7 +65,7 @@ typedef struct {
     FontUI       *fui;               /* menu dei font (NULL in screensaver) */
     SubjectUI    *subj;              /* menu delle materie (NULL in screensaver) */
     HelpUI       *hui;               /* legenda, tasti H / F1 (NULL in screensaver) */
-    /* Suggerimento "H · legenda" (docs/plans/legenda.md): acceso all'avvio e a ogni movimento del
+    /* Suggerimento "H · legenda" (docs/01-functional-spec.md §1.6): acceso all'avvio e a ogni movimento del
      * mouse, spento a hint_deadline (che entra nel timeout di attesa come cursor_deadline: nessun
      * risveglio senza movimento). Mai in screensaver; con un pannello aperto non si disegna. */
     bool          hint_visible;
@@ -82,7 +82,7 @@ typedef struct {
     time_t        pomo_start;        /* inizio sessione STUDIO (0 = nessuna) */
     char          timer_subject[SUBJECT_LEN]; /* materia della sessione timer, fissata all'inizio */
     char          pomo_subject[SUBJECT_LEN];  /* materia della sessione STUDIO, fissata all'inizio */
-    /* Cambio materia a sessione avviata (docs/plans/cambio-materia.md): tempo di studio (pause
+    /* Cambio materia a sessione avviata (docs/01-functional-spec.md, materie): tempo di studio (pause
      * escluse) già registrato in tratti precedenti della sessione in corso; si sottrae da ogni
      * registrazione successiva. Azzerati insieme a timer_start / pomo_start. timer_start e
      * pomo_start diventano l'inizio (ora locale) del tratto corrente. */

@@ -4,7 +4,7 @@
 #include <SDL3/SDL.h>
 #include "core/settings.h"
 
-/* Menu delle materie in overlay (tasto M) — docs/plans/materie.md. Stile del menu font: overlay
+/* Menu delle materie in overlay (tasto M) — docs/01-functional-spec.md (materie). Stile del menu font: overlay
  * leggero, pannello a destra, tessere visibili. Contenuto: titolo "MATERIE", lista (prima voce
  * "Nessuna materia", poi Settings.subjects nell'ordine; la materia attiva ha un segno), riga di
  * inserimento quando si scrive un nome nuovo, suggerimento tasti in basso

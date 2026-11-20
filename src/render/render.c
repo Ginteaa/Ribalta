@@ -552,7 +552,7 @@ bool render_is_animating(const Render *r, Uint64 now_ns)
 
 static float ease_in(float u) { return u * u; }
 
-/* ease-out con piccolo overshoot (max ~2%) */
+/* ease-out con piccolo overshoot (picco ~0,35%, overshoot < 1%) */
 static float ease_out_back(float u)
 {
     const float c1 = 0.35f, c3 = c1 + 1.0f;

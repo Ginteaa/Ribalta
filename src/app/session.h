@@ -4,7 +4,7 @@
 #include <SDL3/SDL.h>
 #include "app/app.h"
 
-/* Obiettivi (docs/plans/obiettivi.md): dopo ogni riga registrata con successo (fine sessione, log
+/* Obiettivi (docs/01-functional-spec.md §1.4): dopo ogni riga registrata con successo (fine sessione, log
  * parziale, tratto chiuso da un cambio materia) si controllano gli obiettivi del Settings con
  * stats_goals, senza stato: se il totale di oggi (o della settimana) ha appena superato l'obiettivo
  * (totale >= obiettivo && totale - durata_riga < obiettivo) arriva una notifica ("Obiettivo di oggi

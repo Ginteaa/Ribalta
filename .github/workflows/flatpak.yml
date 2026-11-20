@@ -13,7 +13,8 @@ permissions:
 jobs:
   flatpak:
     runs-on: ubuntu-latest
-    # Il runtime freedesktop 25.08 include SDL3, SDL3_ttf e fontconfig
+    # Il manifest compila da sé SDL3 3.4, FreeType e SDL3_ttf; il runtime freedesktop 25.08 fornisce
+    # fontconfig e notify-send
     container:
       image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-25.08
       options: --privileged

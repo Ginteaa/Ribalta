@@ -45,7 +45,7 @@ SettingsColorRequest ui_settings_take_color_request(SettingsUI *ui);
  * s->font_file; ui_settings_key ritorna true (main allora chiama render_set_font). */
 bool ui_settings_take_font_request(SettingsUI *ui);
 
-/* Riga descrizione (fase 13, docs/plans/legenda.md): sopra il piè di pagina il pannello spiega la
+/* Riga descrizione (fase 13, docs/01-functional-spec.md §1.3): sopra il piè di pagina il pannello spiega la
  * voce selezionata (significato, limiti, passo con Shift) in testo tenue, fino a 2 righe.
  * La texture si rifà solo quando cambia la voce selezionata (o a apertura/resize).
  *

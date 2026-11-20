@@ -3,7 +3,7 @@
 #include <stdbool.h>
 #include <SDL3/SDL.h>
 
-/* Legenda in overlay (tasti H / F1) — docs/01-functional-spec.md §1.6, docs/plans/legenda.md.
+/* Legenda in overlay (tasti H / F1) — docs/01-functional-spec.md §1.6.
  * Stesso stile e stesse regole di risorse di ui_stats / ui_settings: il font si apre solo mentre la
  * legenda è aperta e si chiude alla chiusura; le texture si creano all'apertura e al resize, mai a
  * ogni fotogramma. Contenuto fisso (sezioni Generale, Timer, Pomodoro, Pannelli, File) in italiano,

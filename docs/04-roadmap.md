@@ -10,7 +10,8 @@
 - `config.ini`: `show_seconds`, `clock_24h`, `scale`, `brightness`, `start_fullscreen`, `animations`.
 - Fullscreen (`F`/`F11`/double click), `Q` to quit, hidden cursor.
 
-**Done when**: the time is correct and flips every minute; RSS < 20 MB; CPU at rest ~0%
+**Done when**: the time is correct and flips every minute; PSS < 20 MB (measured ~17 MB; RSS ~27 MB
+includes shared libraries); CPU at rest ~0%
 (measured with `pidstat` for 2 minutes); `make debug` runs without ASan errors.
 
 ## Phase 2 — Study timer + settings ✅
@@ -115,7 +116,6 @@ accumulate error (±1 s over 1 h); settings survive a restart.
 - CI workflow `macos.yml` on `macos-15` (arm64) and `macos-15-intel`: `-Werror` build, tests, a real
   Cocoa start (renderer `gpu` on arm64, `metal` on Intel), zipped `Ribalta.app` with bundled
   libraries, ad-hoc signed (no notarisation: "Open Anyway" on first launch), attached to `v*` releases.
-- Still to do: feedback from real Macs, resource measurements on macOS.
 
 ## Phase 8 — Study subjects ✅
 
@@ -187,7 +187,22 @@ accumulate error (±1 s over 1 h); settings survive a restart.
 - Flatpak: the `flatpak.yml` workflow attaches `ribalta.flatpak` to each `v*` release; the update is
   done by installing the new bundle again (`flatpak update` does not apply to a bundle).
 
+## Phase 14 — Installer fix and CI hardening (0.7.2, 0.7.3) ✅
+
+- Installer: the progress loop no longer dies under `set -o pipefail` when `find build` runs while
+  `make release` cleans `build/`; `make install` and `ribalta update` used to stop at 0% in a terminal
+  (0.7.0–0.7.1).
+- The installer stops the background build if it quits early.
+- `build.yml` runs `ribalta update -y` inside a pseudo-terminal (`script`) and checks that the progress
+  bar is drawn.
+- `flatpak.yml` copies the container's Flatpak installations into the writable layer (overlayfs
+  "Invalid cross-device link" on some runners) and attaches `ribalta.flatpak` to `v*` releases.
+- 0.7.3: `Q` no longer quits while typing in the font search or a subject name (`Ctrl+Q` always quits).
+- Docs aligned with the code after a full audit.
+- Releases: 0.7.0 (Phases 9–12), 0.7.1 (Phase 13), 0.7.2 and 0.7.3 (this phase).
+
 ## Future ideas
+- Feedback from real Macs and resource measurements on macOS.
 - Publish the Flatpak on Flathub.
 - Snap package.
 - Colour themes (light, amber, terminal green) built on the digit colour.

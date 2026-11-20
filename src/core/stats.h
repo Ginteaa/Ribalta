@@ -43,7 +43,7 @@ typedef struct {
  * (al massimo max); 0 se il file manca. */
 int stats_subject_totals(StatsSubjectTotal *out, int max, time_t now);
 
-/* Obiettivi (docs/plans/obiettivi.md). Contano TUTTE le righe (con e senza materia, nessun filtro);
+/* Obiettivi (docs/01-functional-spec.md §1.4). Contano TUTTE le righe (con e senza materia, nessun filtro);
  * ogni riga vale per il giorno della sua data di inizio (ora locale), come in stats_summary. */
 typedef struct {
     long today_s;          /* studio di oggi */
