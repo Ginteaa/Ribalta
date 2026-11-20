@@ -567,7 +567,10 @@ static void on_key(App *a, const SDL_KeyboardEvent *k)
 {
     if (a->screensaver)
         return;
-    if (k->key == SDLK_Q && !k->repeat) {
+    /* Ctrl+Q esce sempre; Q semplice esce, tranne mentre si scrive (filtro font, nome materia) */
+    bool ctrl = (k->mod & SDL_KMOD_CTRL) != 0;
+    bool scrive = input_font_open(a) || (input_subject_open(a) && ui_subject_editing(a->subj));
+    if (k->key == SDLK_Q && !k->repeat && (ctrl || !scrive)) {
         if (input_color_open(a))
             color_finish(a); /* annulla l'anteprima */
         if (input_font_open(a))
