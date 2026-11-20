@@ -180,13 +180,30 @@ int main(void) {
         CHECK(settings_save(&s));
         settings_defaults(&l);
         CHECK(settings_load(&l) && l.pomodoro_break_mode == m);
-        if (m == BREAK_COLOR_CUSTOM) CHECK(l.pomodoro_break_color == 0x123456);
+        CHECK(l.pomodoro_break_color == 0x123456);
         f = fopen(p, "r");
         memset(buf, 0, sizeof buf);
         if (f) { size_t n = fread(buf, 1, sizeof buf - 1, f); buf[n] = 0; fclose(f); }
         CHECK(!strstr(buf, "pomodoro_break_blue"));
-        CHECK(strstr(buf, "pomodoro_break_color="));
+        CHECK(strstr(buf, m == BREAK_COLOR_CUSTOM ? "pomodoro_break_color=custom\n"
+                          : m == BREAK_COLOR_AUTO ? "pomodoro_break_color=auto\n" : "pomodoro_break_color=digits\n"));
+        CHECK(strstr(buf, "pomodoro_break_custom=#123456\n"));
     }
+    settings_defaults(&l);
+    write_cfg(dir, "pomodoro_break_color=custom\n");
+    CHECK(settings_load(&l) && l.pomodoro_break_mode == BREAK_COLOR_CUSTOM && l.pomodoro_break_color == 0x6fa8dc);
+    settings_defaults(&l);
+    write_cfg(dir, "pomodoro_break_custom=#abcdef\n");
+    CHECK(settings_load(&l) && l.pomodoro_break_mode == BREAK_COLOR_DIGITS && l.pomodoro_break_color == 0xabcdef);
+    settings_defaults(&l);
+    write_cfg(dir, "pomodoro_break_custom=boh\n");
+    CHECK(settings_load(&l) && l.pomodoro_break_mode == BREAK_COLOR_DIGITS && l.pomodoro_break_color == 0x6fa8dc);
+    settings_defaults(&l);
+    write_cfg(dir, "pomodoro_break_blue=true\npomodoro_break_custom=#123456\n");
+    CHECK(settings_load(&l) && l.pomodoro_break_mode == BREAK_COLOR_AUTO && l.pomodoro_break_color == 0x123456);
+    settings_defaults(&l);
+    write_cfg(dir, "pomodoro_break_custom=#123456\npomodoro_break_color=custom\npomodoro_break_blue=true\n");
+    CHECK(settings_load(&l) && l.pomodoro_break_mode == BREAK_COLOR_CUSTOM && l.pomodoro_break_color == 0x123456);
     write_cfg(dir, "pomodoro_break_color=AUTO\n");
     CHECK(settings_load(&l) && l.pomodoro_break_mode == BREAK_COLOR_AUTO);
     write_cfg(dir, "pomodoro_break_color=#FF8800\n");

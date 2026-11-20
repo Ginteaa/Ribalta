@@ -264,7 +264,8 @@ edit it by hand: the settings panel (`S`) changes everything live and saves on c
 | `pomodoro_long_break` | `15` | Long break minutes (1–120) |
 | `pomodoro_cycles` | `4` | Study sessions before the long break (1–12) |
 | `pomodoro_auto_continue` | `true` | Start the next phase automatically |
-| `pomodoro_break_color` | `digits` | Break colour: `digits` keeps your digit colour, `auto` soft blue `#6fa8dc` (amber `#ffb347` if your colour is already blue), or `#rrggbb` a custom colour. An old `pomodoro_break_blue=true` is read as `auto` |
+| `pomodoro_break_color` | `digits` | Break colour mode: `digits` keeps your digit colour, `auto` soft blue `#6fa8dc` (amber `#ffb347` if your colour is already blue), or `custom` your `pomodoro_break_custom` colour. A `#rrggbb` value written by hand selects `custom` and sets that colour. An old `pomodoro_break_blue=true` is read as `auto` |
+| `pomodoro_break_custom` | `#6fa8dc` | Custom break colour `#rrggbb`; kept even when the mode is `digits` or `auto`, so `custom` restores it |
 | `digit_color` | `#b7b7b7` | Digit colour `#rrggbb`; also tints the progress bar and labels (accent) |
 | `recent_colors` | empty | Up to 5 recently used colours, comma separated (`#rrggbb,#rrggbb`) |
 | `font_family` | empty | Name of the digit font (e.g. `DejaVu Sans`); empty = bundled font |

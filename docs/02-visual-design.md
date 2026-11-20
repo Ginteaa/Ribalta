@@ -10,7 +10,7 @@
 | Cut line | `#000000` | separates the upper and lower halves of the tile |
 | Flip shadow | black with alpha 0–60% | darkens the rotating half |
 | AM/PM, labels | `#b7b7b7` at 70% | small text |
-| Pomodoro break (Phase 3, 9) | digit colour (default), `#6fa8dc` with `pomodoro_break_color=auto`, or any custom colour | optional colour to tell breaks apart |
+| Pomodoro break (Phase 3, 9) | digit colour (default), `#6fa8dc` with `pomodoro_break_color=auto`, or a custom colour (`pomodoro_break_color=custom`, `pomodoro_break_custom`) | optional colour to tell breaks apart |
 
 ## 2. Geometry
 

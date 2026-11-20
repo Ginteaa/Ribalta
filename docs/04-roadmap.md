@@ -129,10 +129,12 @@ accumulate error (±1 s over 1 h); settings survive a restart.
 
 ## Phase 9 — Pomodoro break colour ✅
 
-- `pomodoro_break_color=digits|auto|#rrggbb` (default `digits`) replaces `pomodoro_break_blue`:
-  `auto` is soft blue `#6fa8dc` (amber `#ffb347` if the digit colour is already bluish), `#rrggbb`
-  any custom colour.
-- An old `pomodoro_break_blue=true` without the new key is read as `auto`; only the new key is written.
+- `pomodoro_break_color=digits|auto|custom` (default `digits`) replaces `pomodoro_break_blue`:
+  `auto` is soft blue `#6fa8dc` (amber `#ffb347` if the digit colour is already bluish), `custom`
+  uses `pomodoro_break_custom=#rrggbb` (default `#6fa8dc`), kept even when another mode is selected.
+  A `#rrggbb` written by hand in `pomodoro_break_color` selects `custom` and sets that colour.
+- An old `pomodoro_break_blue=true` without a valid `pomodoro_break_color` is read as `auto`; on save
+  only the new keys are written.
 - Settings row "Pomodoro: colore riposo": ←/→ cycle "come le cifre" → "blu automatico" → custom
   colour; Enter opens the colour picker on the break colour, with live preview and Esc to restore.
 - The accent (progress bar and labels) always stays the digit colour.

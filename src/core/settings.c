@@ -105,12 +105,15 @@ static void parse_subjects(Settings *s, char *v)
         settings_subject_add(s, tok);   /* scarta non validi, duplicati, eccedenti */
 }
 
-/* digits|auto|#rrggbb (parole senza distinzione di maiuscole); valore non valido: false, nulla cambia */
+/* digits|auto|custom (senza distinzione di maiuscole) = modalità; per modifica a mano vale anche
+   #rrggbb = modalità custom + colore. Il colore custom si salva a parte in pomodoro_break_custom.
+   Valore non valido: false, nulla cambia */
 static bool parse_break_color(Settings *s, const char *v)
 {
     uint32_t c;
     if (!strcasecmp(v, "digits")) s->pomodoro_break_mode = BREAK_COLOR_DIGITS;
     else if (!strcasecmp(v, "auto")) s->pomodoro_break_mode = BREAK_COLOR_AUTO;
+    else if (!strcasecmp(v, "custom")) s->pomodoro_break_mode = BREAK_COLOR_CUSTOM;
     else if (color_parse_hex(v, &c)) {
         s->pomodoro_break_mode = BREAK_COLOR_CUSTOM;
         s->pomodoro_break_color = c;
@@ -172,6 +175,10 @@ bool settings_load(Settings *s)
         if (!strcmp(k, "pomodoro_break_color")) {
             if (parse_break_color(s, v))
                 seen_break_color = true;
+        } else if (!strcmp(k, "pomodoro_break_custom")) {
+            uint32_t c;   /* solo il colore: la modalità non cambia */
+            if (color_parse_hex(v, &c))
+                s->pomodoro_break_color = c;
         } else if (!strcmp(k, "pomodoro_break_blue")) {
             bool b = false;   /* chiave vecchia: vale solo "true" */
             parse_bool(v, &b);
@@ -222,11 +229,10 @@ bool settings_save(const Settings *s)
     fprintf(f, "pomodoro_auto_continue=%s\n", B(s->pomodoro_auto_continue));
 #undef B
     char hex[8];
-    if (s->pomodoro_break_mode == BREAK_COLOR_CUSTOM) {
-        color_format_hex(s->pomodoro_break_color, hex);
-        fprintf(f, "pomodoro_break_color=%s\n", hex);
-    } else
-        fprintf(f, "pomodoro_break_color=%s\n", s->pomodoro_break_mode == BREAK_COLOR_AUTO ? "auto" : "digits");
+    fprintf(f, "pomodoro_break_color=%s\n", s->pomodoro_break_mode == BREAK_COLOR_CUSTOM ? "custom"
+                                           : s->pomodoro_break_mode == BREAK_COLOR_AUTO ? "auto" : "digits");
+    color_format_hex(s->pomodoro_break_color, hex);
+    fprintf(f, "pomodoro_break_custom=%s\n", hex);
     color_format_hex(s->digit_color, hex);
     fprintf(f, "digit_color=%s\n", hex);
     fprintf(f, "font_family=%s\n", s->font_family);
