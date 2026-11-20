@@ -11,6 +11,8 @@
 | Flip shadow | black with alpha 0–60% | darkens the rotating half |
 | AM/PM, labels | `#b7b7b7` at 70% | small text |
 | Pomodoro break (Phase 3, 9) | digit colour (default), `#6fa8dc` with `pomodoro_break_color=auto`, or a custom colour (`pomodoro_break_color=custom`, `pomodoro_break_custom`) | optional colour to tell breaks apart |
+| Legend (`H`) | keys `#ffffff`, descriptions `#b7b7b7`, section headers `#808080`, title as the other panels | overlay text |
+| Hint `H · legenda` | digit colour (accent) at about 35% alpha | small, bottom-right, see §4 |
 
 ## 2. Geometry
 
@@ -122,6 +124,7 @@ it becomes `TIMER · Analisi` (Pomodoro study: `STUDIO 2/4 · Analisi`).
 │        │    Luminosità            [100%]  │            │
 │        │    Schermo intero avvio  [ no ]  │            │
 │        │    Animazioni            [ sì ]  │            │
+│        │  Mostra i secondi (HH:MM:SS).    │            │
 │        │  Esc per chiudere                │            │
 │        └──────────────────────────────────┘            │
 └────────────────────────────────────────────────────────┘
@@ -134,6 +137,12 @@ Overlay background `#000000` at 75%, panel `#1a1a1a`, text `#b7b7b7`, selected e
 The panel has 19 rows: "Digit font" ("Font cifre") follows "Digit colour" and its value is ellipsised
 with `...` when it does not fit the value column; the last two rows are the goals ("Obiettivo giornaliero",
 "Obiettivo settimanale"), after "Pomodoro: colore riposo".
+
+The description line sits above the footer: dim grey `#808080` like the footer, at 0.9× the panel
+text, that explains the selected entry: what it does, its range and, for numbers, the step with
+`Shift`. It has at most two lines and changes with the selection; the panel grows by about two rows
+to hold it. In the mockup it is the line "Mostra i secondi": the real text comes from the setting's
+description.
 
 ### Font menu (overlay)
 
@@ -170,6 +179,50 @@ Same style as the font menu: light overlay, panel on the right, tiles visible.
 │ Invio sceglie · N nuova ·    │
 │ Canc elimina · Esc chiude    │ ← hint
 └──────────────────────────────┘
+```
+
+### Legend (overlay, `H` / `F1`)
+
+Same overlay style as the other panels, with the title `LEGENDA`. Two columns when the window is wide,
+one column otherwise; the font shrinks until everything fits. The key column is white, the
+descriptions `#b7b7b7`, the section headers `#808080`. The footer `H · F1 · Esc chiudi` closes it.
+The mockup shows the wide layout (the file paths are the real ones, with `~` for the home directory).
+```
+┌────────────────────────────────────────────────────────────────────┐
+│ LEGENDA                                                            │
+│                                                                    │
+│ GENERALE                      PANNELLI                             │
+│ S   impostazioni              ↑ ↓   voce                           │
+│ I   statistiche               ← →   valore                         │
+│ M   materie                   Invio  colore / font                 │
+│ T   timer                     N     nuova materia                  │
+│ P   Pomodoro                  Canc  elimina materia                │
+│ F   schermo intero                                                 │
+│ H   F1   legenda              FILE                                 │
+│ Esc  chiudi                   ~/.config/ribalta/config.ini         │
+│ Q   esci                      ~/.local/share/ribalta/sessions.csv  │
+│                               ribalta --help  (terminale)          │
+│                                                                    │
+│ H · F1 · Esc chiudi                                                │
+└────────────────────────────────────────────────────────────────────┘
+```
+
+### Hint (`H · legenda`)
+
+A small, faint text in the bottom-right corner of the window, shown at startup and on every mouse
+movement, for 3 s. Its colour is the accent (the digit colour) at about 35% alpha; its height is
+`max(11 px, 2.2% of the window height)`, with a margin from the right and bottom edges of 1.2× the text
+height. It is drawn over the tiles and is not part of the layout: the tiles do not move.
+```
+┌──────────────────────────────────────────────────────────────────┐
+│                                                                  │
+│                                                                  │
+│                  ┌──────────┐    ┌──────────┐                    │
+│                  │    1 2   │    │    3 4   │                    │
+│                  └──────────┘    └──────────┘                    │
+│                                                                  │
+│                                              H · legenda  ← 3 s  │
+└──────────────────────────────────────────────────────────────────┘
 ```
 
 ### Statistics panel: subject filter

@@ -41,6 +41,8 @@ static void apply_resize(App *a)
             ui_font_resize(a->fui, w, h);
         if (input_subject_open(a))
             ui_subject_resize(a->subj, w, h);
+        if (input_help_open(a))
+            ui_help_resize(a->hui, w, h);
     }
     a->resized = false;
 }
@@ -82,6 +84,8 @@ static int32_t wait_timeout_ms(const App *a, Uint64 now)
     ms = min_u32(ms, notify_ms_to_next_poll());
     if (a->cursor_deadline)
         ms = min_u32(ms, until_ms(a->cursor_deadline, now));
+    if (a->hint_deadline)
+        ms = min_u32(ms, until_ms(a->hint_deadline, now));
     if (a->font_preview_at)
         ms = min_u32(ms, until_ms(a->font_preview_at, now));
     return ms > 0x7fffffffu ? 0x7fffffff : (int32_t)ms;
@@ -112,6 +116,7 @@ static void main_loop(App *a)
             apply_resize(a);
         now = SDL_GetTicksNS();
         input_cursor_tick(a, now);
+        input_hint_tick(a, now);
         if (a->font_preview_at && now >= a->font_preview_at)
             input_font_preview_apply(a);
         if (timer_update(&a->timer, now))
@@ -144,6 +149,8 @@ static void main_loop(App *a)
                 ui_settings_draw(a->ui, &a->cfg);
             else if (input_stats_open(a))
                 ui_stats_draw(a->sui);
+            else if (input_help_open(a))
+                ui_help_draw(a->hui);
             SDL_RenderPresent(a->ren);
             a->dirty = false;
         }
@@ -221,6 +228,7 @@ static bool app_open(App *a)
         a->cui = ui_color_create(a->ren, a->bundled_font);
         a->fui = ui_font_create(a->ren, a->bundled_font, a->bundled_font);
         a->subj = ui_subject_create(a->ren, a->bundled_font);
+        a->hui = ui_help_create(a->ren, a->bundled_font);
     }
     display_update(a, SDL_GetTicksNS());
     a->dirty = true;
@@ -228,8 +236,11 @@ static bool app_open(App *a)
     if (a->screensaver) {
         SDL_HideCursor();
         a->cursor_hidden = true;
-    } else if (a->cfg.start_fullscreen) {
-        input_cursor_activity(a);
+    } else {
+        a->hint_visible = true; /* suggerimento "H · legenda" all'avvio */
+        a->hint_deadline = a->start_ns + HINT_NS;
+        if (a->cfg.start_fullscreen)
+            input_cursor_activity(a);
     }
     return true;
 }
@@ -247,6 +258,8 @@ static void app_close(App *a)
         ui_font_destroy(a->fui);
     if (a->subj)
         ui_subject_destroy(a->subj);
+    if (a->hui)
+        ui_help_destroy(a->hui);
     if (a->render)
         render_destroy(a->render);
     if (a->ren)
@@ -291,8 +304,16 @@ static void run_subcommand(const char *name, int argc, char **argv)
     bool is_update = strcmp(name, "update") == 0;
     const char *fp = getenv("FLATPAK_ID");
     if (fp && *fp) {
-        fprintf(stderr, "ribalta: Ribalta è installato come Flatpak: %s  flatpak %s io.github.ginteaa.Ribalta\n",
-                is_update ? "aggiornalo con" : "disinstallalo con", is_update ? "update" : "uninstall");
+        if (is_update) {
+            fputs("ribalta: Ribalta è installato come Flatpak: scarica il nuovo ribalta.flatpak da "
+                  "https://github.com/Ginteaa/Ribalta/releases/latest\n"
+                  "e reinstallalo con  flatpak install --user ribalta.flatpak\n",
+                  stderr);
+        } else {
+            fputs("ribalta: Ribalta è installato come Flatpak: "
+                  "disinstallalo con  flatpak uninstall io.github.ginteaa.Ribalta\n",
+                  stderr);
+        }
         exit(1);
     }
 #ifdef __APPLE__

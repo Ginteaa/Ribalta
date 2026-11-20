@@ -76,6 +76,17 @@ Every change is applied immediately and saved when the panel is closed.
 | `subject` | string | empty | Active subject; empty = no subject. Ignored if it is not in `subjects`. Both keys are always written |
 | `daily_goal_min` | int (0–720) | `0` | Daily study goal in minutes; `0` = off. Steps of 15 min in the panel (Shift: 60 min) |
 | `weekly_goal_h` | int (0–100) | `0` | Weekly study goal in hours; `0` = off. Steps of 1 h in the panel (Shift: 5 h) |
+| `pomodoro_work` | int (1–180) | `25` | Study minutes of a STUDIO phase |
+| `pomodoro_break` | int (1–60) | `5` | Short break (RIPOSO) minutes |
+| `pomodoro_long_break` | int (1–120) | `15` | Long break (RIPOSO LUNGO) minutes |
+| `pomodoro_cycles` | int (1–12) | `4` | Study sessions before the long break |
+| `pomodoro_auto_continue` | bool | `true` | Start the next phase by itself; `false` = stop and wait |
+| `pomodoro_break_color` | `digits` / `auto` / `custom` | `digits` | Break colour mode: `digits` keeps the digit colour; `auto` soft blue `#6fa8dc` (amber `#ffb347` if the digit colour is already bluish); `custom` the colour in `pomodoro_break_custom`. A `#rrggbb` written by hand selects `custom`; an old `pomodoro_break_blue=true` without a valid value is read as `auto` |
+| `pomodoro_break_custom` | colour | `#6fa8dc` | Custom break colour `#rrggbb`; kept while the mode is `digits` or `auto`, so `custom` restores it |
+
+**Description line.** Above the footer, a dim line explains the selected entry: what it does, its
+range and, for numbers, the step taken with `Shift`. It takes up to two lines and follows the
+selection.
 
 **Subjects** (optional). `M` opens the subjects menu (overlay, same style as the font menu): first
 entry "Nessuna materia", then the subjects; the active one is marked. `↑`/`↓` move, `Enter` makes the
@@ -100,7 +111,7 @@ label shows the subject:
 The "Digit colour" row shows a swatch and the HEX value; ←/→ step through the palette and Enter
 opens a **colour picker** overlay (saturation/value square, hue bar, HEX field with read-only
 RGB/HSV, palette grid, recent colours; mouse and keyboard). The digits preview the colour live;
-Enter applies, saves and adds it to the recents, Esc restores the previous colour. In Pomodoro
+Enter applies, saves and adds it to the recents, Esc restores the previous colour. With the keyboard, `Tab` changes zone (the square, the hue bar, the HEX field, the palette, the recents). In Pomodoro
 breaks the digits keep the chosen colour (`pomodoro_break_color=digits`, the default). The row
 "Pomodoro: colore riposo" (after the Pomodoro rows) sets the break colour mode: ←/→ cycle "come le
 cifre" (`digits`) → "blu automatico" (`auto`, `#6fa8dc`, or amber `#ffb347` if the digit colour is
@@ -133,15 +144,41 @@ digits; otherwise a warning `ribalta: font non trovato: <path>, uso il font incl
 bundled font is used and the setting is left untouched. Panels, labels and the font menu itself always
 use the bundled font.
 
-The Pomodoro keys (`pomodoro_work`, `pomodoro_break`, `pomodoro_long_break`, `pomodoro_cycles`,
-`pomodoro_auto_continue`, `pomodoro_break_color`, `pomodoro_break_custom`) are described in [04-roadmap.md](04-roadmap.md), section 3.1.
+The Pomodoro settings are in the table above; the Pomodoro mode itself is described in §1.5.
 
 File: `~/.config/ribalta/config.ini` (honours `$XDG_CONFIG_HOME`; on macOS
 `~/Library/Application Support/Ribalta/config.ini`, where `sessions.csv` lives too). `key=value` format,
 lines starting with `#` are ignored, unknown keys are ignored, invalid values fall back to the default.
 If the file does not exist it is created on the first save.
 
-### 1.4 Statistics panel and goals
+### 1.4 Statistics panel, goals and sessions file
+
+**Sessions file.** Study sessions are appended to `~/.local/share/ribalta/sessions.csv` (honours
+`$XDG_DATA_HOME`; on macOS it is in `~/Library/Application Support/Ribalta/`; in the Flatpak sandbox
+it is `~/.var/app/io.github.ginteaa.Ribalta/data/ribalta/sessions.csv`). One row per session; the
+header line is written when the file is created:
+
+```csv
+inizio,durata_s,tipo,completata,materia
+2026-11-14T09:30:00,1500,pomodoro,1,Analisi
+2026-11-14T11:00:00,3600,timer,0,
+```
+
+- `inizio`: local start time, ISO 8601.
+- `durata_s`: studied seconds, pauses excluded.
+- `tipo`: `timer` or `pomodoro`.
+- `completata`: `1` if the session ran to its end, `0` if it was stopped early (or is a part of a
+  session split by a subject change, see §1.3).
+- `materia`: the subject; empty = no subject.
+
+What is recorded: timer sessions and Pomodoro study phases, never breaks, and only if at least 60 s
+were studied. A timer is recorded when it ends (`completata=1`), or when `R` resets it or the app
+quits while it is started (`0`). A Pomodoro STUDIO phase is recorded when it ends (`1`), or when `N`,
+`R` or quitting stops it while started (`0`).
+
+Files written before subjects existed have 4 columns (no `materia`): their rows are still read and
+count as "no subject", and the file is never rewritten. The file is read only when the statistics
+panel opens.
 
 `I` opens the statistics panel (`←`/`→` change the subject filter). Its **Obiettivi** block is shown
 only if at least one goal is set:
@@ -159,6 +196,60 @@ and chime fire (respecting `timer_notify` and `timer_sound`): "Obiettivo di oggi
 "Obiettivo della settimana raggiunto (15h)". The check runs only when a session is recorded, so it
 fires once, even after a restart; it never fires when the app quits and there are no periodic wake-ups.
 
+### 1.5 Pomodoro
+
+- `P` opens the Pomodoro view; `T` and `P` switch directly between the Timer and the Pomodoro view.
+- Cycle: STUDIO (`pomodoro_work`, 25 min) → RIPOSO (`pomodoro_break`, 5 min) → … ; after
+  `pomodoro_cycles` (4) study sessions the break is RIPOSO LUNGO (`pomodoro_long_break`, 15 min), then
+  the cycle restarts from STUDIO 1/N.
+- Labels: `STUDIO 2/4`, `RIPOSO`, `RIPOSO LUNGO`; when paused ` · IN PAUSA` is appended and the tiles dim
+  to 50%.
+- Keys: `Space`/`Enter` start, pause or resume; `N` skips to the next phase; `R` resets everything
+  (STUDIO 1/N, stopped).
+- During breaks the digits keep your colour, or the break colour set with `pomodoro_break_color` (§1.3).
+- At the end of a phase: a notification ("Fine studio — riposo di 5 min" or "Riposo finito — si torna a
+  studiare") and the chime. With `pomodoro_auto_continue=true` (default) the next phase starts by
+  itself; otherwise it stays stopped, ready to start. The view does not change.
+- The timer and the Pomodoro are independent and can both run in the background.
+
+### 1.6 Legend and hint
+
+- `H` or `F1` opens the **legend**, an overlay titled `LEGENDA` with every key and the place of your
+  files. `Esc`, `H` or `F1` close it; `Q`/`Ctrl+Q` still quit. It opens from the clock and the
+  Timer/Pomodoro views, and from the settings and statistics panels, which close when it opens.
+  It is not available in the screensaver, nor in the colour picker, the font menu and the subjects
+  menu, where letters are typed: there `H` and `F1` are ignored.
+- Sections: **Generale** (`S` impostazioni, `I` statistiche, `M` materie, `T` timer, `P` Pomodoro,
+  `F`/`F11`/double click schermo intero, `H`/`F1` legenda, `Esc`, `Q`/`Ctrl+Q`), **Timer**,
+  **Pomodoro**, **Pannelli** (↑↓, ←→, `Invio`, statistics `←`/`→`, subjects `N`/`Canc`) and **File**:
+  the real paths of `config.ini` and `sessions.csv`, with `~` for the home directory (in the Flatpak
+  the sandbox paths), and `ribalta --help` for the command line.
+- Layout: two columns when the window is wide, one column otherwise. The font shrinks until everything
+  fits (minimum 8 px); there is no scrolling. The legend's font is loaded only while the legend is open.
+- **Hint**: a small, faint `H · legenda` in the bottom-right corner. It is shown at startup and on
+  every mouse movement, and hidden after 3 s (`HINT_NS`). It is hidden while a panel or the legend is
+  open and in screensaver mode. It is event-driven: its deadline is part of the wait timeout, so it
+  causes no wake-ups without mouse movement.
+
+### 1.7 Screensaver
+
+`ribalta --screensaver` shows the clock fullscreen with the cursor hidden. Any key, click or mouse
+movement exits; events during the first second are ignored. It saves nothing. If Ribalta is already
+running (single instance), the screensaver instance exits immediately. While a timer or a Pomodoro is
+RUNNING the screen is not blanked (`SDL_DisableScreenSaver`).
+
+To start it after 5 minutes of inactivity, with niri (`~/.config/niri/config.kdl`):
+
+```kdl
+spawn-at-startup "swayidle" "-w" "timeout" "300" "ribalta --screensaver"
+```
+
+or from any compositor or session script:
+
+```sh
+swayidle -w timeout 300 'ribalta --screensaver'
+```
+
 ## 2. Controls
 
 | Key | Action |
@@ -174,7 +265,8 @@ fires once, even after a restart; it never fires when the app quits and there ar
 | `0`–`9` / keypad, `Backspace` | Timer in setup: type the duration (microwave style), delete a digit |
 | `↑ ↓ ← →` | Timer in setup: adjust duration. Panels: navigate |
 | `S` | Open/close the settings panel |
-| `Esc` | Cancel timer entry; close the font menu, the subjects menu or the colour picker, or the panel (settings or statistics); otherwise leave fullscreen; otherwise nothing |
+| `H` / `F1` | Open/close the legend (every key and file paths, §1.6); from the settings or statistics panel it closes that panel and opens the legend |
+| `Esc` | Cancel timer entry; close the legend, the font menu, the subjects menu or the colour picker, or the panel (settings or statistics); otherwise leave fullscreen; otherwise nothing |
 | `Q` / `Ctrl+Q` | Quit |
 
 The mouse cursor hides after 2 s of inactivity in fullscreen.
@@ -202,15 +294,26 @@ The mouse cursor hides after 2 s of inactivity in fullscreen.
 | Invocation | Behaviour | Exit code |
 |---|---|---|
 | `ribalta` | Starts the app | — |
-| `ribalta --screensaver` | Screensaver mode, see the README | — |
+| `ribalta --screensaver` | Screensaver mode, see §1.7 | — |
 | `ribalta --version`, `-V` | Prints `ribalta X.Y.Z` (from `VERSION`) and exits | 0 |
 | `ribalta --help` | Lists the options | 0 |
 | `ribalta update` | Shows the latest release notes, asks `Update now? [Y/n]` (`-y` skips), builds and installs it in the same prefix; settings and statistics are untouched; says to restart a running instance | 0 done, already up to date or cancelled; 1 error |
 | `ribalta update --check` | Reports current and latest version and the release notes, changes nothing | 0 up to date, 10 update available, 1 error |
 | `ribalta uninstall` | Asks `[y/N]` (`-y` skips) and removes exactly what `make install` installed; settings and statistics are kept | 0 removed or cancelled; 1 error, or no terminal without `-y` (nothing done) |
 
-`update` and `uninstall` need an installation made with `make install`. In the Flatpak, on macOS and
-for a binary run from the source tree they print a message pointing to the right command and exit
-with 1: `flatpak update` / `flatpak uninstall`, a new `Ribalta.app` from the releases page, or
+`update` and `uninstall` need an installation made with `make install`. `update` downloads the source
+of the latest release and builds it with the same tools as `make install`, plus `curl` or `wget` and
+`tar`. The update path depends on how Ribalta was installed:
+
+- Native (`make install`): `ribalta update`.
+- Flatpak: the app is installed from the `ribalta.flatpak` bundle, so `flatpak update` does **not**
+  update it. Download the new `ribalta.flatpak` from the latest GitHub release and run
+  `flatpak install --user ribalta.flatpak` again; settings and statistics are kept. Remove it with
+  `flatpak uninstall io.github.ginteaa.Ribalta`.
+- macOS app: download the new `Ribalta.app` zip from the releases page.
+- Binary run from the source tree: `git pull && make install`.
+
+In the last three cases `update` and `uninstall` print a message pointing to the right command and
+exit with 1. Installs older than 0.7.0 have no `update` command: update them once with
 `git pull && make install`. If the prefix is not writable, `update` explains it and stops; it never
 calls `sudo`.
