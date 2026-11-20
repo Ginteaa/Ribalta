@@ -49,6 +49,10 @@
 > | After closing the menu | ~20 MB (`FcFini` + `malloc_trim`); opening/closing the settings panel alone already settled at ~22 MB before this phase |
 > | After switching to another font | +1–2 MB, stable on repeated switches |
 >
+> **0.7.0 measurements** (Wayland/niri, `gpu` renderer, idle clock, 65 s, same session, 0.6.0 →
+> 0.7.0): PSS 17.8 → 17.7 MB, RSS 27.4 → 27.3 MB, CPU from 5 to 65 s ≤ 10 ms (one clock tick).
+> Break colour, subject change, goals and the terminal commands cost nothing at idle.
+>
 > Renderer order: `gpu,opengl,opengles2,software`; `SDL_RENDER_DRIVER=<name>` overrides it.
 > Release binary: ~60 KB (stripped, LTO; the ~27 KB figure measured in Phase 1 predates the
 > later features).
