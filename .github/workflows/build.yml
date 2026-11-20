@@ -14,7 +14,7 @@ jobs:
     container: archlinux:latest
     steps:
       - name: Install dependencies
-        run: pacman -Syu --noconfirm --needed base-devel sdl3 sdl3_ttf fontconfig ttf-dejavu pkgconf git curl
+        run: pacman -Syu --noconfirm --needed base-devel sdl3 sdl3_ttf fontconfig ttf-dejavu pkgconf git curl util-linux
 
       - uses: actions/checkout@v4
 
@@ -51,6 +51,7 @@ jobs:
 
       - name: Update from a local release
         run: |
+          set -o pipefail
           git config --global --add safe.directory "$PWD"
           T="${RUNNER_TEMP:-/tmp}"
           git archive --prefix=Ribalta-9.9.9/ -o "$T/r.tar.gz" HEAD
@@ -59,9 +60,13 @@ jobs:
           rc=0
           RIBALTA_UPDATE_API="file://$T/new.json" _inst/bin/ribalta update --check || rc=$?
           test "$rc" = 10
-          RIBALTA_UPDATE_API="file://$T/new.json" RIBALTA_UPDATE_TARBALL="file://$T/r.tar.gz" \
-            _inst/bin/ribalta update -y
-          _inst/bin/ribalta --version
+          # inside a pseudo-terminal (script): the installer draws its progress bar only in a real
+          # terminal, and that code path broke `ribalta update` in 0.7.0/0.7.1 without CI noticing
+          export TERM=xterm RIBALTA_UPDATE_API="file://$T/new.json" RIBALTA_UPDATE_TARBALL="file://$T/r.tar.gz"
+          script -qec "_inst/bin/ribalta update -y" /dev/null | tee "$T/update.log"
+          grep -q '%' "$T/update.log"   # the progress bar was drawn
+          unset TERM RIBALTA_UPDATE_API RIBALTA_UPDATE_TARBALL
+          test "$(_inst/bin/ribalta --version)" = "ribalta $(cat VERSION)"   # the archive is HEAD
           RIBALTA_UPDATE_API="file://$T/same.json" _inst/bin/ribalta update --check
 
       - name: Uninstall keeps user data
