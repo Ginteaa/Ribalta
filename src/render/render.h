@@ -70,6 +70,14 @@ void render_set_accent(Render *r, Uint8 red, Uint8 green, Uint8 blue);
  * font attuale: nessun effetto, ritorna true. */
 bool render_set_font(Render *r, const char *font_path);
 
+/* --- Fase 13: suggerimento della legenda --- */
+
+/* Scritta piccola "H · legenda" nell'angolo in basso a destra, tenue (colore dell'accento al 35%,
+ * per la luminosità). La texture si crea in render_resize insieme alle etichette (font aperto e
+ * richiuso subito, come per le altre etichette; "-" se manca il punto mediano) e si disegna in
+ * render_draw solo se visible. Economico: nessuna texture ricreata qui, solo il flag. */
+void render_set_hint(Render *r, bool visible);
+
 /* true se almeno una tessera sta ancora animando a now_ns */
 bool render_is_animating(const Render *r, Uint64 now_ns);
 

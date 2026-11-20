@@ -4,6 +4,7 @@
 #include <time.h>
 #include <SDL3/SDL.h>
 #include "app/display.h"
+#include "app/input.h"
 
 /* Colore base delle cifre: anteprima del selettore se attiva, altrimenti quello salvato. */
 uint32_t display_base_color(const App *a)
@@ -154,6 +155,9 @@ static void apply_display(App *a, const Display *d, Uint64 now)
 void display_update(App *a, Uint64 now)
 {
     Display d;
+    bool overlay = input_panel_open(a) || input_stats_open(a) || input_color_open(a) ||
+                   input_font_open(a) || input_subject_open(a) || input_help_open(a);
+    render_set_hint(a->render, a->hint_visible && !overlay);
     build_display(a, now, &d);
     if (!a->has_shown || !display_equal(&d, &a->shown)) {
         apply_display(a, &d, now);

@@ -53,7 +53,12 @@
 > 0.7.0): PSS 17.8 → 17.7 MB, RSS 27.4 → 27.3 MB, CPU from 5 to 65 s ≤ 10 ms (one clock tick).
 > Break colour, subject change, goals and the terminal commands cost nothing at idle.
 >
-> Renderer order: `gpu,opengl,opengles2,software`; `SDL_RENDER_DRIVER=<name>` overrides it.
+> **Phase 13 measurements** (same setup, 0.7.0 → legend build): PSS 17.6 → 17.9 MB, CPU from 5 to 65 s
+> ≤ 30 ms in both (the startup hint hides after 3 s and then nothing wakes up). The legend costs
+> ~+2.2 MB only while it is open; after closing it PSS is back within 0.05 MB.
+>
+> Renderer order: `gpu,opengl,opengles2,software`; `SDL_RENDER_DRIVER=<name> ribalta` overrides it
+> (OpenGL uses noticeably more memory, see the Phase 1 table).
 > Release binary: ~60 KB (stripped, LTO; the ~27 KB figure measured in Phase 1 predates the
 > later features).
 
@@ -62,7 +67,8 @@
 1. **Event-driven loop, not fixed frames.**
    When nothing is animating the main thread calls
    `SDL_WaitEventTimeout(&ev, ms_to_next_change)`: the process sleeps until the next
-   minute (or second, if visible) or an input event. No polling at 60 fps.
+   minute (or second, if visible), the legend-hint deadline (3 s after startup or a mouse movement),
+   the cursor-hide and font-preview deadlines, or an input event. No polling at 60 fps.
 2. **Render only when needed.** Redraw only if: an animation starts/continues, the window
    is resized/exposed, a panel opens. During a flip the animation is capped at
    **30 fps** (the loop sleeps in `SDL_WaitEventTimeout` between frames, vsync on):
@@ -83,6 +89,16 @@
 6. **SDL hints**: `SDL_HINT_VIDEO_DRIVER="wayland,x11"`, `SDL_HINT_APP_ID="ribalta"`,
    `SDL_HINT_VIDEO_ALLOW_SCREENSAVER="1"` (except while a timer is running, Phase 3).
 7. **Release build** with `-O2`, `-flto`, `-s` (strip) for a small binary.
+8. **Load on demand.** The overlay font (legend, settings, statistics, colour picker, font menu), the
+   audio for the chime and fontconfig exist only while they are needed. The font list is freed when
+   the font menu closes (`FcFini`, `malloc_trim`); the legend's font is opened only while it is open.
+9. **No libnotify.** Notifications run `notify-send` (or `osascript` on macOS) through `fork`+`execvp`,
+   only when a session, a Pomodoro phase or a goal ends; no background process is kept.
+
+**Tips for the absolute minimum**: `show_seconds=false` removes the per-second wake-ups and
+`animations=false` removes the flip frames (the digits change at once). Both are settings in the panel
+(`S`) or in `config.ini`. To try another renderer, run `SDL_RENDER_DRIVER=<name> ribalta`; the default
+`gpu` is the lightest of the four measured.
 
 Checking resource use: `ps -o rss,pcpu -C ribalta`, `pidstat -p <pid> 1`, `/usr/bin/time -v`.
 
@@ -111,8 +127,9 @@ ribalta/
 │   │   ├── fonts_common.c  sorting, lookup and ring stepping shared by both
 │   │   └── gpu.c/.h        Flatpak only: load just the Vulkan drivers for the installed GPUs
 │   ├── render/
-│   │   └── render.c/.h     layout, digit/tile textures, flip animation, progress bar
+│   │   └── render.c/.h     layout, digit/tile textures, flip animation, progress bar, hint
 │   └── ui/                 overlay panels
+│       ├── ui_help.c/.h     legend overlay (H / F1): keys and file paths, 2 or 1 columns
 │       ├── ui_settings.c/.h
 │       ├── ui_stats.c/.h
 │       ├── ui_color.c/.h
@@ -140,7 +157,9 @@ Folder roles:
 - `src/core/`: logic with no SDL window or I/O dependency (time, timer, Pomodoro, statistics, settings, colours).
 - `src/platform/`: everything that talks to the operating system (notifications, directories).
 - `src/render/`: drawing only; textures and animation.
-- `src/ui/`: settings, statistics, colour-picker and font-menu overlays.
+- `src/ui/`: settings, statistics, legend, colour-picker, font-menu and subjects overlays.
+- The legend hint (`render_set_hint`) is drawn by `render/`; its 3 s deadline (`hint_deadline`) is
+  handled by `app/input.c` and waits in the main loop like the other deadlines.
 - `assets/`, `tests/`, `tools/`, `docs/`: resources, unit tests, install/maintenance scripts, documentation.
 
 Conventions: headers live next to their `.c`; includes are written from `src/`
@@ -200,9 +219,36 @@ Uint32 clock_ms_to_next_change(const Settings *s);
   zips and attaches them to `v*` releases. No notarisation (no paid developer account).
   Resource figures on macOS have not been measured yet.
 
+- **macOS install**: users download `Ribalta-macos-arm64.zip` (Apple Silicon) or
+  `Ribalta-macos-x86_64.zip` (Intel) from the latest release (SDL3 bundled). The app is ad hoc signed
+  but **not notarised** (that needs a paid Apple Developer account), so the first launch is blocked:
+  open it once, then *System Settings → Privacy & Security → Open Anyway*, or run
+  `xattr -dr com.apple.quarantine /Applications/Ribalta.app`.
+  **Build from source** (a locally built app is not quarantined), with Homebrew and the Xcode
+  command-line tools: `brew install sdl3 sdl3_ttf pkg-config`, clone the repository, then `make install`,
+  which builds `build/Ribalta.app` and copies it to `~/Applications`. `make app` only builds
+  `build/Ribalta.app`. Such a bundle links Homebrew's SDL3, so it runs on the Mac that built it;
+  `BUNDLE_LIBS=1 make app` (needs `brew install dylibbundler`) copies the libraries inside, as the CI
+  does. Notifications (`osascript`) are listed by macOS under *Script Editor*.
 - **Flatpak**: `packaging/flatpak/io.github.ginteaa.Ribalta.yml` builds with `make release` and
   `make install-files PREFIX=/app APPID=io.github.ginteaa.Ribalta`; the AppStream metainfo is
-  installed next to it. The CI workflow `flatpak.yml` produces the `ribalta.flatpak` bundle.
+  installed next to it. The CI workflow `flatpak.yml` produces the `ribalta.flatpak` bundle on every
+  run, and on `v*` tags attaches it to the GitHub release (`softprops/action-gh-release`).
+- **Flatpak install** (users): Ribalta is not on Flathub yet. On Ubuntu install Flatpak first
+  (`sudo apt install flatpak`; Mint already has it), then
+  `flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo`.
+  Download `ribalta.flatpak` from the [latest release](https://github.com/Ginteaa/Ribalta/releases/latest)
+  and run `flatpak install --user ribalta.flatpak` (the runtime is fetched from Flathub), then
+  `flatpak run io.github.ginteaa.Ribalta`. Before a release exists, the CI artifact of the latest
+  successful *Flatpak* workflow run (`ribalta-x86_64.flatpak`, a zip that contains `ribalta.flatpak`)
+  does the same. Updating: download the new bundle and run `flatpak install --user ribalta.flatpak`
+  again; settings and statistics are kept. `flatpak update` does not update a bundle install.
+  Uninstall: `flatpak uninstall io.github.ginteaa.Ribalta`.
+- **Flatpak sandbox paths**: `~/.var/app/io.github.ginteaa.Ribalta/config/ribalta/config.ini` and
+  `~/.var/app/io.github.ginteaa.Ribalta/data/ribalta/sessions.csv`. The system fonts are visible to the
+  digit-font menu.
+- **Flatpak local build**: `flatpak install --user flathub org.freedesktop.Sdk//25.08`, then
+  `flatpak-builder --user --install --force-clean build-flatpak packaging/flatpak/io.github.ginteaa.Ribalta.yml`.
 - **Dependencies**: the `org.freedesktop.Platform` 25.08 runtime ships fontconfig and
   `notify-send`. **SDL3 3.4.20** is built by the manifest as a shared library (no joystick, haptic,
   hidapi, sensor, camera): the runtime's SDL 3.2.30 crashes in `SDL_RenderPresent` with the `gpu`
@@ -298,6 +344,42 @@ The real `Makefile` reads the version from `VERSION` (`VERSION := $(shell cat VE
 passes it to the compiler as `RIBALTA_VERSION`, so `ribalta --version` and the release tag share one
 source. `ribalta update` and `ribalta uninstall` are not Makefile targets: the binary runs
 `tools/update.sh` or `tools/uninstall.sh` from `<prefix>/share/ribalta/` with `execvp`.
+
+### 4.1 Dependencies and install
+
+**Dependencies**
+
+- `sdl3` and `sdl3_ttf` (SDL3 ≥ 3.2 and SDL3_ttf ≥ 3.2; build and runtime).
+- `fontconfig`: headers at build time. The library is `dlopen`ed only when the digit-font menu opens;
+  without it the menu lists just the bundled font.
+- `libnotify` (optional): provides `notify-send` for desktop notifications.
+- A C compiler, `make` and `pkg-config`.
+
+Distributions that ship SDL3 ≥ 3.2 (Arch, Fedora, openSUSE Tumbleweed…) can use the native build; the
+others (Ubuntu 24.04, Mint 22) use the Flatpak. On Arch: `sudo pacman -S sdl3 sdl3_ttf fontconfig libnotify`.
+On other distributions install the equivalent SDL3 and SDL3_ttf development packages (`pkg-config` must
+find `sdl3`, `sdl3-ttf` and `fontconfig`).
+
+**Targets**
+
+- `make`: development build; `make V=1` shows the full compiler commands.
+- `make release`: optimised build (LTO, stripped). `make test`, `make debug` (ASan + UBSan), `make icons`.
+- `make install`: builds the release binary, then installs to `~/.local`:
+  - `~/.local/bin/ribalta`;
+  - `~/.local/share/applications/ribalta.desktop`;
+  - the icons in `~/.local/share/icons/hicolor`;
+  - the assets (font, licence, chime) in `~/.local/share/ribalta`.
+  Make sure `~/.local/bin` is in your `PATH`.
+- Installer output (`tools/install.sh`): in a terminal a banner and a progress bar; in logs or pipes
+  plain lines. The requirement checks come first (`✓ C compiler (cc)`, `make`, `pkg-config`, `SDL3`,
+  `SDL3_ttf`, `fontconfig`), then five steps, each ending with `✓`: `[1/5] Building...`,
+  `[2/5] Installing binary...`, `[3/5] Installing assets...`, `[4/5] Installing icons...`,
+  `[5/5] Desktop entry and icon cache...`.
+- System-wide: `PREFIX=/usr make install`, as root.
+- `make uninstall` (with the same `PREFIX`) removes only the installed files; settings and statistics
+  are kept. `ribalta uninstall` does the same from the installed binary.
+- `make install-files PREFIX=... APPID=...` installs without building (used by the Flatpak manifest and
+  by packagers; see Packaging above).
 
 ## 5. Development with agents
 

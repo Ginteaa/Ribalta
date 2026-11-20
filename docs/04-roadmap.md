@@ -70,7 +70,7 @@ accumulate error (±1 s over 1 h); settings survive a restart.
 - `ribalta --screensaver`: fullscreen, cursor hidden immediately; exits on any key, click or
   mouse movement (ignoring events during the first second). Saves nothing.
 - `ribalta --help` shows the options.
-- Automatic start after inactivity with `swayidle` (README with a niri example:
+- Automatic start after inactivity with `swayidle` (see [01-functional-spec.md](01-functional-spec.md) §1.7 for a niri example:
   `spawn-at-startup "swayidle" "-w" "timeout" "300" "ribalta --screensaver"`).
   If ribalta is already open, the screensaver instance exits immediately (single instance).
 - **Screen-blank inhibition**: while a timer or a Pomodoro is RUNNING the app calls
@@ -173,6 +173,19 @@ accumulate error (±1 s over 1 h); settings survive a restart.
 - `ribalta uninstall`: removes exactly what `make install` installed, keeps settings and statistics.
 - Not for the Flatpak, macOS or source-tree builds, which get a pointer to the right update path;
   installs older than 0.7.0 update once with `git pull && make install`.
+
+## Phase 13 — In-app legend and slimmer README ✅
+
+- `H` / `F1` open the legend overlay (every key, the paths of `config.ini` and `sessions.csv`, the
+  command line); `Esc`, `H` or `F1` close it. Two columns when the window is wide, one otherwise.
+- A discreet "H · legenda" hint in the bottom-right corner at startup and on mouse movement, hidden
+  after 3 s; event-driven (its deadline joins the wait timeout, no extra wake-ups).
+- Settings panel: a description line above the footer explains the selected setting (meaning, range,
+  Shift step).
+- README slimmed down (from 424 to about 200 lines): the keys, the configuration table, the CSV format,
+  the "How it works" notes and the build details moved to `docs/` (sections 01 and 03), nothing removed.
+- Flatpak: the `flatpak.yml` workflow attaches `ribalta.flatpak` to each `v*` release; the update is
+  done by installing the new bundle again (`flatpak update` does not apply to a bundle).
 
 ## Future ideas
 - Publish the Flatpak on Flathub.

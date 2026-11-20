@@ -13,11 +13,14 @@
 #include "render/render.h"
 #include "ui/ui_color.h"
 #include "ui/ui_font.h"
+#include "ui/ui_help.h"
 #include "ui/ui_settings.h"
 #include "ui/ui_stats.h"
 #include "ui/ui_subject.h"
 
 #define CURSOR_HIDE_NS (2000ULL * SDL_NS_PER_MS)
+/* Suggerimento "H · legenda": resta visibile per HINT_NS dopo l'avvio o l'ultimo movimento del mouse. */
+#define HINT_NS        (3000ULL * SDL_NS_PER_MS)
 #define BLINK_PHASE_NS (300ULL * SDL_NS_PER_MS)
 #define BLINK_PHASES   6
 #define SAVER_GRACE_NS (1000ULL * SDL_NS_PER_MS)
@@ -61,6 +64,12 @@ typedef struct {
     uint32_t      preview_color;
     FontUI       *fui;               /* menu dei font (NULL in screensaver) */
     SubjectUI    *subj;              /* menu delle materie (NULL in screensaver) */
+    HelpUI       *hui;               /* legenda, tasti H / F1 (NULL in screensaver) */
+    /* Suggerimento "H · legenda" (docs/plans/legenda.md): acceso all'avvio e a ogni movimento del
+     * mouse, spento a hint_deadline (che entra nel timeout di attesa come cursor_deadline: nessun
+     * risveglio senza movimento). Mai in screensaver; con un pannello aperto non si disegna. */
+    bool          hint_visible;
+    Uint64        hint_deadline;     /* 0 = nessuna scadenza pendente */
     Uint64        font_preview_at;   /* scadenza anteprima font (0 = nessuna); entra nel timeout di attesa */
     char          bundled_font[1024];/* font incluso (assets/font.ttf): fallback e testo dei pannelli */
     char          render_font[1024]; /* file attualmente usato da Render per le cifre */

@@ -35,6 +35,10 @@ struct SettingsUI {
     SDL_Texture  *swatch_tex;    /* quadrato arrotondato bianco, colorato con color mod */
     float         swatch;        /* lato in px */
     Label         title, footer;
+    Label         desc;                  /* descrizione della voce selezionata (fino a 2 righe) */
+    int           desc_sel;              /* voce per cui e' stata costruita desc (-1 = nessuna) */
+    float         fs;                    /* corpo del testo del pannello */
+    float         desc_h;                /* spazio riservato alla descrizione */
     Label         label[ROW_COUNT][2];   /* [riga][0=normale, 1=selezionata] */
     Label         value[ROW_COUNT][2];
 };
@@ -44,6 +48,29 @@ static const char *const k_labels[ROW_COUNT] = {
     "Notifica fine timer", "Dimensione", "Luminosità", "Colore cifre", "Font cifre", "Schermo intero all'avvio", "Animazioni",
     "Pomodoro: studio", "Pomodoro: riposo", "Pomodoro: riposo lungo", "Pomodoro: cicli",
     "Pomodoro: avvio automatico", "Pomodoro: colore riposo", "Obiettivo giornaliero", "Obiettivo settimanale"
+};
+
+/* Una riga breve per voce: significato, limiti, passo (Shift dove cambia). */
+static const char *const k_desc[ROW_COUNT] = {
+    "Mostra anche i secondi (usa un po' più di CPU)",
+    "No = formato 12 ore con AM/PM",
+    "Durata proposta quando apri il timer (1 min – 23h59), Shift ±1 h",
+    "Suono a fine timer, a fine fase Pomodoro e all'obiettivo raggiunto",
+    "Notifica del desktop a fine timer, a fine fase Pomodoro e all'obiettivo raggiunto",
+    "Larghezza delle tessere in % della finestra (50–100), Shift ±10",
+    "Luminosità delle cifre (20–100%), utile di sera, Shift ±20",
+    "←/→ scorre la palette · Invio apre il selettore; colora anche barra ed etichette",
+    "←/→ font installati · Invio apre il menu con la ricerca",
+    "Ribalta si apre già a schermo intero",
+    "Animazione flip delle tessere (no = meno CPU)",
+    "Minuti di ogni fase di studio (1–180), Shift ±5",
+    "Minuti del riposo breve (1–60), Shift ±5",
+    "Minuti del riposo lungo (1–120), Shift ±5",
+    "Fasi di studio prima del riposo lungo (1–12)",
+    "Alla fine di una fase la successiva parte da sola",
+    "←/→ come le cifre, blu automatico o colore scelto · Invio apre il selettore",
+    "Minuti di studio al giorno: passi di 15 min, Shift 1 h (0 = spento, max 12 h)",
+    "Ore di studio a settimana, da lunedì: Shift ±5 h (0 = spento, max 100)",
 };
 
 static int clampi(int v, int lo, int hi) { return v < lo ? lo : (v > hi ? hi : v); }
@@ -77,6 +104,8 @@ static void free_textures(SettingsUI *ui)
     ui->swatch_tex = NULL;
     label_free(&ui->title);
     label_free(&ui->footer);
+    label_free(&ui->desc);
+    ui->desc_sel = -1;
     for (int i = 0; i < ROW_COUNT; i++)
         for (int k = 0; k < 2; k++) { label_free(&ui->label[i][k]); label_free(&ui->value[i][k]); }
 }
@@ -170,6 +199,51 @@ static void ellipsize(TTF_Font *font, char *buf, float maxw)
     }
 }
 
+/* Descrizione della voce selezionata: grigio tenue, max 2 righe (il corpo si riduce se serve). */
+static void build_desc(SettingsUI *ui)
+{
+    label_free(&ui->desc);
+    ui->desc_sel = ui->sel;
+    if (!ui->font || ui->pw <= 0.0f) return;
+    char buf[160];
+    const char *src = k_desc[ui->sel];
+    size_t n = 0;
+    while (*src && n + 8 < sizeof buf) {
+        if (!ui->arrows && (Uint8)src[0] == 0xE2 && (Uint8)src[1] == 0x86 &&
+            ((Uint8)src[2] == 0x90 || (Uint8)src[2] == 0x92)) {
+            const char *rep = (Uint8)src[2] == 0x90 ? "sx" : "dx";
+            buf[n++] = rep[0]; buf[n++] = rep[1];
+            src += 3;
+        } else {
+            buf[n++] = *src++;
+        }
+    }
+    buf[n] = '\0';
+    const SDL_Color dim = {0x80, 0x80, 0x80, 255};
+    const int wrap = (int)(ui->pw - 2.0f * ui->pad);
+    float size = ui->fs * 0.9f;
+    for (;;) {
+        TTF_SetFontSize(ui->font, size);
+        SDL_Surface *sf = TTF_RenderText_Blended_Wrapped(ui->font, buf, 0, dim, wrap);
+        if (sf) {
+            int lines = (sf->h + TTF_GetFontLineSkip(ui->font) / 2) / TTF_GetFontLineSkip(ui->font);
+            if (lines <= 2 || size <= 8.0f) {
+                ui->desc.tex = SDL_CreateTextureFromSurface(ui->ren, sf);
+                ui->desc.w = sf->w;
+                ui->desc.h = sf->h;
+                if (ui->desc.tex) SDL_SetTextureScaleMode(ui->desc.tex, SDL_SCALEMODE_LINEAR);
+                SDL_DestroySurface(sf);
+                break;
+            }
+            SDL_DestroySurface(sf);
+        } else {
+            break;
+        }
+        size -= 1.0f;
+    }
+    TTF_SetFontSize(ui->font, ui->fs);
+}
+
 static void rebuild(SettingsUI *ui, const Settings *s)
 {
     free_textures(ui);
@@ -184,11 +258,13 @@ static void rebuild(SettingsUI *ui, const Settings *s)
     float fs = fmaxf(14.0f, H / 24.0f);
     float ph;
     for (;;) {
-        ph = fs * (1.55f * ROW_COUNT + 6.0f);
+        ph = fs * (1.55f * ROW_COUNT + 8.6f); /* + 2,6 per la descrizione */
         if (ph <= H * 0.94f || fs <= 8.0f) break;
         fs -= 1.0f;
     }
     TTF_SetFontSize(ui->font, fs);
+    ui->fs = fs;
+    ui->desc_h = fs * 2.6f;
     ui->pitch = fs * 1.55f;
     ui->pad = fs * 1.1f;
     ui->pw = pw;
@@ -229,6 +305,8 @@ static void rebuild(SettingsUI *ui, const Settings *s)
         label_make(ui, &ui->value[i][0], buf, norm);
         label_make(ui, &ui->value[i][1], buf, sel);
     }
+    ui->fs = fs;
+    build_desc(ui);
     ui->shown = *s;
     ui->have_shown = true;
     ui->dirty = false;
@@ -300,8 +378,8 @@ bool ui_settings_key(SettingsUI *ui, SDL_Keycode key, SDL_Keymod mod, Settings *
     bool shift = (mod & SDL_KMOD_SHIFT) != 0;
     int dir = 0;
     switch (key) {
-    case SDLK_UP:    ui->sel = (ui->sel + ROW_COUNT - 1) % ROW_COUNT; ui->dirty = true; return false;
-    case SDLK_DOWN:  ui->sel = (ui->sel + 1) % ROW_COUNT;             ui->dirty = true; return false;
+    case SDLK_UP:    ui->sel = (ui->sel + ROW_COUNT - 1) % ROW_COUNT; return false;
+    case SDLK_DOWN:  ui->sel = (ui->sel + 1) % ROW_COUNT; return false;
     case SDLK_LEFT:  dir = -1; break;
     case SDLK_RIGHT: dir = 1; break;
     case SDLK_RETURN:
@@ -378,6 +456,7 @@ void ui_settings_draw(SettingsUI *ui, const Settings *s)
 {
     if (!ui || !ui->open || !s || !ui->font) return;
     if (ui->dirty || !ui->have_shown || memcmp(&ui->shown, s, sizeof *s) != 0) rebuild(ui, s);
+    else if (ui->desc_sel != ui->sel) build_desc(ui); /* solo la descrizione, mai per fotogramma */
 
     SDL_BlendMode prev = SDL_BLENDMODE_NONE;
     Uint8 pr, pg, pb, pa;
@@ -428,6 +507,8 @@ void ui_settings_draw(SettingsUI *ui, const Settings *s)
         blit(ui, vl, vx, ry + (ui->pitch - (float)vl->h) * 0.5f);
     }
     y += (float)ROW_COUNT * ui->pitch + ui->pitch * 0.35f;
+    blit(ui, &ui->desc, x0, y);
+    y += ui->desc_h;
     blit(ui, &ui->footer, x0, y);
 
     SDL_SetRenderDrawBlendMode(ui->ren, prev);

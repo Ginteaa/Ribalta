@@ -3,8 +3,12 @@ name: Flatpak
 on:
   push:
     branches: [main]
+    tags: ['v*']
   pull_request:
   workflow_dispatch:
+
+permissions:
+  contents: write   # allegare il bundle alla release sui tag v*
 
 jobs:
   flatpak:
@@ -21,3 +25,9 @@ jobs:
           bundle: ribalta.flatpak
           manifest-path: packaging/flatpak/io.github.ginteaa.Ribalta.yml
           cache-key: flatpak-builder-${{ github.sha }}
+
+      - name: Attach to the release (tags v*)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ribalta.flatpak

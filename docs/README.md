@@ -10,10 +10,10 @@ Wayland (tested on niri) and on X11.
 
 | File | Contents |
 |---|---|
-| [01-functional-spec.md](01-functional-spec.md) | What the app does: clock mode, timer, settings, controls, non-functional requirements |
-| [02-visual-design.md](02-visual-design.md) | Palette, tile proportions, flip animation, layout mockups |
-| [03-architecture.md](03-architecture.md) | Stack (C17 + SDL3), RAM/CPU saving strategy, modules, Makefile, agent-based development workflow |
-| [04-roadmap.md](04-roadmap.md) | Development phases: MVP, timer, Pomodoro, statistics, screensaver |
+| [01-functional-spec.md](01-functional-spec.md) | What the app does: clock, timer, Pomodoro, statistics file, settings, legend and hint, screensaver, controls, command line, non-functional requirements |
+| [02-visual-design.md](02-visual-design.md) | Palette, tile proportions, flip animation, layout mockups (clock, timer, settings, menus, legend, hint) |
+| [03-architecture.md](03-architecture.md) | Stack (C17 + SDL3), RAM/CPU strategy and measurements, modules, build and install, Flatpak and macOS packaging, agent-based development workflow |
+| [04-roadmap.md](04-roadmap.md) | Development phases: MVP, timer, Pomodoro, statistics, screensaver, packaging, goals, terminal commands, legend |
 
 ## A note on the name
 

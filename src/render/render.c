@@ -47,6 +47,9 @@ struct Render {
     char text[64];           /* etichetta a testo libero ("" = assente) */
     SDL_Texture *txt;
     float txt_w, txt_h;
+    SDL_Texture *hint;       /* "H · legenda" in basso a destra */
+    float hint_w, hint_h;
+    bool hint_on;
 
     Tile tile[MAX_TILES];
     int vals[MAX_TILES];
@@ -76,6 +79,8 @@ static void free_textures(Render *r)
     }
     if (r->txt) SDL_DestroyTexture(r->txt);
     r->txt = NULL;
+    if (r->hint) SDL_DestroyTexture(r->hint);
+    r->hint = NULL;
     for (int i = 0; i < 2; i++) {
         if (r->tag[i]) SDL_DestroyTexture(r->tag[i]);
         r->tag[i] = NULL;
@@ -186,6 +191,32 @@ static void build_text(Render *r)
     TTF_CloseFont(f);
 }
 
+/* Texture del suggerimento "H · legenda" (bianca; colore e alpha si applicano al disegno). */
+static void build_hint(Render *r)
+{
+    if (r->hint) SDL_DestroyTexture(r->hint);
+    r->hint = NULL;
+    if (r->ph <= 0) return;
+    float cap = (float)r->ph * 0.017f; /* altezza delle maiuscole: riga di ~max(11, 2,2% h) px */
+    if (cap < 8.0f) cap = 8.0f;
+    TTF_Font *f = open_font_for(r->font_path, 'A', cap, NULL);
+    if (!f) return;
+    const char *txt = TTF_FontHasGlyph(f, 0xB7) ? "H \xC2\xB7 legenda" : "H - legenda";
+    const SDL_Color col = { 255, 255, 255, 255 };
+    SDL_Surface *s = TTF_RenderText_Blended(f, txt, 0, col);
+    if (s) {
+        r->hint_w = (float)s->w;
+        r->hint_h = (float)s->h;
+        r->hint = SDL_CreateTextureFromSurface(r->ren, s);
+        SDL_DestroySurface(s);
+        if (r->hint) {
+            SDL_SetTextureBlendMode(r->hint, SDL_BLENDMODE_BLEND);
+            SDL_SetTextureAlphaMod(r->hint, 90); /* ~35% */
+        }
+    }
+    TTF_CloseFont(f);
+}
+
 static bool build_glyphs(Render *r)
 {
     /* glifi sempre bianchi: colore e luminosita' si applicano con SDL_SetTextureColorMod */
@@ -278,6 +309,7 @@ static bool build_glyphs(Render *r)
         TTF_CloseFont(f);
     }
     build_text(r);
+    build_hint(r);
     return true;
 }
 
@@ -443,6 +475,11 @@ void render_set_ampm(Render *r, int ampm)
     if (r) r->ampm = ampm < 0 || ampm > 2 ? 0 : ampm;
 }
 
+void render_set_hint(Render *r, bool visible)
+{
+    if (r) r->hint_on = visible;
+}
+
 void render_set_label(Render *r, RenderLabel label)
 {
     if (r) r->label = (label == LABEL_TIMER || label == LABEL_PAUSA) ? label : LABEL_NONE;
@@ -602,6 +639,14 @@ void render_draw(Render *r, Uint64 now_ns)
             SDL_SetTextureColorMod(r->lbl[k], ar, ag, ab);
             SDL_RenderTexture(r->ren, r->lbl[k], NULL, &dst);
         }
+    }
+
+    if (r->hint_on && r->hint) {
+        const float m = r->hint_h * 1.2f;
+        SDL_FRect dst = { (float)r->pw - m - r->hint_w, (float)r->ph - m - r->hint_h,
+                          r->hint_w, r->hint_h };
+        SDL_SetTextureColorMod(r->hint, ar, ag, ab);
+        SDL_RenderTexture(r->ren, r->hint, NULL, &dst);
     }
 
     if (r->count < 1) return;

@@ -6,6 +6,7 @@
 #include "app/input.h"
 #include "app/display.h"
 #include "app/session.h"
+#include "platform/paths.h"
 
 static bool is_fullscreen(const App *a)
 {
@@ -61,6 +62,7 @@ static void pixel_size(const App *a, int *w, int *h)
 }
 
 static void close_panel(App *a);
+static void close_stats(App *a);
 
 bool input_color_open(const App *a)
 {
@@ -293,6 +295,60 @@ static void close_stats(App *a)
     a->dirty = true;
 }
 
+/* --- Legenda (tasti H / F1) --- */
+
+bool input_help_open(const App *a)
+{
+    return a->hui && ui_help_is_open(a->hui);
+}
+
+static void open_help(App *a)
+{
+    int w, h;
+    char cfg[1024] = "", stats[1024] = "", dir[1024];
+    if (!a->hui)
+        return;
+    if (input_panel_open(a))
+        close_panel(a);
+    if (input_stats_open(a))
+        close_stats(a);
+    if (!paths_config_file(cfg, sizeof cfg))
+        cfg[0] = '\0';
+    /* stesso percorso di stats.c (csv_path) */
+    if (paths_data_dir(dir, sizeof dir) && snprintf(stats, sizeof stats, "%s/sessions.csv", dir) >= (int)sizeof stats)
+        stats[0] = '\0';
+    pixel_size(a, &w, &h);
+    ui_help_open(a->hui, w, h, cfg, stats);
+    a->dirty = true;
+}
+
+static void close_help(App *a)
+{
+    ui_help_close(a->hui);
+    a->dirty = true;
+}
+
+/* Suggerimento "H · legenda": acceso a ogni movimento del mouse, ridisegno solo alla transizione. */
+static void hint_activity(App *a)
+{
+    a->hint_deadline = SDL_GetTicksNS() + HINT_NS;
+    if (!a->hint_visible) {
+        a->hint_visible = true;
+        a->dirty = true;
+    }
+}
+
+void input_hint_tick(App *a, Uint64 now)
+{
+    if (a->hint_deadline && now >= a->hint_deadline) {
+        a->hint_deadline = 0;
+        if (a->hint_visible) {
+            a->hint_visible = false;
+            a->dirty = true;
+        }
+    }
+}
+
 static void open_stats(App *a)
 {
     int w, h;
@@ -520,6 +576,8 @@ static void on_key(App *a, const SDL_KeyboardEvent *k)
             settings_save(&a->cfg);
         if (input_subject_open(a))
             close_subject(a); /* salva elenco e materia attiva */
+        if (input_help_open(a))
+            close_help(a);
         a->running = false;
         return;
     }
@@ -535,7 +593,16 @@ static void on_key(App *a, const SDL_KeyboardEvent *k)
         subject_result(a, ui_subject_key(a->subj, k->key, k->mod));
         return;
     }
+    if (input_help_open(a)) {
+        if (!k->repeat && (k->key == SDLK_ESCAPE || k->key == SDLK_H || k->key == SDLK_F1))
+            close_help(a);
+        return;
+    }
     if (input_stats_open(a)) {
+        if (!k->repeat && (k->key == SDLK_H || k->key == SDLK_F1)) {
+            open_help(a);
+            return;
+        }
         if (ui_stats_key(a->sui, k->key)) {
             a->dirty = true;
             return;
@@ -550,6 +617,10 @@ static void on_key(App *a, const SDL_KeyboardEvent *k)
     }
     if (input_panel_open(a) && !k->repeat && k->key == SDLK_I) {
         open_stats(a);
+        return;
+    }
+    if (input_panel_open(a) && !k->repeat && (k->key == SDLK_H || k->key == SDLK_F1)) {
+        open_help(a);
         return;
     }
     if (input_panel_open(a)) {
@@ -580,6 +651,10 @@ static void on_key(App *a, const SDL_KeyboardEvent *k)
         break;
     case SDLK_M:
         open_subject(a);
+        break;
+    case SDLK_H:
+    case SDLK_F1:
+        open_help(a);
         break;
     case SDLK_T:
         set_view(a, a->view == VIEW_TIMER ? VIEW_CLOCK : VIEW_TIMER);
@@ -652,9 +727,10 @@ void input_handle_event(App *a, const SDL_Event *ev)
         }
         if (ev->type == SDL_EVENT_KEY_DOWN)
             on_key(a, &ev->key);
-        else if (ev->type == SDL_EVENT_MOUSE_MOTION)
+        else if (ev->type == SDL_EVENT_MOUSE_MOTION) {
             input_cursor_activity(a);
-        else if (ev->button.button == SDL_BUTTON_LEFT && ev->button.clicks == 2)
+            hint_activity(a);
+        } else if (ev->button.button == SDL_BUTTON_LEFT && ev->button.clicks == 2)
             toggle_fullscreen(a);
         break;
     case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
