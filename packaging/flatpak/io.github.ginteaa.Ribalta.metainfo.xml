@@ -61,6 +61,11 @@
   </supports>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.7.3" date="2026-11-20">
+      <description>
+        <p>Typing the letter Q in the font search or in a subject name no longer quits the app (Ctrl+Q always quits).</p>
+      </description>
+    </release>
     <release version="0.7.2" date="2026-11-20">
       <description>
         <p>Fixes the native installer stopping at 0% when run from a terminal, which also broke ribalta update.</p>
