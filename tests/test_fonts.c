@@ -10,8 +10,30 @@ static int fails;
 
 int main(void) {
     FontList l;
+#ifdef _WIN32
+    /* due chiamate di fila: la prima a freddo (cache dei file vuota, antivirus), la seconda a
+     * caldo; i tempi dicono quanto costa aprire il menu font */
+    Uint64 t0 = SDL_GetTicks();
     CHECK(fonts_list(&l));
+    Uint64 ms1 = SDL_GetTicks() - t0;
+    int count1 = l.count;
+    fonts_free(&l);
+    t0 = SDL_GetTicks();
+    CHECK(fonts_list(&l));
+    Uint64 ms2 = SDL_GetTicks() - t0;
+    CHECK(l.count == count1);
+#else
+    CHECK(fonts_list(&l));
+#endif
     if (l.count == 0) fprintf(stderr, "NOTE: nessun font di sistema con le cifre (verifiche ridotte)\n");
+#ifdef _WIN32
+    /* su Windows (anche i runner di GitHub) Arial c'è sempre: l'elenco dal registro non può essere vuoto */
+    CHECK(l.count > 0);
+    bool has_arial = false;
+    for (int i = 0; i < l.count; i++)
+        if (SDL_strcasecmp(l.items[i].family, "Arial") == 0) has_arial = true;
+    CHECK(has_arial);
+#endif
 
     for (int i = 0; i < l.count; i++) {
         CHECK(paths_readable(l.items[i].file));
@@ -49,6 +71,10 @@ int main(void) {
     }
 
     if (fails) { fprintf(stderr, "%d FAIL\n", fails); return 1; }
+#ifdef _WIN32
+    printf("OK (%d font, 1a %llu ms, 2a %llu ms)\n", n, (unsigned long long)ms1, (unsigned long long)ms2);
+#else
     printf("OK (%d font)\n", n);
+#endif
     return 0;
 }
