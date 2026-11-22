@@ -5,12 +5,13 @@
 <h1 align="center">Ribalta</h1>
 
 <p align="center">
-  <b>A tiny flip clock and study timer for Linux — ~18 MB of RAM, ~0% CPU when idle.</b>
+  <b>A tiny flip clock and study timer for Linux and Windows — ~18 MB of RAM, ~0% CPU when idle on Linux.</b>
 </p>
 
 <p align="center">
   <a href="https://github.com/Ginteaa/Ribalta/actions/workflows/build.yml"><img alt="build" src="https://github.com/Ginteaa/Ribalta/actions/workflows/build.yml/badge.svg"></a>
   <a href="https://github.com/Ginteaa/Ribalta/actions/workflows/flatpak.yml"><img alt="flatpak" src="https://github.com/Ginteaa/Ribalta/actions/workflows/flatpak.yml/badge.svg"></a>
+  <a href="https://github.com/Ginteaa/Ribalta/actions/workflows/windows.yml"><img alt="windows" src="https://github.com/Ginteaa/Ribalta/actions/workflows/windows.yml/badge.svg"></a>
   <img alt="C17" src="https://img.shields.io/badge/language-C17-blue?style=flat-square">
   <img alt="SDL3" src="https://img.shields.io/badge/SDL-3-orange?style=flat-square">
   <img alt="Linux" src="https://img.shields.io/badge/Linux-Wayland%20%C2%B7%20X11-success?style=flat-square">
@@ -26,7 +27,9 @@
 shows the time on animated flip tiles and doubles as a study companion: a countdown timer that keeps
 running in the background, a Pomodoro mode, study statistics and a screensaver. Install it natively
 from source or as a **Flatpak**, which runs on any distribution (including Ubuntu 24.04 and Linux
-Mint 22, which do not ship SDL3). An **experimental macOS build** is also available.
+Mint 22, which do not ship SDL3). A **Windows** build (installer or portable zip) is new: it is tested
+in CI, but it has not yet run on many PCs, so feedback is welcome. An **experimental macOS build** is
+also available.
 
 The name is Italian: *ribalta* means both "flip over" and "the stage" (the limelight). The look is
 inspired by the classic flip-clock style, but code and artwork are original and the project is not
@@ -70,8 +73,8 @@ Start it with `ribalta`; a faint "H · legenda" hint shows up at startup and whe
 
 Settings are saved in `~/.config/ribalta/config.ini` and study sessions in
 `~/.local/share/ribalta/sessions.csv` (the legend shows the real paths; on macOS they are in
-`~/Library/Application Support/Ribalta/`). You never need to edit them by hand. The full key list,
-all configuration keys and the CSV format are in the
+`~/Library/Application Support/Ribalta/`, on Windows in `%APPDATA%\Ribalta\`). You never need to
+edit them by hand. The full key list, all configuration keys and the CSV format are in the
 [functional specification](docs/01-functional-spec.md).
 
 ## 📦 Installation
@@ -114,6 +117,16 @@ Download `Ribalta-macos-arm64.zip` (Apple Silicon) or `Ribalta-macos-x86_64.zip`
 From source on macOS: `brew install sdl3 sdl3_ttf pkg-config`, clone, `make install` (builds
 `Ribalta.app` into `~/Applications`).
 
+### Windows (new)
+
+Download from the [latest release](https://github.com/Ginteaa/Ribalta/releases/latest) either
+`Ribalta-windows-x86_64-setup.exe` (installer: Start menu entry, optional desktop icon, installs for
+the current user without administrator rights) or `Ribalta-windows-x86_64.zip` (portable: extract it
+anywhere and run `ribalta.exe`). The program is not code-signed yet, so SmartScreen warns on the
+first run: click **More info**, then **Run anyway**. Feedback is welcome.
+
+Build from source with MSYS2 (UCRT64): see [Architecture](docs/03-architecture.md#41-dependencies-and-install).
+
 ### From source
 
 Dependencies: `sdl3` and `sdl3_ttf` (≥ 3.2), `fontconfig`, a C compiler, `make` and `pkg-config`;
@@ -138,6 +151,8 @@ On other distributions install the equivalent SDL3 and SDL3_ttf development pack
   [latest release](https://github.com/Ginteaa/Ribalta/releases/latest) and run
   `flatpak install --user ribalta.flatpak` again. Settings and statistics are kept.
 - **macOS:** download the new zip from the latest release.
+- **Windows:** run the new installer over the old one (or replace the folder of the zip). Settings
+  and statistics are kept. `ribalta update` on Windows only prints the download page.
 
 `ribalta update` does not apply to the Flatpak and the macOS app: it prints the right way to update
 them.
@@ -149,8 +164,9 @@ ribalta uninstall                              # native; asks for confirmation (
 flatpak uninstall io.github.ginteaa.Ribalta    # Flatpak
 ```
 
-`ribalta uninstall` does not apply to the Flatpak and the macOS app: it prints the right command to
-use.
+On Windows, remove Ribalta from *Settings → Apps* (installer) or delete its folder (zip).
+`ribalta uninstall` does not apply to the Flatpak, the macOS app and Windows: it prints the right way
+to remove them.
 
 Installs older than 0.7.0 have no `uninstall` command: run `make uninstall` in the source folder.
 Your settings and statistics are always kept.
@@ -183,7 +199,7 @@ swayidle -w timeout 300 'ribalta --screensaver'
 
 | Metric | Value |
 |---|---|
-| Memory (PSS) at idle | ~18 MB native, ~25 MB Flatpak |
+| Memory (PSS) at idle | ~18 MB native, ~25 MB Flatpak, Windows to be measured |
 | CPU at idle, `HH:MM` clock | ~0.07% (one flip per minute) |
 | Release binary size | ~60 KB |
 
