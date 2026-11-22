@@ -3,14 +3,14 @@
  * fonts_mac.c (macOS, CoreText). */
 #include "platform/fonts.h"
 
+#include <SDL3/SDL.h>
 #include <stdlib.h>
 #include <string.h>
-#include <strings.h>
 
 static int cmp_entry(const void *a, const void *b)
 {
     const FontEntry *x = a, *y = b;
-    int c = strcasecmp(x->family, y->family);
+    int c = SDL_strcasecmp(x->family, y->family);
     return c ? c : strcmp(x->family, y->family);
 }
 

@@ -1,13 +1,14 @@
 #include "core/clock.h"
+#include "platform/compat.h"
 #include <time.h>
 
 void clock_get(const Settings *s, ClockFace *out)
 {
     struct timespec ts;
-    struct tm tm;
-    clock_gettime(CLOCK_REALTIME, &ts);
+    struct tm tm = {0};
+    timespec_get(&ts, TIME_UTC);
     time_t t = ts.tv_sec;
-    localtime_r(&t, &tm);
+    compat_localtime(t, &tm);
 
     int h = tm.tm_hour;
     out->ampm = 0;
@@ -28,10 +29,10 @@ void clock_get(const Settings *s, ClockFace *out)
 uint32_t clock_ms_to_next_change(const Settings *s)
 {
     struct timespec ts;
-    struct tm tm;
-    clock_gettime(CLOCK_REALTIME, &ts);
+    struct tm tm = {0};
+    timespec_get(&ts, TIME_UTC);
     time_t t = ts.tv_sec;
-    localtime_r(&t, &tm);
+    compat_localtime(t, &tm);
 
     long ms_in_sec = ts.tv_nsec / 1000000L;
     long ms = 1000 - ms_in_sec;

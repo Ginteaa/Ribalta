@@ -2,6 +2,7 @@
  * libfontconfig è caricata a richiesta con dlopen (solo mentre il menu font è aperto), così
  * all'avvio non si porta dietro freetype, harfbuzz, glib, ecc. */
 #include "platform/fonts.h"
+#include "platform/paths.h"
 
 #include <dlfcn.h>
 #include <fontconfig/fontconfig.h>  /* solo tipi e costanti: nessun simbolo linkato */
@@ -10,7 +11,6 @@
 #endif
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 
 /* Punteggio della variante: più basso = migliore (Bold non corsivo, poi Regular, poi il resto). */
 static int variant_score(int weight, int slant)
@@ -128,7 +128,7 @@ bool fonts_list(FontList *out)
         /* TTF_OpenFont apre solo la faccia 0: scarta le altre facce delle collezioni (.ttc)
          * e le istanze con nome dei font variabili (index != 0) */
         if (fc.PatternGetInteger(p, FC_INDEX, 0, &index) == FcResultMatch && index != 0) continue;
-        if (access((const char *)file, R_OK) != 0) continue;
+        if (!paths_readable((const char *)file)) continue;
         fc.PatternGetInteger(p, FC_WEIGHT, 0, &weight);
         fc.PatternGetInteger(p, FC_SLANT, 0, &slant);
         int sc = variant_score(weight, slant);

@@ -1,9 +1,8 @@
 #include "core/settings.h"
+#include "test_util.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/stat.h>
-#include <unistd.h>
 
 static int fails;
 #define CHECK(c) do { if (!(c)) { fprintf(stderr, "FAIL %s:%d: %s\n", __FILE__, __LINE__, #c); fails++; } } while (0)
@@ -11,18 +10,17 @@ static int fails;
 static void write_cfg(const char *dir, const char *body) {
     char p[600];
     snprintf(p, sizeof p, "%s/ribalta", dir);
-    mkdir(p, 0755);
+    SDL_CreateDirectory(p);
     snprintf(p, sizeof p, "%s/ribalta/config.ini", dir);
     FILE *f = fopen(p, "w");
     if (f) { fputs(body, f); fclose(f); }
 }
 
 int main(void) {
-    char tmpl[] = "/tmp/ribalta-test-XXXXXX";
-    char *dir = mkdtemp(tmpl);
-    if (!dir) { perror("mkdtemp"); return 1; }
-    setenv("XDG_CONFIG_HOME", dir, 1);
-    setenv("XDG_DATA_HOME", dir, 1);
+    char dir[512];
+    if (!test_mkdtemp(dir, sizeof dir)) { fprintf(stderr, "test_mkdtemp fallita\n"); return 1; }
+    test_setenv("XDG_CONFIG_HOME", dir);
+    test_setenv("XDG_DATA_HOME", dir);
 
     Settings s;
     settings_defaults(&s);
@@ -244,9 +242,7 @@ int main(void) {
     settings_defaults(&l);
     CHECK(settings_load(&l) && l.daily_goal_min == 720 && l.weekly_goal_h == 100);
 
-    char cmd[600];
-    snprintf(cmd, sizeof cmd, "rm -rf '%s'", dir);
-    if (system(cmd) != 0) { /* ignora */ }
+    test_rmtree(dir);
 
     if (fails) return 1;
     puts("ok");

@@ -6,6 +6,8 @@
 #include <string.h>
 #include <SDL3_ttf/SDL_ttf.h>
 
+#include "platform/paths.h"
+
 #define SEC_N   5
 #define ROW_MAX 32
 #define STR_MAX 520
@@ -175,7 +177,7 @@ static void display_path(const char *path, const char *fallback, char *out, size
     if (!path || !path[0]) { snprintf(out, cap, "%s", fallback); return; }
     const char *home = getenv("HOME");
     size_t hl = home ? strlen(home) : 0;
-    if (hl > 1 && strncmp(path, home, hl) == 0 && path[hl] == '/')
+    if (hl > 1 && strncmp(path, home, hl) == 0 && paths_is_sep(path[hl]))
         snprintf(out, cap, "~%s", path + hl);
     else
         snprintf(out, cap, "%s", path);
@@ -224,7 +226,7 @@ static void ellipsize_left(const HelpUI *ui, char *buf, float maxw)
     size_t len = strlen(src);
     for (size_t cut = 1; cut < len; cut++) {
         if (((unsigned char)src[cut] & 0xC0) == 0x80) continue;   /* mai a metà di un carattere */
-        if (src[cut] != '/') continue;                            /* si taglia solo davanti a una "/" */
+        if (!paths_is_sep(src[cut])) continue;                    /* si taglia solo davanti a un separatore */
         char tmp[STR_MAX];
         snprintf(tmp, sizeof tmp, "%s%s", dots, src + cut);
         if (!TTF_GetStringSize(ui->font, tmp, 0, &w, &h) || (float)w <= maxw) {
@@ -232,7 +234,7 @@ static void ellipsize_left(const HelpUI *ui, char *buf, float maxw)
             return;
         }
     }
-    /* nessuna "/" utile: si tiene la coda del testo */
+    /* nessun separatore utile: si tiene la coda del testo */
     for (size_t cut = 1; cut < len; cut++) {
         if (((unsigned char)src[cut] & 0xC0) == 0x80) continue;
         char tmp[STR_MAX];

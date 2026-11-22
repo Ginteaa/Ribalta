@@ -4,7 +4,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <strings.h>
 #include <SDL3_ttf/SDL_ttf.h>
 
 /* Righe: "Nessuna materia", le materie, (in inserimento) la riga del nome nuovo. */
@@ -353,7 +352,7 @@ static void commit_edit(SubjectUI *ui)
     if (!settings_subject_valid(t)) err = ERR_INVALID;
     else {
         for (int i = 0; i < c->subject_count; i++)
-            if (strcasecmp(c->subjects[i], t) == 0) err = ERR_DUP;
+            if (SDL_strcasecmp(c->subjects[i], t) == 0) err = ERR_DUP;
         if (err == ERR_NONE && c->subject_count >= SUBJECTS_MAX) err = ERR_FULL;
     }
     if (err == ERR_NONE && !settings_subject_add(c, t)) err = ERR_INVALID;

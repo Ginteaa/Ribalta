@@ -11,7 +11,7 @@ typedef struct {
     int  ampm;               /* 0 = nessuno (24h), 1 = AM, 2 = PM */
 } ClockFace;
 
-/* Ora locale corrente (clock_gettime REALTIME + localtime_r).
+/* Ora locale corrente (timespec_get UTC + compat_localtime).
  * 12h: 0 -> 12, 13 -> 1, ecc. */
 void clock_get(const Settings *s, ClockFace *out);
 

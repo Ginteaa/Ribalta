@@ -1,14 +1,12 @@
 #include "core/settings.h"
 #include "core/color.h"
 #include "platform/paths.h"
+#include <SDL3/SDL.h>
 #include <ctype.h>
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <strings.h>
-#include <sys/stat.h>
-#include <unistd.h>
 
 #define PATH_MAX_LEN 1024
 
@@ -58,9 +56,9 @@ static char *trim(char *s)
 
 static void parse_bool(const char *v, bool *dst)
 {
-    if (!strcasecmp(v, "true") || !strcmp(v, "1") || !strcasecmp(v, "yes"))
+    if (!SDL_strcasecmp(v, "true") || !strcmp(v, "1") || !SDL_strcasecmp(v, "yes"))
         *dst = true;
-    else if (!strcasecmp(v, "false") || !strcmp(v, "0") || !strcasecmp(v, "no"))
+    else if (!SDL_strcasecmp(v, "false") || !strcmp(v, "0") || !SDL_strcasecmp(v, "no"))
         *dst = false;
 }
 
@@ -101,7 +99,7 @@ static void parse_subjects(Settings *s, char *v)
 {
     s->subject_count = 0;
     char *save = NULL;
-    for (char *tok = strtok_r(v, ";", &save); tok; tok = strtok_r(NULL, ";", &save))
+    for (char *tok = SDL_strtok_r(v, ";", &save); tok; tok = SDL_strtok_r(NULL, ";", &save))
         settings_subject_add(s, tok);   /* scarta non validi, duplicati, eccedenti */
 }
 
@@ -111,9 +109,9 @@ static void parse_subjects(Settings *s, char *v)
 static bool parse_break_color(Settings *s, const char *v)
 {
     uint32_t c;
-    if (!strcasecmp(v, "digits")) s->pomodoro_break_mode = BREAK_COLOR_DIGITS;
-    else if (!strcasecmp(v, "auto")) s->pomodoro_break_mode = BREAK_COLOR_AUTO;
-    else if (!strcasecmp(v, "custom")) s->pomodoro_break_mode = BREAK_COLOR_CUSTOM;
+    if (!SDL_strcasecmp(v, "digits")) s->pomodoro_break_mode = BREAK_COLOR_DIGITS;
+    else if (!SDL_strcasecmp(v, "auto")) s->pomodoro_break_mode = BREAK_COLOR_AUTO;
+    else if (!SDL_strcasecmp(v, "custom")) s->pomodoro_break_mode = BREAK_COLOR_CUSTOM;
     else if (color_parse_hex(v, &c)) {
         s->pomodoro_break_mode = BREAK_COLOR_CUSTOM;
         s->pomodoro_break_color = c;
@@ -294,7 +292,7 @@ bool settings_subject_add(Settings *s, const char *name)
     if (!settings_subject_valid(t))
         return false;
     for (int i = 0; i < s->subject_count; i++)
-        if (!strcasecmp(s->subjects[i], t))
+        if (!SDL_strcasecmp(s->subjects[i], t))
             return false;
     memcpy(s->subjects[s->subject_count++], t, strlen(t) + 1);
     return true;

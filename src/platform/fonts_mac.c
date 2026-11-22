@@ -3,14 +3,14 @@
  * CoreText viene usato solo mentre il menu font è aperto: tutto ciò che si crea si rilascia
  * prima di tornare. */
 #include "platform/fonts.h"
+#include "platform/paths.h"
 
 #include <CoreFoundation/CoreFoundation.h>
 #include <CoreText/CoreText.h>
+#include <SDL3/SDL.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#include <strings.h>
-#include <unistd.h>
 
 /* Pesi CoreText (-1..1) in millesimi: Regular 0, Bold circa 0.4 */
 #define W_REGULAR 0
@@ -40,7 +40,7 @@ static bool ext_ok(const char *path)
 {
     const char *dot = strrchr(path, '.');
     if (!dot) return false;
-    return strcasecmp(dot, ".ttf") == 0 || strcasecmp(dot, ".otf") == 0;
+    return SDL_strcasecmp(dot, ".ttf") == 0 || SDL_strcasecmp(dot, ".otf") == 0;
 }
 
 /* Il font contiene tutte le cifre 0..9? */
@@ -118,9 +118,9 @@ bool fonts_list(FontList *out)
                                                            (UInt8 *)file, (CFIndex)sizeof file);
             CFRelease(urlv);
         }
-        if (!file_ok || file[0] != '/') continue;
+        if (!file_ok || !paths_is_absolute(file)) continue;
         if (!ext_ok(file)) continue;
-        if (access(file, R_OK) != 0) continue;
+        if (!paths_readable(file)) continue;
 
         int weight;
         bool italic;

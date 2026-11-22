@@ -1,4 +1,5 @@
 #include "core/stats.h"
+#include "platform/compat.h"
 #include "platform/paths.h"
 #include "core/settings.h"
 
@@ -49,7 +50,7 @@ bool stats_append(time_t start, long duration_s, const char *type, bool complete
     char path[1100];
     if (!csv_path(path, sizeof path)) return false;
     struct tm tm;
-    if (!localtime_r(&start, &tm)) return false;
+    if (!compat_localtime(start, &tm)) return false;
     char subj[STATS_SUBJECT_LEN];
     sanitize_subject(subj, subject);
     FILE *f = fopen(path, "a");
@@ -119,7 +120,7 @@ int stats_subject_totals(StatsSubjectTotal *out, int max, time_t now)
 {
     if (!out || max <= 0) return 0;
     struct tm tn;
-    if (!localtime_r(&now, &tn)) return 0;
+    if (!compat_localtime(now, &tn)) return 0;
     const long today = day_number(tn.tm_year + 1900, tn.tm_mon + 1, tn.tm_mday);
     char path[1100];
     if (!csv_path(path, sizeof path)) return 0;
@@ -167,7 +168,7 @@ bool stats_summary(StatsSummary *out, time_t now, const char *filter)
     memset(out, 0, sizeof *out);
 
     struct tm tn;
-    if (!localtime_r(&now, &tn)) return false;
+    if (!compat_localtime(now, &tn)) return false;
     const long today = day_number(tn.tm_year + 1900, tn.tm_mon + 1, tn.tm_mday);
     for (int i = 0; i < 7; i++) out->week_wday[i] = ((tn.tm_wday - (6 - i)) % 7 + 7) % 7;
 
@@ -203,7 +204,7 @@ bool stats_goals(StatsGoals *out, time_t now, long daily_goal_s)
     memset(out, 0, sizeof *out);
 
     struct tm tn;
-    if (!localtime_r(&now, &tn)) return false;
+    if (!compat_localtime(now, &tn)) return false;
     const long today = day_number(tn.tm_year + 1900, tn.tm_mon + 1, tn.tm_mday);
     const long since_monday = (tn.tm_wday + 6) % 7;   /* 0 = lunedì */
 

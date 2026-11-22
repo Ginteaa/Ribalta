@@ -5,22 +5,23 @@
 #include <SDL3/SDL.h>
 #include "app/session.h"
 #include "core/stats.h"
+#include "platform/compat.h"
 #include "platform/notify.h"
 
 /* Stessa data locale (giorno) di due istanti. */
 static bool same_day(time_t x, time_t y)
 {
-    struct tm a, b;
-    localtime_r(&x, &a);
-    localtime_r(&y, &b);
+    struct tm a = {0}, b = {0};
+    compat_localtime(x, &a);
+    compat_localtime(y, &b);
     return a.tm_year == b.tm_year && a.tm_yday == b.tm_yday;
 }
 
 /* Lunedì (mezzanotte locale) della settimana di t, come time_t. */
 static time_t week_start(time_t t)
 {
-    struct tm tm;
-    localtime_r(&t, &tm);
+    struct tm tm = {0};
+    compat_localtime(t, &tm);
     tm.tm_mday -= (tm.tm_wday + 6) % 7;
     tm.tm_hour = tm.tm_min = tm.tm_sec = 0;
     tm.tm_isdst = -1;
