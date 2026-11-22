@@ -201,6 +201,26 @@ accumulate error (±1 s over 1 h); settings survive a restart.
 - Docs aligned with the code after a full audit.
 - Releases: 0.7.0 (Phases 9–12), 0.7.1 (Phase 13), 0.7.2 and 0.7.3 (this phase).
 
+## Phase 15 — Windows port (in progress)
+
+- Toolchain: MSYS2 MinGW-w64 UCRT64 (same `Makefile`, gcc, pkg-config, SDL3/SDL3_ttf packages).
+- Portable refactor first (no behaviour change on Linux/macOS): SDL string helpers, a small time
+  compatibility header, portable path helpers (absolute paths, readability), tests without POSIX calls.
+- Windows specifics: single instance with a named mutex; settings and statistics in
+  `%APPDATA%\Ribalta`; assets next to the executable; `--help`/`--version` printed to the parent
+  console; `update`/`uninstall` point to the release page / the installer.
+- Notifications: sound (as today) + `SDL_FlashWindow`; no toast, no child processes.
+- Digit-font menu: system fonts from the registry (`…\Windows NT\CurrentVersion\Fonts`), read with
+  SDL_ttf only while the menu is open.
+- Executable resources: icon, manifest (UTF-8 code page, DPI awareness), version info.
+- Renderer order chosen by measuring RAM/CPU at rest on Windows; numbers in `docs/03-architecture.md`.
+- Packages: portable zip (exe + DLLs + assets) and an Inno Setup installer (Start menu entry,
+  uninstaller that keeps `%APPDATA%\Ribalta`), both attached to every release by `windows.yml`.
+
+**Done when**: CI is green on Linux, macOS, Flatpak and Windows; on a real Windows PC every feature
+works from both the zip and the installer, a second instance is refused, user data survives the
+uninstaller; resource numbers are documented.
+
 ## Future ideas
 - Feedback from real Macs and resource measurements on macOS.
 - Publish the Flatpak on Flathub.
