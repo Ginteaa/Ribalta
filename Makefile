@@ -4,6 +4,7 @@
 #   make install    installa in ~/.local     make uninstall  (le statistiche restano)
 #   make debug      ASan + UBSan             make icons      rigenera le PNG dell'icona
 #   make app        macOS: build/Ribalta.app  (make install su macOS la copia in ~/Applications)
+#   make dist       Windows (MSYS2 UCRT64): build/Ribalta-windows-x86_64.zip, cartella portabile con le DLL
 
 CC      ?= cc
 PKGS    := sdl3 sdl3-ttf
@@ -11,8 +12,26 @@ PKGS    := sdl3 sdl3-ttf
 PKGFLAGS ?=
 CFLAGS  ?= -std=c17 -Wall -Wextra -Wpedantic -O2
 UNAME_S := $(shell uname -s)
+# EXE: suffisso dell'eseguibile (.exe solo su Windows); GUILD: opzioni di link solo per l'app, non per i test
+EXE     :=
+GUILD   :=
 
-ifeq ($(UNAME_S),Darwin)
+ifeq ($(OS),Windows_NT)
+  # Windows (MSYS2 MinGW-w64 UCRT64; OS e' definita in ogni ambiente Windows, MSYS2 compreso):
+  # niente fontconfig, elenco font in fonts_win.c. PLATDEF: solo __USE_MINGW_ANSI_STDIO=1, cosi'
+  # printf/snprintf hanno la semantica C99 di Linux (%zu, snprintf che ritorna la lunghezza anche
+  # se tronca) e gcc controlla i formati senza avvisi con -std=c17 -Wpedantic. Non serve
+  # _POSIX_C_SOURCE: su Windows il codice non usa API POSIX (vedi platform/compat.h).
+  # -mwindows: sottosistema GUI (niente finestra di console); le librerie di Windows che servono
+  # (kernel32, user32, advapi32...) sono gia' nell'elenco predefinito di gcc.
+  EXE        := .exe
+  FCPKG      :=
+  PLATDEF    := -D__USE_MINGW_ANSI_STDIO=1
+  PLATLIBS   := -ladvapi32
+  GUILD      := -mwindows
+  FONTS_SRC  := src/platform/fonts_win.c
+  STRIP_LD   := -s
+else ifeq ($(UNAME_S),Darwin)
   # macOS: elenco font con CoreText (fonts_mac.c); _DARWIN_C_SOURCE espone anche flock
   FCPKG      :=
   PLATDEF    := -D_DARWIN_C_SOURCE
@@ -34,11 +53,11 @@ override CFLAGS += $(shell pkg-config --cflags $(PKGS) $(FCPKG)) $(PLATDEF) -Isr
 # fuori da CFLAGS: debug/release richiamano make passando CFLAGS (si duplicherebbe senza virgolette)
 VERSION_DEF := -DRIBALTA_VERSION='"$(VERSION)"'
 override LDLIBS += $(shell pkg-config $(PKGFLAGS) --libs $(PKGS)) -lm $(PLATLIBS)
-# fonts.c e fonts_mac.c sono alternativi: si compila solo quello della piattaforma
-SRC     := $(filter-out src/platform/fonts.c src/platform/fonts_mac.c,$(shell find src -name '*.c')) $(FONTS_SRC)
+# fonts.c, fonts_mac.c e fonts_win.c sono alternativi: si compila solo quello della piattaforma
+SRC     := $(filter-out src/platform/fonts.c src/platform/fonts_mac.c src/platform/fonts_win.c,$(shell find src -name '*.c')) $(FONTS_SRC)
 SRC     := $(sort $(SRC))
 OBJ     := $(SRC:src/%.c=build/%.o)
-BIN     := ribalta
+BIN     := ribalta$(EXE)
 PREFIX  ?= $(HOME)/.local
 
 # output sintetico ("  CC  core/timer.c"); V=1 per i comandi completi
@@ -54,7 +73,7 @@ all: $(BIN)
 
 $(BIN): $(OBJ)
 	$(call say,LD,$@)
-	$(Q)$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS)
+	$(Q)$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS) $(GUILD)
 
 # main.c contiene RIBALTA_VERSION: si ricompila quando cambia VERSION
 build/main.o: VERSION
@@ -75,6 +94,36 @@ release: clean
 	@$(MAKE) --no-print-directory CFLAGS="$(CFLAGS)" LDFLAGS="$(LDFLAGS)" $(BIN)
 
 # installazione con output leggibile (banner, barra di avanzamento): vedi tools/install.sh
+ifeq ($(OS),Windows_NT)
+# Windows: installer e disinstallatore arriveranno con i pacchetti; per ora solo make dist (zip portabile)
+app install uninstall:
+	@echo "make $@: non ancora disponibile su Windows (arrivera' con i pacchetti; per ora: make dist)" >&2; exit 1
+
+# cartella portabile build/dist/Ribalta (exe + DLL di MSYS2 + assets) e zip. Le DLL si trovano con
+# ldd, tenendo solo quelle sotto il prefisso MSYS2 (es. /ucrt64): quelle di C:/Windows restano fuori.
+DISTNAME    := Ribalta-windows-x86_64
+DISTDIR     := build/dist/Ribalta
+MSYS_PREFIX ?= $(if $(MSYSTEM_PREFIX),$(MSYSTEM_PREFIX),/ucrt64)
+dist: release
+	$(call say,DIST,$(DISTDIR))
+	@rm -rf build/dist build/$(DISTNAME).zip
+	@mkdir -p $(DISTDIR)/assets
+	@cp $(BIN) $(DISTDIR)/
+	@for f in font.ttf OFL.txt ding.wav ribalta.svg; do cp assets/$$f $(DISTDIR)/assets/; done
+	@if [ -f LICENSE ]; then cp LICENSE $(DISTDIR)/; fi
+	@ldd ./$(BIN) | awk '/=>/ {print $$3}' | grep -F "$(MSYS_PREFIX)/" | sort -u | while read -r dll; do cp "$$dll" $(DISTDIR)/; done
+	@ls $(DISTDIR)/*.dll > /dev/null 2>&1 || { echo "make dist: nessuna DLL trovata sotto $(MSYS_PREFIX)" >&2; exit 1; }
+	@cd build/dist && if command -v zip > /dev/null 2>&1; then zip -qr ../$(DISTNAME).zip Ribalta; \
+	  else bsdtar -a -cf ../$(DISTNAME).zip Ribalta; fi
+	$(call say,ZIP,build/$(DISTNAME).zip)
+else
+dist:
+	@echo "make dist: per ora solo su Windows (MSYS2 UCRT64)" >&2; exit 1
+
+# rimuove solo i file installati: configurazione e statistiche dell'utente restano
+uninstall:
+	@./tools/uninstall.sh "$(PREFIX)"
+
 ifeq ($(UNAME_S),Darwin)
 # macOS: Ribalta.app (vedi tools/macos-app.sh) copiata in ~/Applications
 APPDIR  ?= $(HOME)/Applications
@@ -92,6 +141,7 @@ app:
 
 install:
 	@./tools/install.sh "$(PREFIX)"
+endif
 endif
 
 # installazione semplice e silenziosa per chi impacchetta (Flatpak, distribuzioni):
@@ -111,10 +161,6 @@ install-files:
 	sed -e 's/^Icon=.*/Icon=$(APPID)/' -e 's/^StartupWMClass=.*/StartupWMClass=$(APPID)/' \
 	  assets/ribalta.desktop > $(DESTDIR)$(PREFIX)/share/applications/$(APPID).desktop
 
-# rimuove solo i file installati: configurazione e statistiche dell'utente restano
-uninstall:
-	@./tools/uninstall.sh "$(PREFIX)"
-
 clean:
 	@rm -rf build $(BIN)
 
@@ -125,22 +171,22 @@ TESTS       := $(patsubst tests/%.c,%,$(wildcard tests/test_*.c))
 TEST_COMMON := src/core/settings.c src/core/color.c src/core/timer.c src/platform/paths.c \
                src/platform/fonts_common.c $(FONTS_SRC) src/core/stats.c
 
-build/tests/%: tests/%.c $(TEST_COMMON)
+build/tests/%$(EXE): tests/%.c $(TEST_COMMON)
 	$(call say,CC,tests/$*.c)
 	@mkdir -p build/tests
 	$(Q)$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $< $(TEST_COMMON) $(LDLIBS)
 
 # test_session: collega anche session.c, pomodoro.c e gli stub delle notifiche
-build/tests/test_session: tests/test_session.c tests/stub_notify.c src/app/session.c src/core/pomodoro.c $(TEST_COMMON)
+build/tests/test_session$(EXE): tests/test_session.c tests/stub_notify.c src/app/session.c src/core/pomodoro.c $(TEST_COMMON)
 	$(call say,CC,tests/test_session.c)
 	@mkdir -p build/tests
 	$(Q)$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $< tests/stub_notify.c src/app/session.c src/core/pomodoro.c $(TEST_COMMON) $(LDLIBS)
 
-test: $(addprefix build/tests/,$(TESTS))
-	@for t in $(TESTS); do printf '  %-4s %s ' TEST $$t; ./build/tests/$$t || exit 1; done
+test: $(addprefix build/tests/,$(addsuffix $(EXE),$(TESTS)))
+	@for t in $(TESTS); do printf '  %-4s %s ' TEST $$t; ./build/tests/$$t$(EXE) || exit 1; done
 
 # rigenera le PNG dell'icona da assets/ribalta.svg (serve rsvg-convert; le PNG sono nel repo)
 icons:
 	./tools/icons.sh
 
-.PHONY: all app debug release install install-files uninstall clean icons test
+.PHONY: all app debug release dist install install-files uninstall clean icons test

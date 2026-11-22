@@ -1,22 +1,26 @@
 #include "platform/notify.h"
 #include <SDL3/SDL.h>
+#include <stdio.h>
+#ifndef _WIN32
 #include <spawn.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <errno.h>
-#include <stdio.h>
 #include <unistd.h>
 
 extern char **environ;
+#endif
 
 #define MAX_CHILDREN 8
 #define POLL_MS 100
 
 static char        g_wav_path[1024];
-static char        g_icon[1024] = "alarm-clock";
 static bool        g_have_wav;
+static int         g_nchildren;  /* processi figli di notifica in corso (sempre 0 su Windows) */
+#ifndef _WIN32
+static char        g_icon[1024] = "alarm-clock";
 static pid_t       g_children[MAX_CHILDREN];
-static int         g_nchildren;
+#endif
 
 static bool              g_audio_on;   /* sottosistema audio inizializzato */
 static SDL_AudioStream  *g_stream;
@@ -26,6 +30,9 @@ static Uint64            g_deadline;   /* ms (SDL_GetTicks) oltre cui chiudere c
 
 void notify_init(const char *wav_path, const char *icon_path) {
     g_have_wav = false;
+#ifdef _WIN32
+    (void)icon_path; /* l'icona serve solo a notify-send: su Windows non ci sono processi figli */
+#else
     /* il demone delle notifiche vuole un percorso assoluto (l'asset può essere "./assets/...") */
     char cwd[512];
     if (icon_path && icon_path[0] == '/' && SDL_strlen(icon_path) < sizeof g_icon)
@@ -36,6 +43,7 @@ void notify_init(const char *wav_path, const char *icon_path) {
         if (n < 0 || (size_t)n >= sizeof g_icon)
             SDL_strlcpy(g_icon, "alarm-clock", sizeof g_icon);
     }
+#endif
     g_nchildren = 0;
     if (wav_path && wav_path[0] && SDL_strlen(wav_path) < sizeof g_wav_path) {
         SDL_strlcpy(g_wav_path, wav_path, sizeof g_wav_path);
@@ -59,6 +67,12 @@ static void applescript_quote(char *out, size_t n, const char *s) {
 #endif
 
 void notify_desktop(const char *title, const char *body) {
+#ifdef _WIN32
+    /* Windows: niente processi figli né toast; il lampeggio della finestra arriva nello step 5
+     * del porting (notify_set_window + SDL_FlashWindow) */
+    (void)title;
+    (void)body;
+#else
     if (g_nchildren >= MAX_CHILDREN) return;
 #ifdef __APPLE__
     /* macOS: notifica nativa tramite osascript (nessuna dipendenza, nessuna firma richiesta) */
@@ -80,6 +94,7 @@ void notify_desktop(const char *title, const char *body) {
         return;
     }
     g_children[g_nchildren++] = pid;
+#endif /* _WIN32 */
 }
 
 static void sound_close(void) {
@@ -125,12 +140,14 @@ void notify_sound(void) {
 }
 
 bool notify_poll(void) {
+#ifndef _WIN32
     for (int i = 0; i < g_nchildren; ) {
         pid_t r = waitpid(g_children[i], NULL, WNOHANG);
         if (r == 0) { i++; continue; }
         if (r < 0 && errno == EINTR) continue;
         g_children[i] = g_children[--g_nchildren]; /* terminato o errore: rimuovi */
     }
+#endif
     if (g_stream) {
         if (SDL_GetTicks() >= g_deadline) {
             sound_close();
@@ -148,6 +165,8 @@ uint32_t notify_ms_to_next_poll(void) {
 
 void notify_shutdown(void) {
     sound_close();
+#ifndef _WIN32
     for (int i = 0; i < g_nchildren; i++) waitpid(g_children[i], NULL, WNOHANG);
+#endif
     g_nchildren = 0;
 }
