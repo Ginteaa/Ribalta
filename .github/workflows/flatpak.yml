@@ -19,7 +19,7 @@ jobs:
       image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-25.08
       options: --privileged
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # Su alcuni runner l'overlayfs del container non permette di rinominare le cartelle che
       # vengono dall'immagine ("Invalid cross-device link"): l'aggiornamento dell'SDK fallisce e
@@ -47,6 +47,6 @@ jobs:
 
       - name: Attach to the release (tags v*)
         if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: ribalta.flatpak

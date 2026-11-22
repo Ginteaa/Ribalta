@@ -61,6 +61,12 @@
   </supports>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="1.0.0" date="2026-11-22">
+      <description>
+        <p>First stable release. Ribalta now also runs on Windows, with an installer and a portable zip.</p>
+        <p>On laptops with two GPUs (for example Intel and NVIDIA) Ribalta now uses the integrated one: much less memory, and the dedicated GPU stays off.</p>
+      </description>
+    </release>
     <release version="0.7.3" date="2026-11-20">
       <description>
         <p>Typing the letter Q in the font search or in a subject name no longer quits the app (Ctrl+Q always quits).</p>

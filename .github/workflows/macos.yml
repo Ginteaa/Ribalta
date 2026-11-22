@@ -26,7 +26,7 @@ jobs:
       # l'avvio di prova usa Cocoa e il renderer scelto dall'app, come su un Mac vero.
       SDL_AUDIO_DRIVER: dummy
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Install dependencies
         run: brew install sdl3 sdl3_ttf pkg-config dylibbundler
@@ -78,13 +78,13 @@ jobs:
       - name: Zip
         run: ditto -c -k --keepParent build/Ribalta.app Ribalta-macos-${{ matrix.suffix }}.zip
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: Ribalta-macos-${{ matrix.suffix }}
           path: Ribalta-macos-${{ matrix.suffix }}.zip
 
       - name: Attach to the release (tags v*)
         if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: Ribalta-macos-${{ matrix.suffix }}.zip

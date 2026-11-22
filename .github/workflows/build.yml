@@ -16,7 +16,7 @@ jobs:
       - name: Install dependencies
         run: pacman -Syu --noconfirm --needed base-devel sdl3 sdl3_ttf fontconfig ttf-dejavu pkgconf git curl util-linux
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Tag matches VERSION
         if: startsWith(github.ref, 'refs/tags/v')
