@@ -1,9 +1,14 @@
 /* Elenco dei font di sistema su Windows (vedi fonts.h).
- * I file si leggono dal registro (HKLM e HKCU, ...\Windows NT\CurrentVersion\Fonts); famiglia,
- * peso, corsivo e presenza delle cifre si leggono aprendo ogni file con SDL_ttf. Tutto vive solo
- * dentro fonts_list: a menu chiuso non resta nulla (niente cache, SDL_ttf è inizializzata e
- * chiusa qui se non lo è già). Le funzioni comuni (fonts_sort, fonts_find, fonts_step) stanno in
- * fonts_common.c. */
+ * I file si leggono dal registro (HKLM e HKCU, ...\Windows NT\CurrentVersion\Fonts); famiglia
+ * reale, peso, corsivo e presenza delle cifre si leggono aprendo il file con SDL_ttf. Aprire un
+ * file costa (antivirus, cache fredda): dal NOME del valore del registro ("Arial Bold Italic
+ * (TrueType)") si ricava prima una classificazione provvisoria (famiglia, peso, corsivo), i file
+ * si raggruppano per famiglia provvisoria e di ogni gruppo si apre il candidato migliore; gli
+ * altri si aprono solo se quello non conferma (non si apre, niente cifre, stile diverso dal
+ * previsto): circa un'apertura per famiglia invece di una per file.
+ * Tutto vive solo dentro fonts_list: a menu chiuso non resta nulla (niente cache, SDL_ttf è
+ * inizializzata e chiusa qui se non lo è già). Le funzioni comuni (fonts_sort, fonts_find,
+ * fonts_step) stanno in fonts_common.c. */
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 
@@ -49,54 +54,145 @@ static bool wide_to_utf8(const WCHAR *w, char *out, size_t size)
     return n > 1;  /* 0 = errore o buffer troppo piccolo, 1 = solo il terminatore */
 }
 
-/* ---- candidati: percorsi dei file, ognuno in un blocco allocato a parte ---- */
+/* ---- classificazione provvisoria dal nome del valore del registro ---- */
+
+/* Parole di peso finali nei nomi ("Segoe UI Semibold", "Arial Black"): restano nel nome del
+ * gruppo (a volte sono famiglie vere, es. "Arial Black"; altre volte il file dichiara la famiglia
+ * senza la parola, es. "Calibri Light" -> "Calibri": la famiglia reale la decide SDL_ttf) e danno
+ * solo il peso provvisorio */
+static const struct { const char *word; int weight; } WEIGHT_WORDS[] = {
+    { "thin", 100 },      { "hairline", 100 },  { "extralight", 200 }, { "ultralight", 200 },
+    { "light", 300 },     { "semilight", 350 }, { "medium", 500 },     { "semibold", 600 },
+    { "demibold", 600 },  { "extrabold", 800 }, { "ultrabold", 800 },  { "black", 900 },
+    { "heavy", 900 },
+};
+
+/* Tronca s a len caratteri, toglie gli spazi finali e ritorna la nuova lunghezza */
+static size_t rtrim(char *s, size_t len)
+{
+    s[len] = '\0';
+    while (len > 0 && s[len - 1] == ' ') s[--len] = '\0';
+    return len;
+}
+
+/* Da "Arial Bold Italic (TrueType)" ricava la chiave del gruppo ("Arial": nome senza il suffisso
+ * tra parentesi e senza le parole finali Bold/Italic/Oblique/Regular/Normal), il peso e il
+ * corsivo provvisori. Un nome troppo lungo o vuoto dà chiave = fallback (il gruppo di un file solo). */
+static void classify(const char *regname, const char *fallback, char *key, size_t key_size,
+                     int *weight, bool *italic)
+{
+    char s[256];
+    bool bold = false;
+    *italic = false;
+    *weight = W_REGULAR;
+    size_t len = strlen(regname);
+    if (len >= sizeof s) goto fallback;
+    memcpy(s, regname, len + 1);
+    len = rtrim(s, len);
+    if (len > 0 && s[len - 1] == ')') {  /* suffisso " (TrueType)" / " (OpenType)" */
+        char *open = strrchr(s, '(');
+        if (open) len = rtrim(s, (size_t)(open - s));
+    }
+    for (;;) {  /* parole di stile finali, finché resta almeno un'altra parola */
+        char *sp = strrchr(s, ' ');
+        if (!sp) break;
+        const char *tok = sp + 1;
+        if (SDL_strcasecmp(tok, "italic") == 0 || SDL_strcasecmp(tok, "oblique") == 0) *italic = true;
+        else if (SDL_strcasecmp(tok, "bold") == 0) bold = true;
+        else if (SDL_strcasecmp(tok, "regular") != 0 && SDL_strcasecmp(tok, "normal") != 0) break;
+        len = rtrim(s, (size_t)(sp - s));
+    }
+    if (len == 0 || len >= key_size) goto fallback;
+    if (bold) {
+        *weight = W_BOLD;
+    } else {
+        const char *last = strrchr(s, ' ');
+        last = last ? last + 1 : s;
+        for (size_t i = 0; i < sizeof WEIGHT_WORDS / sizeof *WEIGHT_WORDS; i++)
+            if (SDL_strcasecmp(last, WEIGHT_WORDS[i].word) == 0) *weight = WEIGHT_WORDS[i].weight;
+    }
+    memcpy(key, s, len + 1);
+    return;
+fallback:
+    *italic = false;
+    *weight = W_REGULAR;
+    snprintf(key, key_size, "%s", fallback);
+}
+
+/* ---- candidati ---- */
 
 typedef struct {
-    char **paths;
-    int    count, cap;
+    char *path;    /* percorso UTF-8 del file; il blocco contiene anche key */
+    char *key;     /* famiglia provvisoria (vedi classify) */
+    int   weight;  /* peso provvisorio */
+    bool  italic;  /* corsivo provvisorio */
+    int   score;   /* variant_score provvisorio */
+} Cand;
+
+typedef struct {
+    Cand *items;
+    int   count, cap;
 } Cands;
 
-static bool cands_add(Cands *c, const char *file)
+static bool cands_add(Cands *c, const char *file, const char *regname)
 {
     if (c->count == c->cap) {
         int ncap = c->cap ? c->cap * 2 : 256;
-        char **p = realloc(c->paths, (size_t)ncap * sizeof *p);
+        Cand *p = realloc(c->items, (size_t)ncap * sizeof *p);
         if (!p) return false;
-        c->paths = p;
+        c->items = p;
         c->cap = ncap;
     }
-    size_t n = strlen(file) + 1;
-    char *copy = malloc(n);
-    if (!copy) return false;
-    memcpy(copy, file, n);
-    c->paths[c->count++] = copy;
+    char key[FONT_FILE_MAX];  /* la chiave di riserva è il percorso */
+    Cand cand;
+    classify(regname, file, key, sizeof key, &cand.weight, &cand.italic);
+    cand.score = variant_score(cand.weight, cand.italic);
+    size_t plen = strlen(file) + 1, klen = strlen(key) + 1;
+    cand.path = malloc(plen + klen);  /* percorso e chiave in un blocco solo */
+    if (!cand.path) return false;
+    memcpy(cand.path, file, plen);
+    cand.key = cand.path + plen;
+    memcpy(cand.key, key, klen);
+    c->items[c->count++] = cand;
     return true;
 }
 
 static void cands_free(Cands *c)
 {
-    for (int i = 0; i < c->count; i++) free(c->paths[i]);
-    free(c->paths);
-    c->paths = NULL;
+    for (int i = 0; i < c->count; i++) free(c->items[i].path);
+    free(c->items);
+    c->items = NULL;
     c->count = c->cap = 0;
 }
 
 /* Il filesystem di Windows non distingue maiuscole e minuscole */
-static int cmp_path(const void *a, const void *b)
+static int cmp_by_path(const void *a, const void *b)
 {
-    return SDL_strcasecmp(*(char *const *)a, *(char *const *)b);
+    const Cand *x = a, *y = b;
+    int c = SDL_strcasecmp(x->path, y->path);
+    return c ? c : SDL_strcasecmp(x->key, y->key);
 }
 
-/* Ordina i percorsi e toglie i duplicati (lo stesso file registrato due volte, o una volta con
- * nome relativo e una assoluto): così ogni file si apre una volta sola */
+/* Per gruppo (chiave), poi dal candidato migliore al peggiore, poi per percorso (ordine stabile) */
+static int cmp_by_group(const void *a, const void *b)
+{
+    const Cand *x = a, *y = b;
+    int c = SDL_strcasecmp(x->key, y->key);
+    if (c) return c;
+    if (x->score != y->score) return x->score < y->score ? -1 : 1;
+    return SDL_strcasecmp(x->path, y->path);
+}
+
+/* Toglie i duplicati (lo stesso file registrato due volte, o una volta con nome relativo e una
+ * assoluto): così ogni file si apre al massimo una volta */
 static void cands_dedup(Cands *c)
 {
     if (c->count < 2) return;
-    qsort(c->paths, (size_t)c->count, sizeof *c->paths, cmp_path);
+    qsort(c->items, (size_t)c->count, sizeof *c->items, cmp_by_path);
     int w = 1;
     for (int i = 1; i < c->count; i++) {
-        if (SDL_strcasecmp(c->paths[i], c->paths[w - 1]) == 0) free(c->paths[i]);
-        else c->paths[w++] = c->paths[i];
+        if (SDL_strcasecmp(c->items[i].path, c->items[w - 1].path) == 0) free(c->items[i].path);
+        else c->items[w++] = c->items[i];
     }
     c->count = w;
 }
@@ -131,7 +227,7 @@ static bool collect_key(HKEY root, const char *fonts_dir, Cands *c)
         if (r != ERROR_SUCCESS || type != REG_SZ) continue;  /* anche ERROR_MORE_DATA: valore cresciuto */
         ((WCHAR *)data)[data_len / sizeof(WCHAR)] = L'\0';
 
-        char val[FONT_FILE_MAX], file[FONT_FILE_MAX];
+        char val[FONT_FILE_MAX], file[FONT_FILE_MAX], regname[256];
         if (!wide_to_utf8((const WCHAR *)data, val, sizeof val)) continue;
         if (paths_is_absolute(val)) {
             memcpy(file, val, strlen(val) + 1);
@@ -141,7 +237,8 @@ static bool collect_key(HKEY root, const char *fonts_dir, Cands *c)
             if (n < 0 || (size_t)n >= sizeof file) continue;
         }
         if (!ext_ok(file)) continue;
-        if (!cands_add(c, file)) ok = false;
+        if (!wide_to_utf8(name, regname, sizeof regname)) regname[0] = '\0';  /* -> gruppo di un file solo */
+        if (!cands_add(c, file, regname)) ok = false;
     }
 
     free(name);
@@ -174,6 +271,39 @@ static bool has_digits(TTF_Font *font)
     return true;
 }
 
+/* Apre il file del candidato; se ha le cifre e migliora la variante già scelta per la sua
+ * famiglia REALE (quella dichiarata nel file, può differire dalla chiave) lo registra in out.
+ * Ritorna true se il file conferma la classificazione provvisoria (cifre presenti, stesso corsivo
+ * e stessa classe Bold/non Bold attesi): allora gli altri file del gruppo non servono. */
+static bool probe(const Cand *c, FontList *out, int *score)
+{
+    const char *file = c->path;
+    if (strlen(file) >= FONT_FILE_MAX) return false;
+    if (!paths_is_absolute(file) || !paths_readable(file)) return false;
+
+    TTF_Font *font = TTF_OpenFont(file, PROBE_PT);
+    if (!font) return false;
+    bool confirmed = false;
+    const char *fam = TTF_GetFontFamilyName(font);
+    if (fam && fam[0] && strlen(fam) < FONT_FAMILY_MAX && has_digits(font)) {
+        int weight = TTF_GetFontWeight(font);
+        bool italic = (TTF_GetFontStyle(font) & TTF_STYLE_ITALIC) != 0;
+        int sc = variant_score(weight, italic);
+
+        int k = 0;
+        while (k < out->count && strcmp(out->items[k].family, fam) != 0) k++;
+        if (k == out->count || sc < score[k]) {
+            if (k == out->count) out->count++;
+            score[k] = sc;
+            strcpy(out->items[k].family, fam);
+            strcpy(out->items[k].file, file);
+        }
+        confirmed = italic == c->italic && (weight >= W_BOLDMIN) == (c->weight >= W_BOLDMIN);
+    }
+    TTF_CloseFont(font);
+    return confirmed;
+}
+
 bool fonts_list(FontList *out)
 {
     out->items = NULL;
@@ -195,37 +325,23 @@ bool fonts_list(FontList *out)
     if (!collect_key(HKEY_LOCAL_MACHINE, fonts_dir, &cands)) goto done;
     if (!collect_key(HKEY_CURRENT_USER, fonts_dir, &cands)) goto done;
     cands_dedup(&cands);
+    if (cands.count > 1)
+        qsort(cands.items, (size_t)cands.count, sizeof *cands.items, cmp_by_group);
 
-    int cap = cands.count;
+    int cap = cands.count;  /* le famiglie reali non superano i file */
     if (cap > 0) {
         out->items = calloc((size_t)cap, sizeof *out->items);
         score = calloc((size_t)cap, sizeof *score);
         if (!out->items || !score) goto done;
     }
 
-    for (int i = 0; i < cands.count; i++) {
-        const char *file = cands.paths[i];
-        if (strlen(file) >= FONT_FILE_MAX) continue;
-        if (!paths_is_absolute(file) || !paths_readable(file)) continue;
-
-        TTF_Font *font = TTF_OpenFont(file, PROBE_PT);
-        if (!font) continue;
-        const char *fam = TTF_GetFontFamilyName(font);
-        if (fam && fam[0] && strlen(fam) < FONT_FAMILY_MAX) {
-            bool italic = (TTF_GetFontStyle(font) & TTF_STYLE_ITALIC) != 0;
-            int sc = variant_score(TTF_GetFontWeight(font), italic);
-
-            int k = 0;
-            while (k < out->count && strcmp(out->items[k].family, fam) != 0) k++;
-            /* le cifre si controllano solo se la variante migliora quella già scelta */
-            if ((k == out->count || sc < score[k]) && has_digits(font)) {
-                if (k == out->count) out->count++;
-                score[k] = sc;
-                strcpy(out->items[k].family, fam);
-                strcpy(out->items[k].file, file);
-            }
-        }
-        TTF_CloseFont(font);
+    /* per ogni gruppo: dal candidato migliore, ci si ferma al primo che conferma */
+    for (int i = 0; i < cands.count;) {
+        int j = i;
+        while (j < cands.count && SDL_strcasecmp(cands.items[j].key, cands.items[i].key) == 0) j++;
+        for (int k = i; k < j; k++)
+            if (probe(&cands.items[k], out, score)) break;
+        i = j;
     }
 
     if (out->count == 0) {
