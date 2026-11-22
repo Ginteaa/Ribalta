@@ -5,6 +5,7 @@
 #include <SDL3/SDL.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 /* Crea una cartella temporanea nuova "<tmp>/ribalta-test-XXXXXX" e ne scrive il percorso in out.
  * <tmp> = $TMPDIR, poi %TEMP% (Windows), poi /tmp. Ritorna false su errore. */
@@ -24,10 +25,15 @@ static inline bool test_mkdtemp(char *out, size_t n)
     return false;
 }
 
-/* setenv(name, value, 1) portabile. */
+/* setenv(name, value, 1) portabile, nell'ambiente del runtime C (quello letto da getenv in
+ * paths.c): su Windows SDL_setenv_unsafe non aggiorna la copia del CRT. */
 static inline void test_setenv(const char *name, const char *value)
 {
-    SDL_setenv_unsafe(name, value, 1);
+#ifdef _WIN32
+    _putenv_s(name, value);
+#else
+    setenv(name, value, 1);
+#endif
 }
 
 /* true se il percorso esiste (file o cartella). */
