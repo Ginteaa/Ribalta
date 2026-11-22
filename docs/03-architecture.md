@@ -63,6 +63,16 @@
 > Release binary: ~60 KB (stripped, LTO; the ~27 KB figure measured in Phase 1 predates the
 > later features).
 
+> **Hybrid laptops** (Intel UHD 620 + NVIDIA GTX 1050 with the proprietary driver active, native
+> build, `gpu` renderer, idle clock): without a filter the Vulkan loader also loads the NVIDIA driver
+> and SDL renders on the discrete GPU (it shows in `nvidia-smi` with ~120 MiB of VRAM), keeping it
+> awake: **PSS ~83 MB**. `SDL_RENDER_GPU_LOW_POWER=1` alone gives ~59 MB (the NVIDIA driver is still
+> loaded). Since then `gpu.c` keeps only the drivers of the GPU that drives the screen
+> (`/sys/class/drm/card*/device/boot_vga` = 1, the integrated one) when GPUs from different vendors
+> are present: **PSS ~15.5 MB**, CPU 30 ms in 65 s, the NVIDIA GPU untouched. `main.c` also sets
+> `SDL_HINT_RENDER_GPU_LOW_POWER` on every platform (Windows and dual-GPU Macs prefer the integrated
+> GPU too). `prime-run` (`__NV_PRIME_RENDER_OFFLOAD`) and `DRI_PRIME` disable the filter.
+
 > **Windows measurements**: to be measured on a real PC (idle PSS and CPU over 65 s, as for the other
 > platforms). The renderer order on Windows, `gpu,direct3d11,direct3d12,opengl,software` (`main.c`), is
 > provisional until these numbers exist.
@@ -138,7 +148,7 @@ ribalta/
 │   │   ├── fonts_mac.c     macOS: CoreText
 │   │   ├── fonts_win.c     Windows: installed-fonts registry, families checked with SDL_ttf
 │   │   ├── fonts_common.c  sorting, lookup and ring stepping shared by all three
-│   │   └── gpu.c/.h        Flatpak only: load just the Vulkan drivers for the installed GPUs
+│   │   └── gpu.c/.h        Linux: load just the Vulkan drivers needed (hybrid laptops, Flatpak)
 │   ├── render/
 │   │   └── render.c/.h     layout, digit/tile textures, flip animation, progress bar, hint
 │   └── ui/                 overlay panels
@@ -315,7 +325,8 @@ The headers are the reference; this is the map.
   `libLLVM`. Inside Flatpak (`$FLATPAK_ID` set) Ribalta reads the PCI vendors from
   `/sys/class/drm/card*/device/vendor` and sets `VK_LOADER_DRIVERS_SELECT` to the matching drivers
   only, before `SDL_Init`. It does nothing if the user already set `VK_LOADER_DRIVERS_SELECT`,
-  `VK_DRIVER_FILES` or `VK_ICD_FILENAMES`, or if no vendor is recognised.
+  `VK_DRIVER_FILES`, `VK_ICD_FILENAMES`, `DRI_PRIME` or `__NV_PRIME_RENDER_OFFLOAD`, or if no vendor
+  is recognised. The same function also covers **hybrid laptops**, native or Flatpak (see below).
 - **Notifications** inside the sandbox go through the notification portal (libnotify does this
   automatically); the portal ignores the app name and icon passed to `notify-send`.
 

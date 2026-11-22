@@ -163,7 +163,7 @@ static void main_loop(App *a)
 
 static bool app_init(void)
 {
-    gpu_limit_vulkan_drivers(); /* solo in Flatpak: evita di caricare driver Vulkan inutili */
+    gpu_limit_vulkan_drivers(); /* Linux: solo i driver Vulkan che servono (vedi gpu.h) */
 #ifdef __linux__
     SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "wayland,x11");
 #endif
@@ -174,6 +174,9 @@ static bool app_init(void)
     SDL_SetHint(SDL_HINT_WINDOWS_INTRESOURCE_ICON_SMALL, "1");
 #endif
     SDL_SetHint(SDL_HINT_VIDEO_ALLOW_SCREENSAVER, "1");
+    /* renderer "gpu": con più GPU preferisce quella a basso consumo (l'integrata), così la scheda
+     * dedicata resta spenta (Windows, Mac con due GPU; su Linux ci pensa anche gpu.c) */
+    SDL_SetHint(SDL_HINT_RENDER_GPU_LOW_POWER, "1");
     /* "gpu" (SDL_GPU: Vulkan su Linux, Metal su macOS) misurato su Linux: ~17 MB PSS contro
      * ~37 MB di opengl. La variabile d'ambiente SDL_RENDER_DRIVER ha comunque la precedenza. */
 #if defined(__APPLE__)
