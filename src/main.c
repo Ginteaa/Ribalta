@@ -234,6 +234,7 @@ static bool app_open(App *a)
     char icon[1024];
     notify_init(paths_find_asset("ding.wav", wav, sizeof wav) ? wav : NULL,
                 paths_find_asset("ribalta.svg", icon, sizeof icon) ? icon : NULL);
+    notify_set_window(a->win);
     if (!a->screensaver) {
         a->ui = ui_settings_create(a->ren, a->bundled_font);
         a->sui = ui_stats_create(a->ren, a->bundled_font);

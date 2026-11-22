@@ -10,8 +10,15 @@
 /* icon_path: percorso dell'icona (ribalta.svg) per le notifiche, o NULL -> icona di tema "alarm-clock". */
 void notify_init(const char *wav_path, const char *icon_path);
 
-/* Lancia `notify-send -a Ribalta -i <icona> <title> <body>` senza bloccare
- * (posix_spawnp). Se notify-send manca, fallisce in silenzio. */
+/* Finestra da far lampeggiare su Windows (NULL = nessuna). Va chiamata dopo SDL_CreateWindow;
+ * notify_shutdown la dimentica (chiamarla prima di distruggere la finestra). Su Linux e macOS non ha effetto. */
+typedef struct SDL_Window SDL_Window;
+void notify_set_window(SDL_Window *w);
+
+/* Linux: lancia `notify-send -a Ribalta -i <icona> <title> <body>` senza bloccare
+ * (posix_spawnp); se notify-send manca, fallisce in silenzio. macOS: osascript.
+ * Windows: fa lampeggiare la finestra nella barra delle applicazioni finché non riceve il fuoco
+ * (SDL_FlashWindow, nessun processo figlio, nessun costo a riposo). */
 void notify_desktop(const char *title, const char *body);
 
 /* Avvia la riproduzione del WAV (SDL_InitSubSystem(SDL_INIT_AUDIO) al bisogno). */
