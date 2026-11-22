@@ -1,14 +1,18 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <fcntl.h>
-#include <sys/file.h>
-#include <fcntl.h>
-#include <sys/file.h>
 #include <time.h>
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <windows.h>
+#else
+#include <fcntl.h>
+#include <sys/file.h>
 #include <unistd.h>
+#endif
 #include <SDL3/SDL.h>
-#include <SDL3_ttf/SDL_ttf.h>
+#include <SDL3/SDL_main.h> /* solo su Windows rinomina main() e fornisce WinMain (build -mwindows) */
 #include <SDL3_ttf/SDL_ttf.h>
 #include "app/app.h"
 #include "app/display.h"
@@ -167,8 +171,11 @@ static bool app_init(void)
     SDL_SetHint(SDL_HINT_VIDEO_ALLOW_SCREENSAVER, "1");
     /* "gpu" (SDL_GPU: Vulkan su Linux, Metal su macOS) misurato su Linux: ~17 MB PSS contro
      * ~37 MB di opengl. La variabile d'ambiente SDL_RENDER_DRIVER ha comunque la precedenza. */
-#ifdef __APPLE__
+#if defined(__APPLE__)
     SDL_SetHint(SDL_HINT_RENDER_DRIVER, "gpu,metal,opengl,software");
+#elif defined(_WIN32)
+    /* ordine provvisorio: la scelta definitiva si fa misurando RAM e CPU su Windows (step 7) */
+    SDL_SetHint(SDL_HINT_RENDER_DRIVER, "gpu,direct3d11,direct3d12,opengl,software");
 #else
     SDL_SetHint(SDL_HINT_RENDER_DRIVER, "gpu,opengl,opengles2,software");
 #endif
@@ -270,6 +277,22 @@ static void app_close(App *a)
     SDL_Quit();
 }
 
+#ifdef _WIN32
+/* Istanza singola: mutex con nome nella sessione dell'utente (Local\Ribalta).
+ * L'handle resta aperto per tutta la vita del processo; il sistema rilascia il mutex
+ * all'uscita, anche in caso di crash. Ritorna false se un'altra istanza è attiva. */
+static bool acquire_single_instance(void)
+{
+    HANDLE h = CreateMutexW(NULL, FALSE, L"Local\\Ribalta");
+    if (!h)
+        return true; /* non bloccare l'avvio se il mutex non è creabile */
+    if (GetLastError() == ERROR_ALREADY_EXISTS) {
+        CloseHandle(h);
+        return false;
+    }
+    return true; /* handle lasciato aperto di proposito */
+}
+#else
 /* Istanza singola: lock esclusivo su $XDG_RUNTIME_DIR/ribalta.lock (fallback $TMPDIR, poi /tmp;
  * su macOS XDG_RUNTIME_DIR di solito manca e TMPDIR è la cartella temporanea dell'utente).
  * Il descrittore resta aperto per tutta la vita del processo; il kernel rilascia
@@ -290,6 +313,7 @@ static bool acquire_single_instance(void)
     }
     return true; /* fd lasciato aperto di proposito */
 }
+#endif
 
 #ifndef RIBALTA_VERSION
 #define RIBALTA_VERSION "dev"
@@ -316,7 +340,21 @@ static void run_subcommand(const char *name, int argc, char **argv)
         }
         exit(1);
     }
-#ifdef __APPLE__
+#if defined(_WIN32)
+    /* Windows: nessuno script bash da lanciare, si aggiorna e si disinstalla a mano */
+    (void)argc;
+    (void)argv;
+    if (is_update)
+        fputs("ribalta: scarica l'ultima versione per Windows (zip portatile o installer) da "
+              "https://github.com/Ginteaa/Ribalta/releases/latest\n",
+              stderr);
+    else
+        fputs("ribalta: disinstalla Ribalta da Impostazioni → App (se l'hai installato con "
+              "l'installer) oppure elimina la cartella di Ribalta (versione portatile); "
+              "impostazioni e statistiche restano\n",
+              stderr);
+    exit(1);
+#elif defined(__APPLE__)
     (void)argc;
     (void)argv;
     if (is_update)

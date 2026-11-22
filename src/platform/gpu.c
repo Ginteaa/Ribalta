@@ -6,14 +6,17 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifdef __linux__
 static bool env_set(const char *name)
 {
     const char *v = getenv(name);
     return v && v[0];
 }
+#endif
 
 void gpu_limit_vulkan_drivers(void)
 {
+#ifdef __linux__
     if (!env_set("FLATPAK_ID") || env_set("VK_LOADER_DRIVERS_SELECT") || env_set("VK_DRIVER_FILES")
         || env_set("VK_ICD_FILENAMES"))
         return;
@@ -48,4 +51,5 @@ void gpu_limit_vulkan_drivers(void)
     setenv("VK_LOADER_DRIVERS_SELECT", sel, 0);
     if (getenv("RIBALTA_DEBUG"))
         fprintf(stderr, "ribalta: VK_LOADER_DRIVERS_SELECT=%s\n", sel);
+#endif /* __linux__: altrove (macOS, Windows) non c'è nulla da filtrare */
 }

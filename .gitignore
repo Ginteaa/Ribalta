@@ -1,5 +1,6 @@
 build/
 /ribalta
+/ribalta.exe
 *.o
 *.d
 AGENTS.md
