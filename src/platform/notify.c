@@ -16,6 +16,7 @@ extern char **environ;
 
 static char        g_wav_path[1024];
 static bool        g_have_wav;
+static SDL_Window *g_window;     /* finestra da far lampeggiare (solo Windows) */
 static int         g_nchildren;  /* processi figli di notifica in corso (sempre 0 su Windows) */
 #ifndef _WIN32
 static char        g_icon[1024] = "alarm-clock";
@@ -66,12 +67,18 @@ static void applescript_quote(char *out, size_t n, const char *s) {
 }
 #endif
 
+void notify_set_window(SDL_Window *w) {
+    g_window = w;
+}
+
 void notify_desktop(const char *title, const char *body) {
 #ifdef _WIN32
-    /* Windows: niente processi figli né toast; il lampeggio della finestra arriva nello step 5
-     * del porting (notify_set_window + SDL_FlashWindow) */
+    /* Windows: niente processi figli né toast; la finestra lampeggia nella barra delle
+     * applicazioni finché l'utente non la porta in primo piano (se lo è già, non succede nulla) */
     (void)title;
     (void)body;
+    if (g_window)
+        SDL_FlashWindow(g_window, SDL_FLASH_UNTIL_FOCUSED);
 #else
     if (g_nchildren >= MAX_CHILDREN) return;
 #ifdef __APPLE__
@@ -165,6 +172,7 @@ uint32_t notify_ms_to_next_poll(void) {
 
 void notify_shutdown(void) {
     sound_close();
+    g_window = NULL;
 #ifndef _WIN32
     for (int i = 0; i < g_nchildren; i++) waitpid(g_children[i], NULL, WNOHANG);
 #endif
