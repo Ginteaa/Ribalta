@@ -1,0 +1,44 @@
+/* Risorse di ribalta.exe, compilate con windres (vedi il Makefile):
+ * icona (id 1), manifest (UTF-8, DPI per monitor) e informazioni di versione.
+ *
+ * Solo ASCII e nessun #include di sistema: windres e' sensibile alla codifica del file e
+ * i valori numerici qui sotto sono quelli di winver.h. Percorsi relativi alla radice del
+ * repository (e' la cartella da cui il Makefile lancia windres).
+ * ribalta_version.h e' generato dal Makefile (build/) a partire dal file VERSION. */
+#include "ribalta_version.h"
+
+/* icona dell'eseguibile e della finestra: main.c la richiede a SDL con il suo id (1) */
+1 ICON "assets/ribalta.ico"
+
+/* manifest: id 1 = CREATEPROCESS_MANIFEST_RESOURCE_ID, tipo 24 = RT_MANIFEST */
+1 24 "packaging/windows/ribalta.manifest"
+
+/* versione: 1 = VS_VERSION_INFO */
+1 VERSIONINFO
+FILEVERSION RIBALTA_VER_MAJOR, RIBALTA_VER_MINOR, RIBALTA_VER_PATCH, 0
+PRODUCTVERSION RIBALTA_VER_MAJOR, RIBALTA_VER_MINOR, RIBALTA_VER_PATCH, 0
+FILEFLAGSMASK 0x3fL   /* VS_FFI_FILEFLAGSMASK */
+FILEFLAGS 0x0L
+FILEOS 0x40004L       /* VOS_NT_WINDOWS32 */
+FILETYPE 0x1L         /* VFT_APP */
+FILESUBTYPE 0x0L      /* VFT2_UNKNOWN */
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904B0" /* inglese USA (0x0409), Unicode (0x04B0) */
+        BEGIN
+            VALUE "CompanyName", "Ribalta"
+            VALUE "FileDescription", "Ribalta - orologio flip e timer di studio"
+            VALUE "FileVersion", RIBALTA_VERSION_STR
+            VALUE "InternalName", "ribalta"
+            VALUE "LegalCopyright", "GPL-3.0-or-later"
+            VALUE "OriginalFilename", "ribalta.exe"
+            VALUE "ProductName", "Ribalta"
+            VALUE "ProductVersion", RIBALTA_VERSION_STR
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x0409, 0x04B0
+    END
+END

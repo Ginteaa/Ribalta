@@ -17,13 +17,13 @@ static void stamp(time_t t, char *out, size_t n) {
 }
 
 static void write_file(const char *body) {
-    FILE *f = fopen(csv, "w");
+    FILE *f = fopen(csv, "wb");
     if (f) { fputs(body, f); fclose(f); }
 }
 
 static char *slurp(void) {
     static char buf[8192];
-    FILE *f = fopen(csv, "r");
+    FILE *f = fopen(csv, "rb");
     size_t n = 0;
     if (f) { n = fread(buf, 1, sizeof buf - 1, f); fclose(f); }
     buf[n] = '\0';
@@ -106,7 +106,7 @@ int main(void) {
     CHECK(stats_append(now, 60, "timer", true, "Fisica"));
     CHECK(strncmp(slurp(), legacy, legacy_len) == 0);   /* mai riscritto */
     {
-        FILE *f = fopen(csv, "a");
+        FILE *f = fopen(csv, "ab");
         fprintf(f, "garbage\n%s,abc,timer,1,X\n%s,-5,timer,1,X\n%s,100,timer,2,X\n%s,100,timer,1x\n"
                    "%s,0,timer,1\nsolo,virgole,,\n%s,3000,timer,1,Vecchia\n",
                 t0, t0, t0, t0, t0, t2);
@@ -136,6 +136,28 @@ int main(void) {
     write_file(legacy);
     CHECK(stats_subject_totals(tot, 8, now) == 2);
     CHECK(strcmp(tot[0].name, "Alfa") == 0 && strcmp(tot[1].name, "Zeta") == 0);
+
+    /* CSV con fine riga Windows (salvato da un foglio di calcolo): ogni riga con CRLF, anche l'ultima */
+    snprintf(legacy, sizeof legacy,
+             "inizio,durata_s,tipo,completata,materia\r\n%s,600,timer,1,Analisi\r\n%s,300,pomodoro,0,\r\n"
+             "%s,120,timer,1\r\n", t0, t0, t0);
+    write_file(legacy);
+    CHECK(stats_summary(&s, now, NULL) && s.today_s == 1020 && s.completed_sessions == 2);
+    CHECK(stats_summary(&s, now, "Analisi") && s.today_s == 600);   /* niente '\r' nel nome materia */
+    CHECK(stats_subject_totals(tot, 8, now) == 2);
+    CHECK(strcmp(tot[0].name, "Analisi") == 0 && tot[0].week_s == 600);
+    CHECK(strcmp(tot[1].name, "") == 0 && tot[1].week_s == 420);
+    {
+        StatsGoals g;
+        CHECK(stats_goals(&g, now, 0) && g.today_s == 1020);
+    }
+    /* un append dopo un file CRLF aggiunge una riga LF e lascia intatto il resto */
+    {
+        size_t len = strlen(legacy);
+        CHECK(stats_append(now, 600, "timer", true, "Fisica"));
+        CHECK(strncmp(slurp(), legacy, len) == 0);
+        CHECK(stats_summary(&s, now, "Fisica") && s.today_s == 600);
+    }
 
     /* obiettivi */
     {

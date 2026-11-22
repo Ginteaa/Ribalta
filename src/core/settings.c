@@ -156,13 +156,17 @@ bool settings_load(Settings *s)
     char path[PATH_MAX_LEN];
     if (!paths_config_file(path, sizeof path))
         return false;
-    FILE *f = fopen(path, "r");
+    FILE *f = fopen(path, "rb");   /* binario: nessuna conversione di \r\n; il \r finale lo toglie trim() */
     if (!f)
         return false;
     char line[1024];
-    bool seen_break_color = false, legacy_blue = false;
+    bool seen_break_color = false, legacy_blue = false, first = true;
     while (fgets(line, sizeof line, f)) {
-        char *p = trim(line);
+        char *p = line;
+        if (first && !strncmp(p, "\xEF\xBB\xBF", 3))   /* BOM UTF-8 (alcuni editor di Windows lo aggiungono) */
+            p += 3;
+        first = false;
+        p = trim(p);
         if (*p == '#' || *p == '\0')
             continue;
         char *eq = strchr(p, '=');
@@ -200,11 +204,11 @@ bool settings_load(Settings *s)
 bool settings_save(const Settings *s)
 {
     char dir[PATH_MAX_LEN], path[PATH_MAX_LEN];
-    if (!paths_config_dir(dir, sizeof dir) || snprintf(path, sizeof path, "%s/config.ini", dir) >= (int)sizeof path)
+    if (!paths_config_dir(dir, sizeof dir) || !paths_config_file(path, sizeof path))
         return false;
     if (!paths_mkdir_p(dir))
         return false;
-    FILE *f = fopen(path, "w");
+    FILE *f = fopen(path, "wb");   /* binario: file sempre con fine riga LF, su ogni sistema */
     if (!f)
         return false;
 #define B(x) ((x) ? "true" : "false")

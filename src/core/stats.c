@@ -20,14 +20,6 @@ static long day_number(int year, int mon /*1-12*/, int mday)
     return era * 146097 + doe;
 }
 
-static bool csv_path(char *out, size_t n)
-{
-    char dir[1024];
-    if (!paths_data_dir(dir, sizeof dir)) return false;
-    int r = snprintf(out, n, "%s/sessions.csv", dir);
-    return r > 0 && (size_t)r < n;
-}
-
 /* Copia subject in out sostituendo , " ; e i caratteri di controllo con spazi e troncando a
  * STATS_SUBJECT_LEN-1 byte senza spezzare una sequenza UTF-8. */
 static void sanitize_subject(char *out, const char *subject)
@@ -48,12 +40,12 @@ bool stats_append(time_t start, long duration_s, const char *type, bool complete
 {
     if (duration_s < 60) return true;
     char path[1100];
-    if (!csv_path(path, sizeof path)) return false;
+    if (!paths_sessions_file(path, sizeof path)) return false;
     struct tm tm;
     if (!compat_localtime(start, &tm)) return false;
     char subj[STATS_SUBJECT_LEN];
     sanitize_subject(subj, subject);
-    FILE *f = fopen(path, "a");
+    FILE *f = fopen(path, "ab");
     if (!f) return false;
     bool ok = true;
     if (fseek(f, 0, SEEK_END) == 0 && ftell(f) == 0)
@@ -123,8 +115,8 @@ int stats_subject_totals(StatsSubjectTotal *out, int max, time_t now)
     if (!compat_localtime(now, &tn)) return 0;
     const long today = day_number(tn.tm_year + 1900, tn.tm_mon + 1, tn.tm_mday);
     char path[1100];
-    if (!csv_path(path, sizeof path)) return 0;
-    FILE *f = fopen(path, "r");
+    if (!paths_sessions_file(path, sizeof path)) return 0;
+    FILE *f = fopen(path, "rb");
     if (!f) return 0;
 
     enum { MAX_NAMES = 32 };
@@ -173,8 +165,8 @@ bool stats_summary(StatsSummary *out, time_t now, const char *filter)
     for (int i = 0; i < 7; i++) out->week_wday[i] = ((tn.tm_wday - (6 - i)) % 7 + 7) % 7;
 
     char path[1100];
-    if (!csv_path(path, sizeof path)) return true;   /* niente directory dati: riepilogo vuoto */
-    FILE *f = fopen(path, "r");
+    if (!paths_sessions_file(path, sizeof path)) return true;   /* niente directory dati: riepilogo vuoto */
+    FILE *f = fopen(path, "rb");
     if (!f) return true;
 
     static long per_day[HIST_DAYS];   /* [k] = k giorni fa */
@@ -209,8 +201,8 @@ bool stats_goals(StatsGoals *out, time_t now, long daily_goal_s)
     const long since_monday = (tn.tm_wday + 6) % 7;   /* 0 = lunedì */
 
     char path[1100];
-    if (!csv_path(path, sizeof path)) return true;
-    FILE *f = fopen(path, "r");
+    if (!paths_sessions_file(path, sizeof path)) return true;
+    FILE *f = fopen(path, "rb");
     if (!f) return true;
 
     /* Totali per giorno: [k] = k giorni fa. La serie di obiettivi è limitata agli ultimi GOAL_DAYS
