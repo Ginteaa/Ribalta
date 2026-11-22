@@ -7,9 +7,10 @@
 | Language | **C17** | no runtime, small binary, full control over memory |
 | Window / rendering / input / audio | **SDL3** (3.4.x at the time of writing) | native Wayland backend, GPU renderer, a single dependency |
 | Font rasterisation | **SDL3_ttf** (3.2.x) | simple API; used only to generate textures once at startup/resize. The font is closed after generation to free memory |
-| Font list | **fontconfig** (loaded with `dlopen`) | lists installed scalable fonts that contain the digits; loaded **only while the font menu is open** (or on ←/→ in the settings row), then released with `FcFini`. Startup opens `font_file` directly, without fontconfig |
-| Notifications | `notify-send` process (`fork`+`execvp`) | avoids linking libnotify/GLib (several MB of RAM) |
-| Build | **Makefile** + `pkg-config` | simple, no extra build system |
+| Font list | **fontconfig** (loaded with `dlopen`) on Linux; the installed-fonts registry on Windows (`fonts_win.c`), CoreText on macOS | lists installed scalable fonts that contain the digits; loaded **only while the font menu is open** (or on ←/→ in the settings row), then released (`FcFini` on Linux). Startup opens `font_file` directly, without any font list |
+| Notifications | `notify-send` process (`fork`+`execvp`) on Linux, `osascript` on macOS; on Windows `SDL_FlashWindow` (no process) | avoids linking libnotify/GLib (several MB of RAM) |
+| Windows glue | Win32 named mutex (single instance), `%APPDATA%`, `windres` resources (icon, manifest, version), `-mwindows` | only a few `#ifdef _WIN32` branches; the rest is portable C17 (`platform/compat.h` for the time functions) |
+| Build | **Makefile** + `pkg-config` (MSYS2 MinGW-w64 UCRT64 on Windows) | simple, no extra build system |
 
 ### Comparison (indicative steady-state RAM)
 
@@ -62,6 +63,10 @@
 > Release binary: ~60 KB (stripped, LTO; the ~27 KB figure measured in Phase 1 predates the
 > later features).
 
+> **Windows measurements**: to be measured on a real PC (idle PSS and CPU over 65 s, as for the other
+> platforms). The renderer order on Windows, `gpu,direct3d11,direct3d12,opengl,software` (`main.c`), is
+> provisional until these numbers exist.
+
 ## 2. Strategy for using very few resources
 
 1. **Event-driven loop, not fixed frames.**
@@ -83,8 +88,8 @@
    Textures are rebuilt only when the window size changes (the resize is flagged by the event and
    applied once on the next loop pass: `main.c`, `input.c`) and when the digit font changes.
 4. **Drift-free timekeeping.**
-   - Clock: `clock_gettime(CLOCK_REALTIME)` + `localtime_r`; the wait timeout is computed
-     up to the next minute/second boundary, +5 ms margin.
+   - Clock: `timespec_get(TIME_UTC)` + `compat_localtime` (`localtime_r`, or `localtime_s` on Windows;
+     `platform/compat.h`); the wait timeout is computed up to the next minute/second boundary, +5 ms margin.
    - Timer: `SDL_GetTicksNS()` (monotonic); the end instant is stored instead of decrementing a counter.
    Changing the digit font (`render_set_font`) rebuilds glyphs and faces once; the font menu defers
    the live preview with a wait-timeout deadline (`font_preview_at`, ~150 ms), never with polling.
@@ -98,7 +103,8 @@
    audio for the chime and fontconfig exist only while they are needed. The font list is freed when
    the font menu closes (`FcFini`, `malloc_trim`); the legend's font is opened only while it is open.
 9. **No libnotify.** Notifications run `notify-send` (or `osascript` on macOS) through `fork`+`execvp`,
-   only when a session, a Pomodoro phase or a goal ends; no background process is kept.
+   only when a session, a Pomodoro phase or a goal ends; no background process is kept. On Windows there
+   is no process at all: the taskbar button flashes (`SDL_FlashWindow`) until the window is focused.
 
 **Tips for the absolute minimum**: `show_seconds=false` removes the per-second wake-ups and
 `animations=false` removes the flip frames (the digits change at once). Both are settings in the panel
@@ -124,12 +130,14 @@ ribalta/
 │   ├── core/               pure logic, testable without a window
 │   │   ├── clock  timer  pomodoro  stats  settings  color   (.c/.h)
 │   ├── platform/           OS integration
-│   │   ├── notify.c/.h     notify-send (Linux) / osascript (macOS) + sound
-│   │   ├── paths.c/.h      config/data directories (XDG; macOS: Application Support), asset lookup
+│   │   ├── compat.h        small POSIX/Windows differences (localtime); header only
+│   │   ├── notify.c/.h     notify-send (Linux) / osascript (macOS) / taskbar flash (Windows) + sound
+│   │   ├── paths.c/.h      config/data directories (XDG; macOS: Application Support; Windows: %APPDATA%), asset lookup
 │   │   ├── fonts.h         installed font list API; no state kept
 │   │   ├── fonts.c         Linux: fontconfig (dlopen'd while needed)
 │   │   ├── fonts_mac.c     macOS: CoreText
-│   │   ├── fonts_common.c  sorting, lookup and ring stepping shared by both
+│   │   ├── fonts_win.c     Windows: installed-fonts registry, families checked with SDL_ttf
+│   │   ├── fonts_common.c  sorting, lookup and ring stepping shared by all three
 │   │   └── gpu.c/.h        Flatpak only: load just the Vulkan drivers for the installed GPUs
 │   ├── render/
 │   │   └── render.c/.h     layout, digit/tile textures, flip animation, progress bar, hint
@@ -141,9 +149,10 @@ ribalta/
 │       ├── ui_font.c/.h    digit-font menu (search field, list, preview)
 │       └── ui_subject.c/.h subjects menu (list, add with text input, remove)
 ├── assets/                 font, licence, chime, icon source
+│   ├── ribalta.ico         Windows icon (generated from the SVG by make icons)
 │   ├── icons/              PNG icons (16 ... 512 px)
 │   └── ribalta.desktop     launcher entry
-├── tests/                  unit tests run by `make test` and the CI
+├── tests/                  unit tests run by `make test` and the CI (test_util.h: helpers without POSIX calls)
 ├── tools/
 │   ├── install.sh          `make install`: build, install, progress UI
 │   ├── uninstall.sh        `make uninstall` / `ribalta uninstall`: removes only installed files, keeps user data
@@ -152,8 +161,9 @@ ribalta/
 │   └── macos-app.sh        `make app` on macOS: builds build/Ribalta.app (icon, bundled libs, ad-hoc signature)
 ├── packaging/flatpak/      Flatpak manifest and AppStream metainfo
 ├── packaging/macos/        Info.plist template for Ribalta.app
+├── packaging/windows/      exe resources (ribalta.rc, ribalta.manifest) and the Inno Setup script (ribalta.iss)
 ├── docs/                   specifications and design notes
-└── .github/workflows/      CI (build, tests, install/uninstall smoke test, Flatpak bundle, macOS app)
+└── .github/workflows/      CI (build, tests, install/uninstall smoke test, Flatpak bundle, macOS app, Windows zip and installer)
 ```
 
 Folder roles:
@@ -231,6 +241,27 @@ The headers are the reference; this is the map.
   `build/Ribalta.app`. Such a bundle links Homebrew's SDL3, so it runs on the Mac that built it;
   `BUNDLE_LIBS=1 make app` (needs `brew install dylibbundler`) copies the libraries inside, as the CI
   does. Notifications (`osascript`) are listed by macOS under *Script Editor*.
+- **Windows** (new, to be checked on real PCs): the same `Makefile`, in its `Windows_NT` branch, built
+  with MSYS2 MinGW-w64 UCRT64 (packages `mingw-w64-ucrt-x86_64-{gcc,pkgconf,sdl3,sdl3-ttf}`, `make`,
+  `zip`). `-mwindows` makes it a GUI program: `--version`, `--help`, the update/uninstall messages and
+  errors are attached to the parent console (`AttachConsole`). `windres` compiles
+  `packaging/windows/ribalta.rc`: icon (`assets/ribalta.ico`), `ribalta.manifest` (UTF-8 code page,
+  per-monitor DPI v2, long paths) and version information from `VERSION`. The digit-font list comes from
+  `fonts_win.c`; there is no `make debug` (MinGW has no ASan).
+  - `make dist`: `build/dist/Ribalta` with `ribalta.exe`, the DLLs found under the MSYS2 prefix with
+    `ldd` (`/ucrt64/bin`; the system DLLs in `C:\Windows` stay out), `assets/` and `LICENSE`, zipped to
+    `build/Ribalta-windows-x86_64.zip` (portable: extract and run `ribalta.exe`).
+  - `make installer` (Inno Setup 6, `ISCC=<path>` if it is not in `PATH`): `packaging/windows/ribalta.iss`
+    turns the `make dist` folder into `build/Ribalta-windows-x86_64-setup.exe`. Per-user install in
+    `%LOCALAPPDATA%\Programs\Ribalta` without administrator rights (all users is an option), Start menu
+    entry, optional desktop icon, Italian and English. The AppId is fixed, so installing a newer version
+    over an older one is an upgrade. The uninstaller removes the program and keeps `%APPDATA%\Ribalta`.
+  - Neither file is code-signed: SmartScreen warns on the first run.
+  - `windows.yml` (`windows-latest`, MSYS2 shell): `-Werror` build, unit tests, command-line smoke test,
+    embedded-resource check, a run with only `APPDATA` set (no XDG variables), the single-instance check,
+    `make dist` and a run of the bundle without MSYS2 in `PATH`, `make installer`, then a silent installer
+    test (per-user install, upgrade, uninstall keeping the user data). It uploads the zip and the setup as
+    artifacts and attaches them to `v*` releases.
 - **Flatpak**: `packaging/flatpak/io.github.ginteaa.Ribalta.yml` builds with `make release` and
   `make install-files PREFIX=/app APPID=io.github.ginteaa.Ribalta`; the AppStream metainfo is
   installed next to it. The CI workflow `flatpak.yml` produces the `ribalta.flatpak` bundle on every
@@ -310,10 +341,12 @@ The `Makefile` in the repository is the reference; in short:
 
 - **Libraries**: `PKGS := sdl3 sdl3-ttf` (linked); `FCPKG := fontconfig` only on Linux, for its headers
   (the library is `dlopen`ed, never linked). `PKGFLAGS=--static` is used by the Flatpak manifest.
-- **Platform switch** (`uname -s`): on Linux `-D_POSIX_C_SOURCE=200809L`, `fonts.c`, `-s` for
+- **Platform switch** (`uname -s`, and `OS` on Windows): on Linux `-D_POSIX_C_SOURCE=200809L`, `fonts.c`, `-s` for
   stripping; on macOS `-D_DARWIN_C_SOURCE`, `fonts_mac.c`, `-framework CoreText -framework
   CoreFoundation`, `-Wl,-dead_strip`, plus `make app` (`tools/macos-app.sh`) and a `make install` that
-  copies `Ribalta.app` to `~/Applications`. On Linux `make app` just says it is macOS only.
+  copies `Ribalta.app` to `~/Applications`. On Linux `make app` just says it is macOS only. On Windows
+  (`OS=Windows_NT`): `-mwindows`, `fonts_win.c`, `windres` for `packaging/windows/ribalta.rc`, and the
+  `dist` and `installer` targets; `install` and `uninstall` just say they are not available there.
 - **Sources**: `SRC` is every `*.c` found by `find src -name '*.c'` minus the other platform's fonts
   file; objects go to `build/`, with `-Isrc` and dependency files (`-MMD -MP`).
 - **Version**: read from the `VERSION` file (works from a release tarball without `.git`) and passed as
@@ -344,6 +377,9 @@ The `Makefile` in the repository is the reference; in short:
   without it the menu lists just the bundled font.
 - `libnotify` (optional): provides `notify-send` for desktop notifications.
 - A C compiler, `make` and `pkg-config`.
+- Windows: MSYS2 with the UCRT64 environment (`pacman -S mingw-w64-ucrt-x86_64-{gcc,pkgconf,sdl3,sdl3-ttf} make zip`),
+  then `make` in the UCRT64 shell; `make installer` also needs Inno Setup 6. The zip and the installer
+  are described in Packaging.
 
 Distributions that ship SDL3 ≥ 3.2 (Arch, Fedora, openSUSE Tumbleweed…) can use the native build; the
 others (Ubuntu 24.04, Mint 22) use the Flatpak. On Arch: `sudo pacman -S sdl3 sdl3_ttf fontconfig libnotify`.
@@ -354,6 +390,9 @@ find `sdl3`, `sdl3-ttf` and `fontconfig`).
 
 - `make`: development build; `make V=1` shows the full compiler commands.
 - `make release`: optimised build (LTO, stripped). `make test`, `make debug` (ASan + UBSan), `make icons`.
+- Windows: `make` builds `ribalta.exe` in the repository root, `make test` runs the same tests, `make dist` builds the
+  portable zip and `make installer` the setup (both in `build/`). `make install` and `make uninstall` are
+  not available there.
 - `make install`: builds the release binary, then installs to `~/.local`:
   - `~/.local/bin/ribalta`;
   - `~/.local/share/applications/ribalta.desktop`;
@@ -416,8 +455,10 @@ desktop file, the icons and its own files in `share/ribalta` (`font.ttf`, `OFL.t
 `sessions.csv` are kept (and the script prints how to delete them). `make uninstall` runs the same
 script without the prompt.
 
-Both subcommands exit 1 with a pointer message inside the Flatpak (`FLATPAK_ID` set), on macOS, or
-when the script is not installed next to the binary (e.g. a build run from the repository).
+Both subcommands exit 1 with a pointer message inside the Flatpak (`FLATPAK_ID` set), on macOS, on
+Windows (no script there: `update` prints the releases page, `uninstall` says to use *Settings → Apps* or
+to delete the folder), or when the script is not installed next to the binary (e.g. a build run from the
+repository).
 
 ### 4.3 CI
 
@@ -439,6 +480,10 @@ when the script is not installed next to the binary (e.g. a build run from the r
   8. reinstall and `ribalta uninstall -y`: same checks, plus `uninstall.sh` gone.
 - **`flatpak.yml`**: builds the `ribalta.flatpak` bundle and attaches it to releases (see Packaging).
 - **`macos.yml`**: builds, tests and zips `Ribalta.app` for arm64 and Intel (see Packaging).
+- **`windows.yml`**: on `windows-latest` in an MSYS2 UCRT64 shell: builds with `-Werror`, runs the tests and
+  the command-line, resource, `APPDATA`-only, single-instance and bundle checks, builds the zip and the
+  installer, and tests the installer silently (install, upgrade, uninstall that keeps the user data). It
+  attaches both files to `v*` releases (see Packaging). The Windows figures are not measured yet.
 
 ## 5. Development with agents
 

@@ -203,19 +203,31 @@ accumulate error (±1 s over 1 h); settings survive a restart.
 
 ## Phase 15 — Windows port (in progress)
 
-- Toolchain: MSYS2 MinGW-w64 UCRT64 (same `Makefile`, gcc, pkg-config, SDL3/SDL3_ttf packages).
-- Portable refactor first (no behaviour change on Linux/macOS): SDL string helpers, a small time
-  compatibility header, portable path helpers (absolute paths, readability), tests without POSIX calls.
-- Windows specifics: single instance with a named mutex; settings and statistics in
-  `%APPDATA%\Ribalta`; assets next to the executable; `--help`/`--version` printed to the parent
-  console; `update`/`uninstall` point to the release page / the installer.
-- Notifications: sound (as today) + `SDL_FlashWindow`; no toast, no child processes.
-- Digit-font menu: system fonts from the registry (`…\Windows NT\CurrentVersion\Fonts`), read with
+Done:
+
+- Toolchain: MSYS2 MinGW-w64 UCRT64, the same `Makefile` (gcc, pkgconf, SDL3 and SDL3_ttf packages).
+- Portable refactor first, with no behaviour change on Linux/macOS: SDL string helpers, a small time
+  compatibility header (`platform/compat.h`), portable path helpers (absolute paths, readability),
+  tests without POSIX calls (`tests/test_util.h`, `tests/test_paths.c`).
+- Windows specifics: single instance with a named mutex; settings and statistics in `%APPDATA%\Ribalta`;
+  assets next to the executable; `--help`/`--version` and the command messages on the parent console;
+  `update` prints the releases page, `uninstall` says how to remove Ribalta.
+- Notifications: sound (as today) + the taskbar button flashes (`SDL_FlashWindow`); no toast, no child
+  processes.
+- Digit-font menu: system fonts from the registry (`…\Windows NT\CurrentVersion\Fonts`), checked with
   SDL_ttf only while the menu is open.
-- Executable resources: icon, manifest (UTF-8 code page, DPI awareness), version info.
-- Renderer order chosen by measuring RAM/CPU at rest on Windows; numbers in `docs/03-architecture.md`.
-- Packages: portable zip (exe + DLLs + assets) and an Inno Setup installer (Start menu entry,
-  uninstaller that keeps `%APPDATA%\Ribalta`), both attached to every release by `windows.yml`.
+- Executable resources: icon, manifest (UTF-8 code page, DPI awareness), version information.
+- Packages: portable zip (exe + DLLs + assets) and an Inno Setup installer (per-user by default, Start
+  menu entry, uninstaller that keeps `%APPDATA%\Ribalta`), built and tested by `windows.yml`, which
+  attaches both to every `v*` release.
+
+Still open:
+
+- Resource measurements on a real PC (idle PSS and CPU over 65 s); the renderer order
+  `gpu,direct3d11,direct3d12,opengl,software` is provisional until then. The numbers go in
+  [03-architecture.md](03-architecture.md).
+- The first release with Windows files, and a check on a real PC of every feature from both the zip and
+  the installer (a second instance is refused, the user data survives the uninstaller).
 
 **Done when**: CI is green on Linux, macOS, Flatpak and Windows; on a real Windows PC every feature
 works from both the zip and the installer, a second instance is refused, user data survives the

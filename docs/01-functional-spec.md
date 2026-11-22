@@ -42,7 +42,8 @@ The app has one active mode at a time. It always starts in **Clock** mode.
 - **PAUSED**: the digits dim (50% opacity) and time does not advance.
 - **FINISHED**:
   - desktop notification titled `Ribalta`: `Sessione di studio completata (2h 30min)` via
-    `notify-send` (`osascript` on macOS), if `timer_notify`;
+    `notify-send` (`osascript` on macOS; on Windows the taskbar button flashes until the window is
+    focused, no pop-up), if `timer_notify`;
   - optional short sound (`timer_sound=true`), played through an SDL audio stream from the bundled
     `ding.wav` (the audio subsystem is opened only while it plays);
   - the app switches to the Timer view, the tiles show `00:00` and blink 3 times (≈ 1.8 s),
@@ -142,8 +143,9 @@ save the new keys are written.
 
 The "Font cifre" row (right after "Colore cifre", 19 rows in total) shows `font_family`, or the bundled
 font name when empty (ellipsised if too wide). ←/→ move to the previous/next font of the ring
-[bundled font, installed fonts…] and apply it immediately. Enter opens the **font menu** (fontconfig
-is queried only while it is open): a search field filtering the list (case-insensitive substring),
+[bundled font, installed fonts…] and apply it immediately. Enter opens the **font menu** (the system font
+list is read only while it is open: fontconfig on Linux, the installed-fonts registry on Windows, CoreText
+on macOS): a search field filtering the list (case-insensitive substring),
 a scrolling list of the font families that contain the digits 0–9 (first entry: the bundled font),
 a "12:34" preview drawn in the selected font and a key hint. Keys: ↑/↓ entry, PgUp/PgDn page,
 Home/End first/last, letters, digits, space and `-` edit the filter (`Q` is typed too: it does not quit
@@ -156,7 +158,7 @@ selection rests for ~150 ms (no polling: the pause is a wait-timeout deadline).
 `no` when the goal is off, otherwise a value such as `2h 30m` or `15h`; ←/→ change it. Goals always
 count the total study time, with or without subject, whatever filter the statistics panel uses.
 
-Startup: if `font_file` is non-empty and readable (`access(R_OK)`, no fontconfig) it is used for the
+Startup: if `font_file` is non-empty and readable (no fontconfig is needed) it is used for the
 digits; otherwise a warning `ribalta: font non trovato: <path>, uso il font incluso` goes to stderr, the
 bundled font is used and the setting is left untouched. Panels, labels and the font menu itself always
 use the bundled font.
@@ -164,16 +166,19 @@ use the bundled font.
 The Pomodoro settings are in the table above; the Pomodoro mode itself is described in §1.5.
 
 File: `~/.config/ribalta/config.ini` (honours `$XDG_CONFIG_HOME`; on macOS
-`~/Library/Application Support/Ribalta/config.ini`, where `sessions.csv` lives too). `key=value` format,
+`~/Library/Application Support/Ribalta/config.ini`, on Windows `%APPDATA%\Ribalta\config.ini`; the
+statistics file lives in the same folder on macOS and Windows). `key=value` format,
 lines starting with `#` are ignored, unknown keys are ignored, invalid values fall back to the default;
-out-of-range numbers are clamped to the allowed range.
+out-of-range numbers are clamped to the allowed range. The file is always written with LF line endings;
+on reading, CRLF line endings and a UTF-8 byte-order mark (added by some Windows editors) are accepted.
 If the file does not exist it is created on the first save.
 
 ### 1.4 Statistics panel, goals and sessions file
 
 **Sessions file.** Study sessions are appended to `~/.local/share/ribalta/sessions.csv` (honours
-`$XDG_DATA_HOME`; on macOS it is in `~/Library/Application Support/Ribalta/`; in the Flatpak sandbox
-it is `~/.var/app/io.github.ginteaa.Ribalta/data/ribalta/sessions.csv`). One row per session; the
+`$XDG_DATA_HOME`; on macOS it is in `~/Library/Application Support/Ribalta/`; on Windows in
+`%APPDATA%\Ribalta\sessions.csv`; in the Flatpak sandbox it is
+`~/.var/app/io.github.ginteaa.Ribalta/data/ribalta/sessions.csv`). One row per session; the
 header line is written when the file is created:
 
 ```csv
@@ -251,8 +256,8 @@ fires once, even after a restart; it never fires when the app quits and there ar
 - Sections: **Generale** (`S` impostazioni, `I` statistiche, `M` materie, `T` timer, `P` Pomodoro,
   `F`/`F11`/double click schermo intero, `H`/`F1` legenda, `Esc`, `Q`/`Ctrl+Q`), **Timer**,
   **Pomodoro**, **Pannelli** (↑↓, ←→, `Invio`, statistics `←`/`→`, subjects `N`/`Canc`) and **File**:
-  the real paths of `config.ini` and `sessions.csv`, with `~` for the home directory (in the Flatpak
-  the sandbox paths), and `ribalta --help` for the command line.
+  the real paths of `config.ini` and `sessions.csv`, with `~` for the home directory (on Windows
+  `%APPDATA%`; in the Flatpak the sandbox paths), and `ribalta --help` for the command line.
 - Layout: two columns when the window is wide, one column otherwise. The font shrinks until everything
   fits (minimum 8 px); there is no scrolling. The legend's font is loaded only while the legend is open.
 - **Hint**: a small, faint `H · legenda` in the bottom-right corner. It is shown at startup and on
@@ -267,7 +272,8 @@ movement exits (mouse movement counts only after about 8 px of real movement); e
 second are ignored. It saves nothing. If Ribalta is already
 running (single instance), the screensaver instance exits immediately.
 
-To start it after 5 minutes of inactivity, with niri (`~/.config/niri/config.kdl`):
+The examples below use `swayidle` (Linux). To start it after 5 minutes of inactivity, with niri
+(`~/.config/niri/config.kdl`):
 
 ```kdl
 spawn-at-startup "swayidle" "-w" "timeout" "300" "ribalta --screensaver"
@@ -305,7 +311,8 @@ The mouse cursor hides after 2 s of inactivity in fullscreen.
 
 ## 3. Window
 
-- Title `Ribalta`, Wayland app-id `ribalta` (for compositor rules, e.g. niri `window-rule`).
+- Title `Ribalta`, Wayland app-id `ribalta` (for compositor rules, e.g. niri `window-rule`). On Windows
+  the window and taskbar icon come from the icon embedded in `ribalta.exe`.
 - While the timer or the Pomodoro is RUNNING, the system screen blanking is inhibited.
 - Resizable; the layout adapts while keeping proportions and staying centred.
 - Initial size 960×400 (logical), HiDPI support (`SDL_WINDOW_HIGH_PIXEL_DENSITY`).
@@ -318,9 +325,9 @@ The mouse cursor hides after 2 s of inactivity in fullscreen.
 | CPU at rest (between animations) | ~0% — the process sleeps waiting for events |
 | CPU during a flip | short spike, animation ≤ 400 ms |
 | Startup time | < 200 ms |
-| Runtime dependencies | SDL3 + SDL3_ttf (+ optional `notify-send`); fontconfig is optional, loaded only while the font list is needed |
+| Runtime dependencies | SDL3 + SDL3_ttf (+ optional `notify-send`); fontconfig is optional, loaded only while the font list is needed. Windows: the SDL3 DLLs ship next to `ribalta.exe` |
 | Accuracy | the minute change happens within 50 ms of the real minute |
-| Platforms | Linux Wayland (primary), X11; macOS (experimental build) |
+| Platforms | Linux Wayland (primary), X11; macOS (experimental build); Windows (new build: CI-tested, resource figures still to be measured on a real PC) |
 
 ## 5. Command line
 
@@ -331,12 +338,17 @@ The mouse cursor hides after 2 s of inactivity in fullscreen.
 | `ribalta --version`, `-V` | Prints `ribalta X.Y.Z` (from `VERSION`) and exits | 0 |
 | `ribalta --help`, `-h` | Lists the options | 0 |
 | any other option | `ribalta: opzione sconosciuta: X` and the usage on stderr | 2 |
-| `ribalta update` | Shows the latest release notes, asks `Update now? [Y/n]` (`-y` skips), builds and installs it in the same prefix; settings and statistics are untouched; says to restart a running instance | 0 done, already up to date or cancelled; 1 error |
+| `ribalta update` | Shows the latest release notes, asks `Update now? [Y/n]` (`-y` skips), builds and installs it in the same prefix; settings and statistics are untouched; says to restart a running instance. On Windows it only prints the download page (see below) | 0 done, already up to date or cancelled; 1 error (on Windows always 1) |
 | `ribalta update --check` | Reports current and latest version and the release notes, changes nothing | 0 up to date, 10 update available, 1 error |
-| `ribalta uninstall` | Asks `[y/N]` (`-y` skips) and removes exactly what `make install` installed; settings and statistics are kept | 0 removed or cancelled; 1 error, or no terminal without `-y` (nothing done) |
+| `ribalta uninstall` | Asks `[y/N]` (`-y` skips) and removes exactly what `make install` installed; settings and statistics are kept. On Windows it only prints how to remove Ribalta (see below) | 0 removed or cancelled; 1 error, or no terminal without `-y` (nothing done); 1 on Windows |
 
 If Ribalta is already running, a new instance prints `ribalta: già in esecuzione` and exits 0 (single-instance
-lock `ribalta.lock` in `$XDG_RUNTIME_DIR`, falling back to `$TMPDIR` or `/tmp`).
+lock `ribalta.lock` in `$XDG_RUNTIME_DIR`, falling back to `$TMPDIR` or `/tmp`; on Windows a named mutex
+`Local\Ribalta` for the user session).
+
+**Windows.** `ribalta.exe` is a GUI program: `--version`, `--help`, the update and uninstall messages and
+errors are printed to the console that started it (cmd or PowerShell); when started from a shortcut
+there is no console to print to. Some shells print the prompt before the text.
 
 `update` and `uninstall` need an installation made with `make install`. `update` downloads the source
 of the latest release and builds it with the same tools as `make install`, plus `curl` or `wget` and
@@ -348,9 +360,12 @@ of the latest release and builds it with the same tools as `make install`, plus 
   `flatpak install --user ribalta.flatpak` again; settings and statistics are kept. Remove it with
   `flatpak uninstall io.github.ginteaa.Ribalta`.
 - macOS app: download the new `Ribalta.app` zip from the releases page.
+- Windows (installer or zip): download the new installer or zip from the releases page and run it over
+  the old one (or replace the folder). `update` prints the download page; `uninstall` says to use
+  *Settings → Apps* (installer) or to delete the folder (zip). Settings and statistics are kept.
 - Binary run from the source tree: `git pull && make install`.
 
-In the last three cases `update` and `uninstall` print a message pointing to the right command and
+In the last four cases `update` and `uninstall` print a message pointing to the right command and
 exit with 1. Installs older than 0.7.0 have no `update` command: update them once with
 `git pull && make install`. If the prefix is not writable, `update` explains it and stops; it never
 calls `sudo`.
