@@ -340,7 +340,7 @@ static void run_subcommand(const char *name, int argc, char **argv)
         memcpy(prefix, exe, el - 4);
         prefix[el - 4] = '\0';
         ok = snprintf(script, sizeof script, "%s/share/ribalta/%s.sh", prefix, name) < (int)sizeof script
-             && access(script, R_OK) == 0;
+             && paths_readable(script);
     }
     if (!ok) {
         fprintf(stderr, "ribalta: Questa copia di Ribalta non risulta installata con make install (%s): "
@@ -433,7 +433,7 @@ int main(int argc, char **argv)
      * altrimenti l'incluso; l'impostazione non viene cancellata */
     snprintf(app.render_font, sizeof app.render_font, "%s", app.bundled_font);
     if (app.cfg.font_file[0]) {
-        if (access(app.cfg.font_file, R_OK) == 0)
+        if (paths_readable(app.cfg.font_file))
             snprintf(app.render_font, sizeof app.render_font, "%s", app.cfg.font_file);
         else
             fprintf(stderr, "ribalta: font non trovato: %s, uso il font incluso\n", app.cfg.font_file);

@@ -1,9 +1,9 @@
 #include "platform/fonts.h"
+#include "platform/paths.h"
+#include <SDL3/SDL.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <strings.h>
-#include <unistd.h>
 
 static int fails;
 #define CHECK(c) do { if (!(c)) { fprintf(stderr, "FAIL %s:%d: %s\n", __FILE__, __LINE__, #c); fails++; } } while (0)
@@ -14,10 +14,10 @@ int main(void) {
     if (l.count == 0) fprintf(stderr, "NOTE: nessun font di sistema con le cifre (verifiche ridotte)\n");
 
     for (int i = 0; i < l.count; i++) {
-        CHECK(access(l.items[i].file, R_OK) == 0);
-        CHECK(l.items[i].family[0] && l.items[i].file[0] == '/');
+        CHECK(paths_readable(l.items[i].file));
+        CHECK(l.items[i].family[0] && paths_is_absolute(l.items[i].file));
         if (i > 0) {
-            CHECK(strcasecmp(l.items[i - 1].family, l.items[i].family) <= 0);
+            CHECK(SDL_strcasecmp(l.items[i - 1].family, l.items[i].family) <= 0);
             CHECK(strcmp(l.items[i - 1].family, l.items[i].family) != 0);
         }
         CHECK(fonts_find(&l, l.items[i].file) >= 0);

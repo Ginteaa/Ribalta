@@ -1,10 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/stat.h>
-#include <unistd.h>
 #include "app/session.h"
 #include "core/pomodoro.h"
+#include "test_util.h"
 
 static int fails;
 #define CHECK(c) do { if (!(c)) { fprintf(stderr, "FAIL %s:%d: %s\n", __FILE__, __LINE__, #c); fails++; } } while (0)
@@ -14,7 +13,7 @@ static const Uint64 T0 = 1000 * S;
 
 static char csv[700];
 
-static void reset_csv(void) { unlink(csv); }
+static void reset_csv(void) { test_remove(csv); }
 
 /* Contenuto del CSV senza intestazione */
 static char *rows(void)
@@ -71,14 +70,13 @@ static void start_timer(App *a, const char *subj)
 
 int main(void)
 {
-    char tmpl[] = "/tmp/ribalta-test-XXXXXX";
-    char *dir = mkdtemp(tmpl);
-    if (!dir) { perror("mkdtemp"); return 1; }
-    setenv("XDG_CONFIG_HOME", dir, 1);
-    setenv("XDG_DATA_HOME", dir, 1);
+    char dir[512];
+    if (!test_mkdtemp(dir, sizeof dir)) { fprintf(stderr, "test_mkdtemp fallita\n"); return 1; }
+    test_setenv("XDG_CONFIG_HOME", dir);
+    test_setenv("XDG_DATA_HOME", dir);
     char d[600];
     snprintf(d, sizeof d, "%s/ribalta", dir);
-    mkdir(d, 0700);
+    SDL_CreateDirectory(d);
     snprintf(csv, sizeof csv, "%s/ribalta/sessions.csv", dir);
 
     App a;
@@ -185,6 +183,8 @@ int main(void)
     timer_reset(&a.timer);
     session_track_starts(&a);
     CHECK(a.timer_seg_ns == 0 && a.timer_start == 0);
+
+    test_rmtree(dir);
 
     if (fails) { fprintf(stderr, "%d fallimenti\n", fails); return 1; }
     puts("ok");

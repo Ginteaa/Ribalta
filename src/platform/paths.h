@@ -14,8 +14,19 @@ bool paths_config_file(char *out, size_t out_size);
  * Ritorna false su errore. */
 bool paths_data_dir(char *out, size_t out_size);
 
-/* mkdir -p: crea path e le cartelle intermedie (0755). */
+/* mkdir -p: crea path e le cartelle intermedie (0755; su Windows senza permessi).
+ * Accetta '/' e, su Windows, anche '\' come separatori; non prova a creare "C:". */
 bool paths_mkdir_p(const char *path);
+
+/* true se c è un separatore di percorso: '/' ovunque, anche '\' su Windows. */
+bool paths_is_sep(char c);
+
+/* true se p è un percorso assoluto: "/..." su POSIX; su Windows anche "C:\...", "C:/..." e
+ * "\\server\..." (un "/" iniziale conta come assoluto anche lì). NULL o "" -> false. */
+bool paths_is_absolute(const char *p);
+
+/* true se il file p esiste ed è leggibile (access R_OK su POSIX, _access su Windows). */
+bool paths_readable(const char *p);
 
 /* Cartella dell'eseguibile in uso (assoluta, senza '/' finale), es. "/home/u/.local/bin".
  * Non richiede SDL_Init: si può chiamare prima di inizializzare SDL (sottocomandi di main).

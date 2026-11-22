@@ -1,9 +1,9 @@
 #include "core/stats.h"
+#include "platform/compat.h"
+#include "test_util.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/stat.h>
-#include <unistd.h>
 
 static int fails;
 #define CHECK(c) do { if (!(c)) { fprintf(stderr, "FAIL %s:%d: %s\n", __FILE__, __LINE__, #c); fails++; } } while (0)
@@ -12,7 +12,7 @@ static char csv[700];
 
 static void stamp(time_t t, char *out, size_t n) {
     struct tm tm;
-    localtime_r(&t, &tm);
+    compat_localtime(t, &tm);
     strftime(out, n, "%Y-%m-%dT%H:%M:%S", &tm);
 }
 
@@ -31,14 +31,13 @@ static char *slurp(void) {
 }
 
 int main(void) {
-    char tmpl[] = "/tmp/ribalta-test-XXXXXX";
-    char *dir = mkdtemp(tmpl);
-    if (!dir) { perror("mkdtemp"); return 1; }
-    setenv("XDG_CONFIG_HOME", dir, 1);
-    setenv("XDG_DATA_HOME", dir, 1);
+    char dir[512];
+    if (!test_mkdtemp(dir, sizeof dir)) { fprintf(stderr, "test_mkdtemp fallita\n"); return 1; }
+    test_setenv("XDG_CONFIG_HOME", dir);
+    test_setenv("XDG_DATA_HOME", dir);
     char d[600];
     snprintf(d, sizeof d, "%s/ribalta", dir);
-    mkdir(d, 0755);
+    SDL_CreateDirectory(d);
     snprintf(csv, sizeof csv, "%s/ribalta/sessions.csv", dir);
 
     time_t now = time(NULL);
@@ -52,7 +51,7 @@ int main(void) {
 
     /* append nuovo file, < 60 s ignorato */
     CHECK(stats_append(now, 30, "timer", true, "Analisi"));
-    CHECK(access(csv, F_OK) != 0);
+    CHECK(!test_exists(csv));
     CHECK(stats_append(now, 600, "timer", true, "Analisi"));
     CHECK(stats_append(now, 300, "pomodoro", false, NULL));
     CHECK(stats_append(now, 120, "timer", true, ""));
@@ -67,13 +66,13 @@ int main(void) {
     CHECK(stats_summary(&s, now, "Altro") && s.today_s == 0 && s.streak_days == 0);
 
     /* sanitizzazione */
-    unlink(csv);
+    test_remove(csv);
     CHECK(stats_append(now, 600, "timer", true, "A,b\"c;d\te"));
     CHECK(strstr(slurp(), ",1,A b c d e\n") != NULL);
     CHECK(stats_summary(&s, now, "A b c d e") && s.today_s == 600);
 
     /* troncamento UTF-8: 20 'è' = 40 byte */
-    unlink(csv);
+    test_remove(csv);
     CHECK(stats_append(now, 600, "timer", true, "èèèèèèèèèèèèèèèèèèèè"));
     {
         char *line = strrchr(slurp(), ',') + 1;
@@ -85,7 +84,7 @@ int main(void) {
             if ((unsigned char)line[i] != 0xC3 || (unsigned char)line[i + 1] != 0xA8) ok = 0;
         CHECK(ok);
     }
-    unlink(csv);
+    test_remove(csv);
     CHECK(stats_append(now, 600, "timer", true, "abcdefghijklmnopqrstuvwèx"));   /* taglio dentro la è */
     {
         char *line = strrchr(slurp(), ',') + 1;
@@ -141,7 +140,7 @@ int main(void) {
     /* obiettivi */
     {
         StatsGoals g;
-        unlink(csv);
+        test_remove(csv);
         CHECK(stats_goals(&g, now, 3600) && g.today_s == 0 && g.week_s == 0 && g.goal_streak_days == 0);
 
         /* mercoledì 2026-11-18 12:00 locale */
@@ -197,6 +196,8 @@ int main(void) {
         write_file(b);
         CHECK(stats_goals(&g, dec, 0) && g.today_s == 100 && g.week_s == 700);
     }
+
+    test_rmtree(dir);
 
     if (fails) { fprintf(stderr, "%d failure(s)\n", fails); return 1; }
     puts("ok");
