@@ -201,7 +201,7 @@ accumulate error (±1 s over 1 h); settings survive a restart.
 - Docs aligned with the code after a full audit.
 - Releases: 0.7.0 (Phases 9–12), 0.7.1 (Phase 13), 0.7.2 and 0.7.3 (this phase).
 
-## Phase 15 — Windows port (in progress)
+## Phase 15 — Windows port and 1.0.0 ✅
 
 Done:
 
@@ -221,19 +221,18 @@ Done:
   menu entry, uninstaller that keeps `%APPDATA%\Ribalta`), built and tested by `windows.yml`, which
   attaches both to every `v*` release.
 
-Still open:
-
-- Resource measurements on a real PC (idle PSS and CPU over 65 s); the renderer order
-  `gpu,direct3d11,direct3d12,opengl,software` is provisional until then. The numbers go in
-  [03-architecture.md](03-architecture.md).
-- The first release with Windows files, and a check on a real PC of every feature from both the zip and
-  the installer (a second instance is refused, the user data survives the uninstaller).
-
-**Done when**: CI is green on Linux, macOS, Flatpak and Windows; on a real Windows PC every feature
-works from both the zip and the installer, a second instance is refused, user data survives the
-uninstaller; resource numbers are documented.
+- Checked on a real Windows PC (installer and zip): every feature works, a second instance is refused,
+  the taskbar flashes, the font menu lists the Windows fonts, user data survives the uninstaller.
+- Hybrid laptops (Linux): only the Vulkan driver of the GPU that drives the screen is loaded, and the
+  `gpu` renderer prefers the low-power GPU everywhere (Intel + NVIDIA: PSS ~83 MB → ~15.5 MB).
+- CI actions moved to the Node 24 runtime.
+- Release: **1.0.0**, the first stable version, with five files attached (two macOS zips,
+  `ribalta.flatpak`, the Windows zip and installer).
 
 ## Future ideas
+- Resource measurements on Windows (idle memory and CPU), and the final renderer order there
+  (`gpu,direct3d11,direct3d12,opengl,software` today).
+- Code signing for the Windows installer (no SmartScreen warning).
 - Feedback from real Macs and resource measurements on macOS.
 - Publish the Flatpak on Flathub.
 - Snap package.
