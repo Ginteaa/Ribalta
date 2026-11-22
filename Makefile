@@ -5,6 +5,7 @@
 #   make debug      ASan + UBSan             make icons      rigenera le icone (PNG e assets/ribalta.ico)
 #   make app        macOS: build/Ribalta.app  (make install su macOS la copia in ~/Applications)
 #   make dist       Windows (MSYS2 UCRT64): build/Ribalta-windows-x86_64.zip, cartella portabile con le DLL
+#   make installer  Windows: build/Ribalta-windows-x86_64-setup.exe (serve Inno Setup 6, ISCC=<percorso> se non e' nel PATH)
 
 CC      ?= cc
 PKGS    := sdl3 sdl3-ttf
@@ -123,9 +124,9 @@ release: clean
 
 # installazione con output leggibile (banner, barra di avanzamento): vedi tools/install.sh
 ifeq ($(OS),Windows_NT)
-# Windows: installer e disinstallatore arriveranno con i pacchetti; per ora solo make dist (zip portabile)
+# Windows: niente install/uninstall da Makefile; si usa make dist (zip portabile) o make installer (setup.exe)
 app install uninstall:
-	@echo "make $@: non ancora disponibile su Windows (arrivera' con i pacchetti; per ora: make dist)" >&2; exit 1
+	@echo "make $@: non disponibile su Windows (usa make dist per lo zip portabile o make installer per il setup.exe)" >&2; exit 1
 
 # cartella portabile build/dist/Ribalta (exe + DLL di MSYS2 + assets) e zip. Le DLL si trovano con
 # ldd, tenendo solo quelle sotto il prefisso MSYS2 (es. /ucrt64): quelle di C:/Windows restano fuori.
@@ -144,9 +145,32 @@ dist: release
 	@cd build/dist && if command -v zip > /dev/null 2>&1; then zip -qr ../$(DISTNAME).zip Ribalta; \
 	  else bsdtar -a -cf ../$(DISTNAME).zip Ribalta; fi
 	$(call say,ZIP,build/$(DISTNAME).zip)
+
+# installer (Inno Setup 6, packaging/windows/ribalta.iss): build/Ribalta-windows-x86_64-setup.exe, creato
+# a partire dalla cartella di make dist. ISCC e' il compilatore: se non e' nel PATH si passa il percorso
+# completo, anche con spazi e senza virgolette (le aggiunge il Makefile), per esempio
+#   make installer ISCC="/c/Program Files (x86)/Inno Setup 6/ISCC.exe"
+# La versione dell'installer e' quella di VERSION se e' x.y.z (come per le risorse dell'exe), altrimenti 0.0.0.
+ISCC        ?= iscc
+INSTALLER   := build/$(DISTNAME)-setup.exe
+ISS_SRC     := packaging/windows/ribalta.iss
+INST_VER    := $(word 1,$(RC_VER)).$(word 2,$(RC_VER)).$(word 3,$(RC_VER))
+# Gli argomenti di ISCC sono interruttori che iniziano con "/" (/DAppVersion=..., /O...): la shell MSYS2
+# li scambierebbe per percorsi POSIX e li "convertirebbe" in modo imprevedibile prima di passarli a un
+# programma Windows. MSYS2_ARG_CONV_EXCL='*' spegne la conversione per tutti gli argomenti di questo
+# comando; i percorsi veri (cartella dist, uscita, script) si convertono quindi a mano con cygpath -w.
+installer: dist
+	@command -v "$(ISCC)" > /dev/null 2>&1 || { echo "make installer: Inno Setup (ISCC) non trovato: installalo o passa ISCC=<percorso di ISCC.exe>" >&2; exit 1; }
+	$(call say,ISCC,$(INSTALLER))
+	@rm -f $(INSTALLER)
+	$(Q)MSYS2_ARG_CONV_EXCL='*' "$(ISCC)" /Qp "/DAppVersion=$(INST_VER)" \
+	  "/DSourceDir=$$(cygpath -w '$(CURDIR)/$(DISTDIR)')" \
+	  "/O$$(cygpath -w '$(CURDIR)/build')" \
+	  "$$(cygpath -w '$(CURDIR)/$(ISS_SRC)')"
+	@test -f $(INSTALLER) || { echo "make installer: $(INSTALLER) non creato" >&2; exit 1; }
 else
-dist:
-	@echo "make dist: per ora solo su Windows (MSYS2 UCRT64)" >&2; exit 1
+dist installer:
+	@echo "make $@: per ora solo su Windows (MSYS2 UCRT64)" >&2; exit 1
 
 # rimuove solo i file installati: configurazione e statistiche dell'utente restano
 uninstall:
@@ -217,4 +241,4 @@ test: $(addprefix build/tests/,$(addsuffix $(EXE),$(TESTS)))
 icons:
 	./tools/icons.sh
 
-.PHONY: all app debug release dist install install-files uninstall clean icons test
+.PHONY: all app debug release dist installer install install-files uninstall clean icons test

@@ -8,7 +8,7 @@ on:
     branches: [main]
 
 permissions:
-  contents: write   # allegare lo zip alla release sui tag v*
+  contents: write   # allegare zip e setup alla release sui tag v*
 
 jobs:
   build:
@@ -189,13 +189,187 @@ jobs:
             cat run.log; echo "::error::$(tr '\n' '|' < run.log)"; exit 1
           fi
 
+      - name: Find Inno Setup (install it if missing)
+        shell: pwsh
+        run: |
+          # windows-latest (2022 e 2025) ha gia' Inno Setup 6, installato con Chocolatey (pacchetto
+          # innosetup, vedi actions/runner-images); il choco finale e' solo una rete di sicurezza.
+          # L'installer di Inno mette ISCC.exe in "Program Files (x86)\Inno Setup 6" senza aggiungerlo al PATH.
+          function Find-Iscc {
+            $cmd = Get-Command iscc -ErrorAction SilentlyContinue
+            if ($cmd) { return $cmd.Source }
+            foreach ($dir in @("${env:ProgramFiles(x86)}\Inno Setup 6", "$env:ProgramFiles\Inno Setup 6", "$env:LOCALAPPDATA\Programs\Inno Setup 6")) {
+              if (Test-Path -LiteralPath "$dir\ISCC.exe") { return "$dir\ISCC.exe" }
+            }
+            return $null
+          }
+          $iscc = Find-Iscc
+          if ($iscc) {
+            Write-Host "Inno Setup already installed"
+          } else {
+            Write-Host "Inno Setup not found: installing it with Chocolatey"
+            choco install innosetup -y --no-progress
+            $iscc = Find-Iscc
+          }
+          if (-not $iscc) {
+            Write-Host "::error::ISCC.exe not found"
+            exit 1
+          }
+          Write-Host "ISCC: $iscc"
+          Write-Host "Inno Setup version: $((Get-Item -LiteralPath $iscc).VersionInfo.ProductVersion)"
+          # percorso Windows per i passi successivi (make lo converte con cygpath)
+          Add-Content -Path $env:GITHUB_ENV -Value "ISCC=$iscc"
+
+      - name: Installer (make installer)
+        run: |
+          # make installer rifa anche make dist (cartella e zip), poi lancia ISCC con ribalta.iss
+          make installer ISCC="$(cygpath -u "$ISCC")"
+          ls -l build/Ribalta-windows-x86_64.zip build/Ribalta-windows-x86_64-setup.exe
+          # il setup contiene l'exe e le DLL compressi: deve pesare piu' dello zip, non pochi KB
+          size=$(stat -c %s build/Ribalta-windows-x86_64-setup.exe)
+          echo "setup size: $size bytes"
+          test "$size" -gt 1048576
+
+      - name: Installer test (silent, per-user, upgrade, uninstall keeps user data)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          function Fail($msg) {
+            Write-Host "::error::$msg"
+            exit 1
+          }
+
+          $appId      = '{142E70C6-A819-47F3-B36F-9C7CB97474DB}'   # AppId di ribalta.iss
+          $uninstKey  = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\${appId}_is1"
+          $version    = (Get-Content -LiteralPath VERSION -Raw).Trim()
+          $setup      = Join-Path $PWD 'build\Ribalta-windows-x86_64-setup.exe'
+          $dist       = Join-Path $PWD 'build\dist\Ribalta'
+          # cartella con uno spazio: l'installer e l'app devono funzionare anche cosi'
+          $installDir = Join-Path $env:RUNNER_TEMP 'Ribalta installed'
+          $realAppData = $env:APPDATA
+          $lnk        = Join-Path $realAppData 'Microsoft\Windows\Start Menu\Programs\Ribalta.lnk'
+          $exe        = Join-Path $installDir 'ribalta.exe'
+          $unins      = Join-Path $installDir 'unins000.exe'
+          $setupLog   = Join-Path $env:RUNNER_TEMP 'ribalta-setup.log'
+          $setup2Log  = Join-Path $env:RUNNER_TEMP 'ribalta-setup-upgrade.log'
+          $uninsLog   = Join-Path $env:RUNNER_TEMP 'ribalta-uninstall.log'
+          if (-not (Test-Path -LiteralPath $setup)) { Fail "setup not found: $setup" }
+
+          # 1. dati dell'utente in %APPDATA%\Ribalta (VM usa e getta: si usa quello vero, e' quello
+          #    che il disinstallatore potrebbe toccare); l'app di questo test usa un APPDATA temporaneo
+          $dataDir = Join-Path $realAppData 'Ribalta'
+          $cfg = Join-Path $dataDir 'config.ini'
+          $csv = Join-Path $dataDir 'sessions.csv'
+          New-Item -ItemType Directory -Force -Path $dataDir | Out-Null
+          Set-Content -LiteralPath $cfg -Value 'timer_default_minutes=37' -Encoding ascii
+          Set-Content -LiteralPath $csv -Value 'marker-sessions-csv' -Encoding ascii
+
+          function Install-Ribalta($log) {
+            $p = Start-Process -FilePath $setup -Wait -PassThru -ArgumentList @(
+              '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/CURRENTUSER',
+              "/DIR=`"$installDir`"", "/LOG=`"$log`"")
+            Write-Host "setup exit code: $($p.ExitCode)"
+            if ($p.ExitCode -ne 0) {
+              if (Test-Path -LiteralPath $log) { Get-Content -LiteralPath $log | Select-Object -Last 60 }
+              Fail "setup failed with exit code $($p.ExitCode)"
+            }
+          }
+
+          # 2. installazione silenziosa per l'utente corrente
+          Install-Ribalta $setupLog
+          if (-not (Test-Path -LiteralPath $exe)) { Fail "ribalta.exe not installed in $installDir" }
+          if (-not (Test-Path -LiteralPath (Join-Path $installDir 'assets\font.ttf'))) { Fail "assets\font.ttf not installed" }
+          if (-not (Test-Path -LiteralPath $unins)) { Fail "unins000.exe not installed" }
+          # tutto cio' che c'e' nella cartella portabile deve essere stato installato
+          $missing = @(Get-ChildItem -LiteralPath $dist -Recurse -File | ForEach-Object {
+            $rel = $_.FullName.Substring($dist.Length).TrimStart('\')
+            if (-not (Test-Path -LiteralPath (Join-Path $installDir $rel))) { $rel }
+          })
+          if ($missing.Count -gt 0) { Fail "files missing from the install dir: $($missing -join ', ')" }
+          Write-Host "installed files:"; Get-ChildItem -LiteralPath $installDir -Recurse -File | ForEach-Object { "  " + $_.FullName.Substring($installDir.Length).TrimStart('\') }
+
+          if (-not (Test-Path -LiteralPath $lnk)) { Fail "Start menu shortcut not found: $lnk" }
+          $target = (New-Object -ComObject WScript.Shell).CreateShortcut($lnk).TargetPath
+          if ($target -ine $exe) { Fail "shortcut points to '$target', expected '$exe'" }
+
+          if (-not (Test-Path -LiteralPath $uninstKey)) { Fail "uninstall registry key not found: $uninstKey" }
+          $reg = Get-ItemProperty -LiteralPath $uninstKey
+          Write-Host "DisplayName=$($reg.DisplayName) DisplayVersion=$($reg.DisplayVersion) UninstallString=$($reg.UninstallString)"
+          if ($reg.DisplayVersion -ne $version) { Fail "DisplayVersion '$($reg.DisplayVersion)' != VERSION '$version'" }
+
+          # 3. l'app installata parte (APPDATA temporaneo: il config.ini di prova non si tocca)
+          $tmpData = Join-Path $env:RUNNER_TEMP 'ribalta-appdata'
+          New-Item -ItemType Directory -Force -Path $tmpData | Out-Null
+          $env:APPDATA = $tmpData
+          $app = Start-Process -FilePath $exe -WorkingDirectory $env:RUNNER_TEMP -PassThru
+          $env:APPDATA = $realAppData
+          Start-Sleep -Seconds 3
+          if ($app.HasExited) { Fail "installed ribalta.exe exited after start (exit code $($app.ExitCode))" }
+          Write-Host "installed ribalta.exe is running (pid $($app.Id))"
+          Stop-Process -Id $app.Id -Force
+          $null = $app.WaitForExit(10000)
+
+          # aggiornamento: lo stesso setup sopra l'installazione esistente (stesso AppId)
+          Install-Ribalta $setup2Log
+          if (-not (Test-Path -LiteralPath $exe)) { Fail "ribalta.exe missing after the upgrade" }
+          if (-not (Test-Path -LiteralPath $uninstKey)) { Fail "uninstall registry key missing after the upgrade" }
+
+          # 4. disinstallazione silenziosa: unins000.exe si copia in %TEMP% e prosegue da la', quindi
+          #    si aspetta (al massimo 120 s) che exe, scorciatoia, voce del registro e unins000 spariscano
+          $p = Start-Process -FilePath $unins -Wait -PassThru -ArgumentList @(
+            '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/LOG=`"$uninsLog`"")
+          Write-Host "unins000 exit code: $($p.ExitCode)"
+          $deadline = (Get-Date).AddSeconds(120)
+          while ((Get-Date) -lt $deadline) {
+            if (-not (Test-Path -LiteralPath $exe) -and -not (Test-Path -LiteralPath $unins) -and
+                -not (Test-Path -LiteralPath $lnk) -and -not (Test-Path -LiteralPath $uninstKey)) { break }
+            Start-Sleep -Seconds 1
+          }
+          Write-Host "after uninstall:"
+          if (Test-Path -LiteralPath $installDir) {
+            Get-ChildItem -LiteralPath $installDir -Recurse | ForEach-Object { "  " + $_.FullName }
+          } else {
+            Write-Host "  (install dir removed)"
+          }
+          if (Test-Path -LiteralPath $exe) { Fail "ribalta.exe still there after the uninstall" }
+          if (Test-Path -LiteralPath $unins) { Fail "unins000.exe still there after the uninstall" }
+          if (Test-Path -LiteralPath $lnk) { Fail "Start menu shortcut still there after the uninstall" }
+          if (Test-Path -LiteralPath $uninstKey) { Fail "uninstall registry key still there after the uninstall" }
+
+          # i dati dell'utente restano, intatti
+          if (-not (Test-Path -LiteralPath $cfg)) { Fail "config.ini removed by the uninstaller: user data must be kept" }
+          if (-not (Test-Path -LiteralPath $csv)) { Fail "sessions.csv removed by the uninstaller: user data must be kept" }
+          if ((Get-Content -LiteralPath $cfg -Raw).Trim() -ne 'timer_default_minutes=37') { Fail "config.ini changed by the install or uninstall" }
+          if ((Get-Content -LiteralPath $csv -Raw).Trim() -ne 'marker-sessions-csv') { Fail "sessions.csv changed by the install or uninstall" }
+          Write-Host "OK: installed, started, upgraded and uninstalled; %APPDATA%\Ribalta kept"
+
+      - name: Installer logs (on failure)
+        if: failure()
+        shell: pwsh
+        run: |
+          foreach ($name in 'ribalta-setup.log', 'ribalta-setup-upgrade.log', 'ribalta-uninstall.log') {
+            $f = Join-Path $env:RUNNER_TEMP $name
+            if (Test-Path -LiteralPath $f) {
+              Write-Host "::group::$name"
+              Get-Content -LiteralPath $f
+              Write-Host "::endgroup::"
+            }
+          }
+
       - uses: actions/upload-artifact@v4
         with:
           name: Ribalta-windows-x86_64
           path: build/Ribalta-windows-x86_64.zip
 
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Ribalta-windows-x86_64-setup
+          path: build/Ribalta-windows-x86_64-setup.exe
+
       - name: Attach to the release (tags v*)
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: build/Ribalta-windows-x86_64.zip
+          files: |
+            build/Ribalta-windows-x86_64.zip
+            build/Ribalta-windows-x86_64-setup.exe
