@@ -12,7 +12,7 @@ static void write_cfg(const char *dir, const char *body) {
     snprintf(p, sizeof p, "%s/ribalta", dir);
     SDL_CreateDirectory(p);
     snprintf(p, sizeof p, "%s/ribalta/config.ini", dir);
-    FILE *f = fopen(p, "w");
+    FILE *f = fopen(p, "wb");
     if (f) { fputs(body, f); fclose(f); }
 }
 
@@ -43,11 +43,12 @@ int main(void) {
     CHECK(settings_save(&s));
     char p[600];
     snprintf(p, sizeof p, "%s/ribalta/config.ini", dir);
-    FILE *f = fopen(p, "r");
+    FILE *f = fopen(p, "rb");
     char buf[4096] = {0};
     if (f) { size_t n = fread(buf, 1, sizeof buf - 1, f); buf[n] = 0; fclose(f); }
     CHECK(strstr(buf, "digit_color=#b7b7b7") != NULL);
     CHECK(strstr(buf, "recent_colors") == NULL);
+    CHECK(strchr(buf, '\r') == NULL && strchr(buf, '\n') != NULL);   /* solo LF, anche su Windows */
 
     /* valori non validi */
     write_cfg(dir, "digit_color=zzz\nrecent_colors=#aabbcc, nope,#112233,#12,#445566,#778899,#99aabb,#ccddee,#010203\n");
@@ -88,6 +89,17 @@ int main(void) {
     write_cfg(dir, "font_family=Foo Bar  \r\nfont_file=/a/b c.ttf\r\n");
     CHECK(settings_load(&l));
     CHECK(!strcmp(l.font_family, "Foo Bar") && !strcmp(l.font_file, "/a/b c.ttf"));
+    /* file con fine riga Windows (modificato col Blocco note): ogni riga con CRLF, BOM UTF-8 iniziale */
+    write_cfg(dir, "\xEF\xBB\xBFshow_seconds=true\r\nscale=75 \r\n\r\n# commento\r\n"
+                   "digit_color=#ffb347\r\nsubjects=Analisi;Fisica\r\nsubject=Fisica\r\n"
+                   "pomodoro_break_color=auto\r\n");
+    settings_defaults(&l);
+    CHECK(settings_load(&l));
+    CHECK(l.show_seconds && l.scale == 75 && l.digit_color == 0xffb347);
+    CHECK(l.subject_count == 2 && !strcmp(l.subject, "Fisica") && l.pomodoro_break_mode == BREAK_COLOR_AUTO);
+    /* ultima riga senza fine riga */
+    write_cfg(dir, "scale=60\r\nbrightness=40");
+    CHECK(settings_load(&l) && l.scale == 60 && l.brightness == 40);
     /* valore troppo lungo ignorato */
     {
         char big[900], body[1000];
@@ -163,7 +175,7 @@ int main(void) {
     /* le chiavi si scrivono sempre */
     settings_defaults(&s);
     CHECK(settings_save(&s));
-    f = fopen(p, "r");
+    f = fopen(p, "rb");
     memset(buf, 0, sizeof buf);
     if (f) { size_t n = fread(buf, 1, sizeof buf - 1, f); buf[n] = 0; fclose(f); }
     CHECK(strstr(buf, "subjects=\n") && strstr(buf, "subject=\n"));
@@ -179,7 +191,7 @@ int main(void) {
         settings_defaults(&l);
         CHECK(settings_load(&l) && l.pomodoro_break_mode == m);
         CHECK(l.pomodoro_break_color == 0x123456);
-        f = fopen(p, "r");
+        f = fopen(p, "rb");
         memset(buf, 0, sizeof buf);
         if (f) { size_t n = fread(buf, 1, sizeof buf - 1, f); buf[n] = 0; fclose(f); }
         CHECK(!strstr(buf, "pomodoro_break_blue"));

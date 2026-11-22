@@ -1,5 +1,6 @@
 #!/bin/sh
-# Genera assets/icons/<N>x<N>.png da assets/ribalta.svg (richiede rsvg-convert).
+# Genera assets/icons/<N>x<N>.png da assets/ribalta.svg (richiede rsvg-convert) e
+# assets/ribalta.ico per Windows (richiede ImageMagick: magick, oppure convert della versione 6).
 # Per ogni dimensione la linea di taglio viene allineata a pixel interi,
 # così resta netta anche a 16-32 px invece di diventare una sfumatura grigia.
 set -eu
@@ -17,3 +18,23 @@ for n in $SIZES; do
         rsvg-convert -w "$n" -h "$n" -o "$OUT/${n}x${n}.png"
 done
 echo "icone generate in $OUT: $SIZES"
+
+# assets/ribalta.ico: le PNG già pronte (stessa linea di taglio nitida) in un unico file.
+# ImageMagick salva ogni dimensione in BMP a 32 bit (anche la 256: ~270 KB in più, ma è il
+# formato classico che windres e ogni altro strumento leggono senza problemi)
+ICO=assets/ribalta.ico
+ICO_SIZES="16 24 32 48 64 128 256"
+if command -v magick >/dev/null 2>&1; then
+    IM=magick
+elif command -v convert >/dev/null 2>&1; then
+    IM=convert
+else
+    echo "ImageMagick (magick o convert) non trovato: $ICO non rigenerata" >&2
+    exit 1
+fi
+set --
+for n in $ICO_SIZES; do
+    set -- "$@" "$OUT/${n}x${n}.png"
+done
+"$IM" "$@" "$ICO"
+echo "icona Windows generata: $ICO ($ICO_SIZES)"

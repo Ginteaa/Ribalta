@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<!-- Manifest di Ribalta, incorporato nell'exe da ribalta.rc (risorsa 1, tipo RT_MANIFEST):
+     codepage UTF-8, DPI per monitor, Windows 10/11, percorsi lunghi, nessuna elevazione.
+     Elementi e namespace: https://learn.microsoft.com/windows/win32/sbscs/application-manifests -->
+<assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0"
+          xmlns:asmv3="urn:schemas-microsoft-com:asm.v3">
+  <assemblyIdentity type="win32" name="io.github.ginteaa.Ribalta" version="1.0.0.0"
+                    processorArchitecture="*"/>
+  <description>Ribalta - orologio flip e timer di studio</description>
+
+  <!-- nessuna elevazione: l'app gira con i permessi dell'utente -->
+  <trustInfo xmlns="urn:schemas-microsoft-com:asm.v2">
+    <security>
+      <requestedPrivileges xmlns="urn:schemas-microsoft-com:asm.v3">
+        <requestedExecutionLevel level="asInvoker" uiAccess="false"/>
+      </requestedPrivileges>
+    </security>
+  </trustInfo>
+
+  <compatibility xmlns="urn:schemas-microsoft-com:compatibility.v1">
+    <application>
+      <!-- Windows 10 e Windows 11 -->
+      <supportedOS Id="{8e0f7a12-bfb3-4fe8-b9a5-48fd50a15a9a}"/>
+    </application>
+  </compatibility>
+
+  <asmv3:application>
+    <asmv3:windowsSettings>
+      <!-- DPI: PerMonitorV2 (Windows 10 1703+), PerMonitor sulle versioni piu' vecchie di Windows 10;
+           dpiAware "true/pm" e' il ripiego per Windows 8.1 (dpiAwareness vince dove e' riconosciuto) -->
+      <dpiAware xmlns="http://schemas.microsoft.com/SMI/2005/WindowsSettings">true/pm</dpiAware>
+      <dpiAwareness xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">PerMonitorV2, PerMonitor</dpiAwareness>
+      <!-- percorsi oltre MAX_PATH (Windows 10 1607+, se abilitato anche nel sistema) -->
+      <ws2:longPathAware xmlns:ws2="http://schemas.microsoft.com/SMI/2016/WindowsSettings">true</ws2:longPathAware>
+      <!-- fopen/getenv/argv in UTF-8 anche con nomi utente non ASCII (Windows 10 1903+) -->
+      <activeCodePage xmlns="http://schemas.microsoft.com/SMI/2019/WindowsSettings">UTF-8</activeCodePage>
+    </asmv3:windowsSettings>
+  </asmv3:application>
+</assembly>

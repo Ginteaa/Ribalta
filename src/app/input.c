@@ -305,7 +305,7 @@ bool input_help_open(const App *a)
 static void open_help(App *a)
 {
     int w, h;
-    char cfg[1024] = "", stats[1024] = "", dir[1024];
+    char cfg[1024] = "", stats[1024] = "";
     if (!a->hui)
         return;
     if (input_panel_open(a))
@@ -314,8 +314,7 @@ static void open_help(App *a)
         close_stats(a);
     if (!paths_config_file(cfg, sizeof cfg))
         cfg[0] = '\0';
-    /* stesso percorso di stats.c (csv_path) */
-    if (paths_data_dir(dir, sizeof dir) && snprintf(stats, sizeof stats, "%s/sessions.csv", dir) >= (int)sizeof stats)
+    if (!paths_sessions_file(stats, sizeof stats))   /* la stessa funzione usata da stats.c */
         stats[0] = '\0';
     pixel_size(a, &w, &h);
     ui_help_open(a->hui, w, h, cfg, stats);

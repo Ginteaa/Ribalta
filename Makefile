@@ -2,7 +2,7 @@
 #   make            build di sviluppo        make V=1   mostra i comandi completi
 #   make release    build ottimizzata        make test  test unitari (senza display)
 #   make install    installa in ~/.local     make uninstall  (le statistiche restano)
-#   make debug      ASan + UBSan             make icons      rigenera le PNG dell'icona
+#   make debug      ASan + UBSan             make icons      rigenera le icone (PNG e assets/ribalta.ico)
 #   make app        macOS: build/Ribalta.app  (make install su macOS la copia in ~/Applications)
 #   make dist       Windows (MSYS2 UCRT64): build/Ribalta-windows-x86_64.zip, cartella portabile con le DLL
 
@@ -12,9 +12,11 @@ PKGS    := sdl3 sdl3-ttf
 PKGFLAGS ?=
 CFLAGS  ?= -std=c17 -Wall -Wextra -Wpedantic -O2
 UNAME_S := $(shell uname -s)
-# EXE: suffisso dell'eseguibile (.exe solo su Windows); GUILD: opzioni di link solo per l'app, non per i test
+# EXE: suffisso dell'eseguibile (.exe solo su Windows); GUILD: opzioni di link solo per l'app, non per i test;
+# RES_OBJ: risorse dell'exe (icona, manifest, versione), compilate con windres solo su Windows
 EXE     :=
 GUILD   :=
+RES_OBJ :=
 
 ifeq ($(OS),Windows_NT)
   # Windows (MSYS2 MinGW-w64 UCRT64; OS e' definita in ogni ambiente Windows, MSYS2 compreso):
@@ -29,6 +31,9 @@ ifeq ($(OS),Windows_NT)
   PLATDEF    := -D__USE_MINGW_ANSI_STDIO=1
   PLATLIBS   := -ladvapi32
   GUILD      := -mwindows
+  # risorse di ribalta.exe: icona, manifest (UTF-8, DPI), versione (ribalta.rc, vedi sotto)
+  WINDRES    ?= windres
+  RES_OBJ    := build/ribalta.res.o
   FONTS_SRC  := src/platform/fonts_win.c
   STRIP_LD   := -s
 else ifeq ($(UNAME_S),Darwin)
@@ -71,9 +76,32 @@ endif
 
 all: $(BIN)
 
-$(BIN): $(OBJ)
+$(BIN): $(OBJ) $(RES_OBJ)
 	$(call say,LD,$@)
 	$(Q)$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDLIBS) $(GUILD)
+
+ifeq ($(OS),Windows_NT)
+# Risorse dell'exe: windres compila packaging/windows/ribalta.rc in un oggetto COFF che si linka
+# solo in ribalta.exe (non nei test). La versione arriva dal file VERSION tramite un header
+# generato (build/ribalta_version.h): niente -D con virgolette, che windres, passandole al
+# preprocessore tramite la shell di Windows, rovina facilmente. VERSION non numerico = 0.0.0.
+RC_SRC       := packaging/windows/ribalta.rc
+RC_VERSION_H := build/ribalta_version.h
+RC_VER       := $(subst ., ,$(VERSION))
+ifneq ($(words $(RC_VER)),3)
+  RC_VER     := 0 0 0
+endif
+
+$(RC_VERSION_H): VERSION
+	@mkdir -p $(dir $@)
+	@printf '#define RIBALTA_VER_MAJOR %s\n#define RIBALTA_VER_MINOR %s\n#define RIBALTA_VER_PATCH %s\n#define RIBALTA_VERSION_STR "%s"\n' \
+	  $(word 1,$(RC_VER)) $(word 2,$(RC_VER)) $(word 3,$(RC_VER)) "$(VERSION)" > $@
+
+$(RES_OBJ): $(RC_SRC) packaging/windows/ribalta.manifest assets/ribalta.ico $(RC_VERSION_H)
+	$(call say,RC,ribalta.rc)
+	@mkdir -p $(dir $@)
+	$(Q)$(WINDRES) -I build -O coff -i $< -o $@
+endif
 
 # main.c contiene RIBALTA_VERSION: si ricompila quando cambia VERSION
 build/main.o: VERSION

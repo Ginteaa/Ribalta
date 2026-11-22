@@ -171,14 +171,26 @@ static void resolve(const bool have[4], const char *src, char *dst, size_t cap)
     dst[o] = '\0';
 }
 
-/* Percorso da mostrare: "~" al posto della home, oppure solo il nome file se mancante. */
+/* Cartella che nei percorsi mostrati si abbrevia: la home ("~") su POSIX, la cartella dei dati
+ * applicativi ("%APPDATA%") su Windows, dove i percorsi non distinguono le maiuscole. */
+#ifdef _WIN32
+#define SHORT_VAR   "APPDATA"
+#define SHORT_LABEL "%APPDATA%"
+#define SHORT_NCMP  SDL_strncasecmp
+#else
+#define SHORT_VAR   "HOME"
+#define SHORT_LABEL "~"
+#define SHORT_NCMP  strncmp
+#endif
+
+/* Percorso da mostrare, con la cartella abbreviata; solo il nome file se il percorso manca. */
 static void display_path(const char *path, const char *fallback, char *out, size_t cap)
 {
     if (!path || !path[0]) { snprintf(out, cap, "%s", fallback); return; }
-    const char *home = getenv("HOME");
-    size_t hl = home ? strlen(home) : 0;
-    if (hl > 1 && strncmp(path, home, hl) == 0 && paths_is_sep(path[hl]))
-        snprintf(out, cap, "~%s", path + hl);
+    const char *base = getenv(SHORT_VAR);
+    size_t bl = base ? strlen(base) : 0;
+    if (bl > 1 && SHORT_NCMP(path, base, bl) == 0 && paths_is_sep(path[bl]))
+        snprintf(out, cap, "%s%s", SHORT_LABEL, path + bl);
     else
         snprintf(out, cap, "%s", path);
 }

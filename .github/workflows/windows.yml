@@ -47,15 +47,52 @@ jobs:
       - name: Unit tests
         run: make test
 
-      - name: Smoke test
+      - name: Smoke test (command line)
         run: |
-          # app GUI: l'output arriva solo se stdout e' un file o una pipe; per ora puo' essere
-          # vuoto (la console per --version e' un altro step), ma l'uscita deve essere 0
+          # app GUI (-mwindows): l'output arriva solo se stdout/stderr sono un file o una pipe
+          # (come qui). Il CRT di Windows scrive i fine riga come \r\n: si tolgono prima di confrontare.
           rc=0
           ./ribalta.exe --version > version.txt 2>&1 || rc=$?
           echo "exit code: $rc"
           echo "--- output"; cat version.txt; echo "---"
           test "$rc" -eq 0
+          test "$(tr -d '\r' < version.txt)" = "ribalta $(cat VERSION)"
+
+          rc=0
+          ./ribalta.exe --help > help.txt 2>&1 || rc=$?
+          echo "--help: exit code $rc"
+          test "$rc" -eq 0
+          grep -q "Uso: ribalta" help.txt
+
+          # su Windows update e uninstall non fanno nulla: spiegano come fare e finiscono con 1
+          for cmd in update uninstall; do
+            rc=0
+            ./ribalta.exe $cmd > "$cmd.txt" 2>&1 || rc=$?
+            echo "$cmd: exit code $rc"; cat "$cmd.txt"
+            test "$rc" -eq 1
+          done
+          grep -q "releases/latest" update.txt
+          grep -q "disinstalla Ribalta" uninstall.txt
+
+          # opzione sconosciuta: messaggio, uso e uscita 2
+          rc=0
+          ./ribalta.exe --opzione-inesistente > bad.txt 2>&1 || rc=$?
+          echo "opzione sconosciuta: exit code $rc"; cat bad.txt
+          test "$rc" -eq 2
+          grep -q "opzione sconosciuta" bad.txt
+
+      - name: Embedded resources (manifest, icon, version)
+        run: |
+          # ribalta.rc: icona, manifest UTF-8/DPI e VERSIONINFO devono stare nell'exe GUI
+          objdump -h ribalta.exe | grep -F ".rsrc"
+          objdump -p ribalta.exe | grep -i "Subsystem" | grep -F "Windows GUI"
+          rsrc=$(objdump -h ribalta.exe | awk '$2 == ".rsrc" { print "0x" $3 }')
+          echo ".rsrc size: $((rsrc)) bytes"
+          test "$((rsrc))" -gt 65536   # le sette dimensioni dell'icona da sole pesano ~370 KB
+          strings -a ribalta.exe | grep -F "activeCodePage"
+          strings -a ribalta.exe | grep -F "PerMonitorV2"
+          strings -a -e l ribalta.exe | grep -F "Ribalta - orologio flip"
+          strings -a -e l ribalta.exe | grep -F "$(cat VERSION)"
 
       - name: Test run
         run: |
@@ -73,11 +110,64 @@ jobs:
             cat run.log; echo "::error::$(tr '\n' '|' < run.log)"; exit 1
           fi
 
+      - name: Startup with APPDATA only (no XDG variables)
+        run: |
+          # come su un PC vero: niente variabili XDG, le impostazioni stanno in %APPDATA%\Ribalta.
+          # All'avvio l'app legge soltanto config.ini e non scrive nulla finche' non si salvano
+          # le impostazioni o non finisce una sessione: si prepara quindi un config.ini con un font
+          # inesistente, che l'app segnala su stderr solo se lo ha letto da %APPDATA%\Ribalta.
+          unset XDG_CONFIG_HOME XDG_DATA_HOME
+          appdata="$(mktemp -d)"
+          mkdir -p "$appdata/Ribalta"
+          printf 'font_file=C:\\nonexistent\\prova.ttf\n' > "$appdata/Ribalta/config.ini"
+          cat "$appdata/Ribalta/config.ini"
+          export APPDATA="$(cygpath -w "$appdata")"
+          RIBALTA_DEBUG=1 ./ribalta.exe > appdata.log 2>&1 &
+          pid=$!
+          sleep 3
+          alive=0
+          if kill -0 "$pid" 2>/dev/null; then alive=1; fi
+          kill "$pid" 2>/dev/null || true
+          taskkill //F //IM ribalta.exe > /dev/null 2>&1 || true
+          wait "$pid" 2>/dev/null || true
+          cat appdata.log
+          echo "--- $appdata"; find "$appdata" -type f
+          test "$alive" -eq 1
+          grep -q "font non trovato: C:.nonexistent.prova.ttf" appdata.log
+
+      - name: Single instance
+        run: |
+          export XDG_CONFIG_HOME="$(cygpath -m "$(mktemp -d)")" XDG_DATA_HOME="$(cygpath -m "$(mktemp -d)")"
+          ./ribalta.exe > first.log 2>&1 &
+          pid=$!
+          sleep 3
+          if ! kill -0 "$pid" 2>/dev/null; then
+            wait "$pid" || true
+            cat first.log; echo "::error::la prima istanza non e' partita"; exit 1
+          fi
+          # la seconda deve uscire subito con 0 e dirlo (mutex Local\Ribalta gia' preso)
+          start=$SECONDS
+          rc=0
+          timeout -s KILL 30 ./ribalta.exe > second.log 2>&1 || rc=$?
+          elapsed=$((SECONDS - start))
+          kill "$pid" 2>/dev/null || true
+          taskkill //F //IM ribalta.exe > /dev/null 2>&1 || true
+          wait "$pid" 2>/dev/null || true
+          echo "seconda istanza: exit code $rc dopo ${elapsed}s"; cat second.log
+          test "$rc" -eq 0
+          test "$elapsed" -lt 15
+          grep -q "in esecuzione" second.log
+
       - name: Portable bundle (make dist)
         run: |
           make dist
           ls -l build/dist/Ribalta build/dist/Ribalta/assets
           ls -l build/Ribalta-windows-x86_64.zip
+          # anche l'exe release (LTO, strippato) deve avere le risorse
+          rsrc=$(objdump -h build/dist/Ribalta/ribalta.exe | awk '$2 == ".rsrc" { print "0x" $3 }')
+          echo ".rsrc size: $((rsrc)) bytes"
+          test "$((rsrc))" -gt 65536
+          strings -a build/dist/Ribalta/ribalta.exe | grep -F "activeCodePage"
 
       - name: Test run of the bundle
         run: |

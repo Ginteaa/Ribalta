@@ -168,6 +168,11 @@ static bool app_init(void)
     SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "wayland,x11");
 #endif
     SDL_SetHint(SDL_HINT_APP_ID, "ribalta");
+#ifdef _WIN32
+    /* icona della finestra e della barra delle applicazioni: risorsa con id 1 di ribalta.rc */
+    SDL_SetHint(SDL_HINT_WINDOWS_INTRESOURCE_ICON, "1");
+    SDL_SetHint(SDL_HINT_WINDOWS_INTRESOURCE_ICON_SMALL, "1");
+#endif
     SDL_SetHint(SDL_HINT_VIDEO_ALLOW_SCREENSAVER, "1");
     /* "gpu" (SDL_GPU: Vulkan su Linux, Metal su macOS) misurato su Linux: ~17 MB PSS contro
      * ~37 MB di opengl. La variabile d'ambiente SDL_RENDER_DRIVER ha comunque la precedenza. */
@@ -315,6 +320,62 @@ static bool acquire_single_instance(void)
 }
 #endif
 
+#ifdef _WIN32
+/* Codepage di uscita della console prima di passare a UTF-8 (0 = non modificata). */
+static UINT g_console_cp;
+
+/* Rimette la codepage originale: la console è condivisa con la shell che ha lanciato Ribalta e
+ * una codepage cambiata resterebbe tale anche dopo. Idempotente; registrata con atexit. */
+static void console_restore_cp(void)
+{
+    if (g_console_cp) {
+        fflush(stdout); /* il testo UTF-8 ancora in buffer va scritto prima del cambio */
+        fflush(stderr);
+        SetConsoleOutputCP(g_console_cp);
+        g_console_cp = 0;
+    }
+}
+
+/* true se stdout/stderr (f) puntano a qualcosa di valido (file, pipe o console). */
+static bool std_stream_valid(DWORD which, FILE *f)
+{
+    HANDLE h = GetStdHandle(which);
+    return h && h != INVALID_HANDLE_VALUE && _fileno(f) >= 0;
+}
+
+/* Ribalta è un'app GUI (-mwindows): lanciata da cmd o PowerShell non ha stdout/stderr, quindi
+ * --version, --help, i comandi e i messaggi d'errore non stampano nulla. Se uno dei due non è
+ * valido ci si aggancia alla console del processo padre (nessuna console nuova: da Esplora
+ * risorse l'aggancio fallisce e non succede nulla) e lo si riapre su CONOUT$. Se l'output è
+ * reindirizzato a un file o a una pipe (ribalta.exe --version > v.txt) gli handle sono validi e
+ * restano quelli: la CI conta su questo. Limite noto: cmd e PowerShell non aspettano le app GUI,
+ * quindi il prompt può tornare prima che il testo compaia. La console viene messa in UTF-8 (i
+ * messaggi sono in italiano) fino a console_release(), poi la codepage torna com'era. */
+static void console_attach(void)
+{
+    bool out_ok = std_stream_valid(STD_OUTPUT_HANDLE, stdout);
+    bool err_ok = std_stream_valid(STD_ERROR_HANDLE, stderr);
+    if ((out_ok && err_ok) || !AttachConsole(ATTACH_PARENT_PROCESS))
+        return;
+    if (!out_ok)
+        freopen("CONOUT$", "w", stdout);
+    if (!err_ok)
+        freopen("CONOUT$", "w", stderr);
+    UINT cp = GetConsoleOutputCP();
+    if (cp && cp != CP_UTF8 && SetConsoleOutputCP(CP_UTF8)) {
+        g_console_cp = cp;
+        atexit(console_restore_cp);
+    }
+}
+
+/* Da chiamare quando l'app sta per aprire la finestra: da qui i messaggi sono rari e in
+ * inglese (SDL), e la shell che ha lanciato Ribalta ritrova la sua codepage mentre l'app gira. */
+static void console_release(void)
+{
+    console_restore_cp();
+}
+#endif
+
 #ifndef RIBALTA_VERSION
 #define RIBALTA_VERSION "dev"
 #endif
@@ -433,6 +494,9 @@ static void usage(FILE *out)
 int main(int argc, char **argv)
 {
     bool screensaver = false;
+#ifdef _WIN32
+    console_attach();
+#endif
     if (argc > 1 && (strcmp(argv[1], "update") == 0 || strcmp(argv[1], "uninstall") == 0))
         run_subcommand(argv[1], argc, argv);
     for (int i = 1; i < argc; i++) {
@@ -477,6 +541,9 @@ int main(int argc, char **argv)
             fprintf(stderr, "ribalta: font non trovato: %s, uso il font incluso\n", app.cfg.font_file);
     }
     int rc = 1;
+#ifdef _WIN32
+    console_release();
+#endif
     if (app_init() && app_open(&app)) {
         main_loop(&app);
         if (!app.screensaver) {
